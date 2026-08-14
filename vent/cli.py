@@ -50,13 +50,13 @@ def inspect(app_name: str, depth: int, max_nodes: int, menus: bool) -> None:
     try:
         app = ax.find_app(app_name)
         root = ax.app_element(app)
-        nodes = snapshot(root, max_depth=depth, max_nodes=max_nodes, include_menus=menus)
+        snap = snapshot(root, max_depth=depth, max_nodes=max_nodes, include_menus=menus)
     except ax.AXError as exc:
         click.secho(str(exc), fg="red")
         sys.exit(1)
 
-    click.secho(f"{app.name} (pid {app.pid}) — {len(nodes)} elements", bold=True)
-    click.echo(render(nodes))
+    click.secho(f"{app.name} (pid {app.pid}): {len(snap.nodes)} elements", bold=True)
+    click.echo(render(snap))
 
 
 @main.command()
@@ -70,11 +70,11 @@ def act(app_name: str, node_id: int, action_name: str, menus: bool, text: str | 
     try:
         app = ax.find_app(app_name)
         root = ax.app_element(app)
-        nodes = snapshot(root, include_menus=menus)
-        if node_id >= len(nodes):
-            click.secho(f"No element #{node_id} (snapshot has {len(nodes)}).", fg="red")
+        snap = snapshot(root, include_menus=menus)
+        if node_id >= len(snap.nodes):
+            click.secho(f"No element #{node_id} (snapshot has {len(snap.nodes)}).", fg="red")
             sys.exit(1)
-        node = nodes[node_id]
+        node = snap.nodes[node_id]
         if text is not None:
             node.element.set_value(text)
             click.secho(f"✓ Set value of #{node_id} {node.role} {node.label!r}", fg="green")
