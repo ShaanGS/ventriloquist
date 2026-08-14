@@ -60,8 +60,18 @@ def _display_value(element: Element) -> str:
     return text if len(text) <= 80 else text[:77] + "..."
 
 
-def snapshot(root: Element, max_depth: int = 25, max_nodes: int = 800) -> list[Node]:
-    """Walk the tree and return surfaced nodes with stable ids and paths."""
+def snapshot(
+    root: Element,
+    max_depth: int = 25,
+    max_nodes: int = 800,
+    include_menus: bool = False,
+) -> list[Node]:
+    """Walk the tree and return surfaced nodes with stable ids and paths.
+
+    The menu bar is skipped by default — it dwarfs window content (a plain
+    Finder snapshot is ~75 menu items before the first window element) and
+    deserves its own targeted exploration pass.
+    """
     nodes: list[Node] = []
 
     def visit(element: Element, path: tuple[int, ...], depth: int, shown_depth: int) -> None:
@@ -91,6 +101,8 @@ def snapshot(root: Element, max_depth: int = 25, max_nodes: int = 800) -> list[N
             )
 
         for index, child in enumerate(element.children()):
+            if depth == 0 and not include_menus and child.role == "AXMenuBar":
+                continue
             visit(child, path + (index,), depth + 1, shown_depth + (1 if interesting else 0))
 
     visit(root, (), 0, 0)
