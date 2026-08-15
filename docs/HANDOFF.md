@@ -133,6 +133,17 @@ first polite terminate and honor a repeat (the harness re-asks).
 An outside review (August 2026) landed several points now reflected in
 the code and docs, plus a queue of open work in priority order:
 
+0. The Slack numbers exist now, and the thesis holds: 95% baseline,
+   82.5% resized, 82.5% after a full restart, zero wrong bindings over
+   40 anchors, with no identifiers anywhere in the tree. Slack needs
+   `--force-renderer-accessibility` like VS Code (readable but
+   action-deaf without it), serves only an open modal's subtree while a
+   promo overlay is up, and its composer and search are the two text
+   inputs. Figma desktop probed as the expected worst case: usable shell
+   chrome, opaque pixel canvas. Next Slack step is a pack: channel
+   navigation plus a parameter-bound select is what send_message_to
+   needs, and the DM list is virtualized, so select must compose with
+   scrolling.
 1. Portability is the untested load-bearing claim. Packs carry window
    titles and chain ordinals that may be coupled to one machine's state.
    AppKit identifiers ship in compiled nibs and should travel; Electron

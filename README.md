@@ -116,7 +116,23 @@ Numbers from this machine (macOS 26, small anchor sets, early days):
 TextEdit: baseline 100%,  resized 100%,   0 wrong
 Finder:   baseline 100%,  resized 100%,   0 wrong
 VS Code:  baseline  95%,  resized  87.5%, restart 92.5%, 0 wrong  (40 anchors)
+Slack:    baseline  95%,  resized  82.5%, restart 82.5%, 0 wrong  (40 anchors)
 ```
+
+Slack matters here more than the others. TextEdit and Finder have
+AppleScript, VS Code has a CLI and an extension API, so the apps that
+justify this project are the ones with no scripting surface at all, and
+Slack is the first of those measured. Its tree has no identifiers
+anywhere, so anchors ride entirely on labels and ancestor chains, and
+they still come back with zero wrong bindings across resize and a full
+restart. Every non-survivor is an ambiguity refusal.
+
+Figma desktop is the deliberate worst case and it behaves like one: the
+app shell (tabs, navigation, buttons) publishes a usable tree, and the
+design canvas publishes nothing, because it's rendered pixels. That's
+the honest boundary of the accessibility thesis. Apps whose content is
+a custom-drawn canvas keep their chrome scriptable and their content
+opaque.
 
 The VS Code restart round quits and relaunches the app completely, and 37
 of 40 anchors still bind to provably the same element afterward. The ones
