@@ -48,6 +48,15 @@ def test_label_change_tolerated_when_identifier_confirms():
     assert _identity_verdict(record, toggled) == "same"
 
 
+def test_dead_ref_is_stale_not_wrong():
+    """A ref whose every attribute reads empty is a node the app tore down
+    between resolution and the verdict read (Chromium does this while
+    settling after launch). That is churn, not a lookalike binding."""
+    record = record_for(label="Go Back")
+    dead = FakeElement("", "")
+    assert _identity_verdict(record, dead) == "stale"
+
+
 def test_pick_nodes_prefers_actionable_and_identified():
     snap = snapshot(textedit_like())
     picked = _pick_nodes(snap.nodes, cap=3)

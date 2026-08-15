@@ -131,6 +131,12 @@ def _identity_verdict(record: AnchorRecord, element: ax.Element) -> str:
     """
     if not (record.identifier or record.label or record.subrole):
         return "unverifiable"
+    if not element.role:
+        # Every attribute of a dead ref reads empty. The element existed
+        # when the resolver walked (it scored a role match) and vanished
+        # before this read; Chromium recreates nodes while an app is still
+        # settling after launch. That is churn, not a lookalike binding.
+        return "stale"
     if element.role != record.role:
         return "wrong"
     identifier = str(element.attribute("AXIdentifier") or "")
@@ -147,6 +153,10 @@ def _identity_verdict(record: AnchorRecord, element: ax.Element) -> str:
 
 
 def _resolve_round(name: str, root: ax.Element, records: list[AnchorRecord]) -> RoundResult:
+    # A locked screen makes every app serve an empty tree, which would
+    # score here as total anchor loss. Say what actually happened instead.
+    if ax.session_locked():
+        return RoundResult(name=name, note="screen locked; round skipped")
     result = RoundResult(name=name)
     for record in records:
         try:
@@ -165,6 +175,8 @@ def _resolve_round(name: str, root: ax.Element, records: list[AnchorRecord]) -> 
             result.resolved += 1
         elif verdict == "unverifiable":
             result.unverifiable += 1
+        elif verdict == "stale":
+            result.lost += 1
         else:
             result.wrong += 1
     return result
@@ -285,13 +297,19 @@ def run(app_query: str, cap: int = 40, restart: bool = False, reopen: str | None
         # Termination is asynchronous and heavyweight apps quit slowly.
         # Relaunching before the old process exits re-binds the dying pid
         # and every later read comes back empty, so wait it out first.
-        deadline = time.monotonic() + 20.0
+        # Electron apps have been seen ignoring the first polite quit and
+        # honoring a repeat, so keep asking; never escalate to force-kill.
+        deadline = time.monotonic() + 60.0
+        last_ask = time.monotonic()
         while time.monotonic() < deadline:
             try:
                 if ax.find_app_by_bundle(app.bundle_id).pid != app.pid:
                     break
             except ax.AXError:
                 break
+            if time.monotonic() - last_ask >= 5.0:
+                ax.terminate(app)
+                last_ask = time.monotonic()
             time.sleep(0.5)
         launch = ["open", "-b", app.bundle_id]
         if reopen:

@@ -90,9 +90,11 @@ def session_locked() -> bool:
 
     A locked screen makes every app serve an empty tree while permission
     checks still pass, a combination that reads as "this app is broken"
-    until you know to look. Quartz is queried lazily and any failure
-    reports unlocked, so this stays a diagnostic aid, never a gate."""
-    _require_pyobjc()
+    until you know to look. Quartz is queried lazily and any failure,
+    including running off macOS, reports unlocked, so this stays a
+    diagnostic aid, never a gate."""
+    if not _PYOBJC_AVAILABLE:
+        return False
     try:
         from Quartz import CGSessionCopyCurrentDictionary
 
@@ -121,6 +123,15 @@ class RunningApp:
 def running_apps() -> list[RunningApp]:
     """List regular (Dock-visible) running applications."""
     _require_pyobjc()
+    # NSWorkspace's running-application list is maintained by KVO on the
+    # run loop. A headless process that never pumps the loop sees the list
+    # frozen at first access: quit apps stay listed, relaunched ones never
+    # appear. Found when the harness polled for a restarted VS Code for a
+    # full minute while ps showed it had already come back. One brief pump
+    # keeps every read current.
+    from Cocoa import NSDate, NSRunLoop
+
+    NSRunLoop.currentRunLoop().runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(0.05))
     apps = []
     for app in NSWorkspace.sharedWorkspace().runningApplications():
         # activationPolicy 0 == NSApplicationActivationPolicyRegular
