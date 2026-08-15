@@ -32,6 +32,8 @@ from mcp.server.stdio import stdio_server
 
 from . import ax, packs, runtime
 
+LOCK_TIMEOUT_S = 180.0
+
 
 def _slug(name: str) -> str:
     return "".join(c if c.isalnum() else "_" for c in name.lower()).strip("_")
@@ -51,6 +53,17 @@ def _tool_schema(spec: packs.ToolSpec) -> dict:
     }
 
 
+def risk_refusal(spec: packs.ToolSpec, allow_high: bool) -> str | None:
+    """The refusal message for a tool call, or None if it may proceed.
+    Split out of the handler so the gate is unit-testable."""
+    if spec.risk == "high" and not allow_high:
+        return (
+            f"{spec.name} is a high risk tool and this server was not started "
+            "with VENT_ALLOW_HIGH=1. Refusing."
+        )
+    return None
+
+
 def _error(text: str) -> types.CallToolResult:
     return types.CallToolResult(
         content=[types.TextContent(type="text", text=text)],
@@ -59,15 +72,26 @@ def _error(text: str) -> types.CallToolResult:
 
 
 def build_server(packs_dir: Path) -> Server:
-    loaded = packs.load_all(packs_dir)
+    try:
+        loaded = packs.load_all(packs_dir)
+    except packs.PackError as exc:
+        raise SystemExit(f"Pack failed to load: {exc}") from exc
     if not loaded:
         raise SystemExit(f"No packs found under {packs_dir}. Author or compile one first.")
 
-    # (mcp tool name) -> (pack, spec)
+    # (mcp tool name) -> (pack, spec). Names use the app name for
+    # readability; collisions are an error, never a silent overwrite.
     registry: dict[str, tuple[packs.Pack, packs.ToolSpec]] = {}
     for pack in loaded:
         for spec in pack.tools:
-            registry[f"{_slug(pack.app_name)}_{spec.name}"] = (pack, spec)
+            key = f"{_slug(pack.app_name)}_{spec.name}"
+            if key in registry:
+                other = registry[key][0]
+                raise SystemExit(
+                    f"Tool name collision: {key} is defined by both "
+                    f"{other.bundle_id} and {pack.bundle_id}. Rename one tool."
+                )
+            registry[key] = (pack, spec)
 
     locks: dict[str, threading.Lock] = {pack.bundle_id: threading.Lock() for pack in loaded}
     allow_high = os.getenv("VENT_ALLOW_HIGH") == "1"
@@ -90,21 +114,30 @@ def build_server(packs_dir: Path) -> Server:
             return _error(f"Unknown tool {name!r}")
         pack, spec = registry[name]
 
-        if spec.risk == "high" and not allow_high:
-            return _error(
-                f"{name} is a high risk tool and this server was not started with "
-                "VENT_ALLOW_HIGH=1. Refusing."
-            )
+        refusal = risk_refusal(spec, allow_high)
+        if refusal is not None:
+            return _error(refusal)
 
         def run_locked() -> runtime.ToolResult:
             # One tool call per app at a time, held for the whole call.
-            with locks[pack.bundle_id]:
-                app = ax.find_app(pack.app_name)
-                root = ax.app_element(app)
-                low_confidence = packs.is_stale(pack, app_version="")
-                return runtime.execute(
-                    pack, spec.name, arguments, root, low_confidence=low_confidence
+            # The acquire has a deadline so one hung app cannot queue
+            # callers forever (ARCHITECTURE.md section 7).
+            lock = locks[pack.bundle_id]
+            if not lock.acquire(timeout=LOCK_TIMEOUT_S):
+                raise runtime.ToolExecutionError(
+                    f"{name}: another tool call against {pack.app_name} has been "
+                    f"running for over {LOCK_TIMEOUT_S:.0f}s. Giving up on the queue."
                 )
+            try:
+                app = ax.find_app_by_bundle(pack.bundle_id)
+                root = ax.app_element(app)
+                low_confidence = packs.is_stale(pack, ax.app_version(app))
+                return runtime.execute(
+                    pack, spec.name, arguments, root,
+                    app=app, low_confidence=low_confidence,
+                )
+            finally:
+                lock.release()
 
         try:
             result = await anyio.to_thread.run_sync(run_locked)
@@ -112,6 +145,8 @@ def build_server(packs_dir: Path) -> Server:
             # The message names the app, tool, and step, which is what
             # "fail loudly" means in SECURITY.md.
             return _error(str(exc))
+        except Exception as exc:  # never leak a bare traceback to the client
+            return _error(f"{name}: internal error: {exc!r}")
 
         text = f"{pack.app_name}.{spec.name} succeeded: {result.detail}"
         if result.values:

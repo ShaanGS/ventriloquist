@@ -127,3 +127,48 @@ def test_truncation_is_explicit():
     tree = textedit_like()
     snap = snapshot(tree, max_nodes=1)
     assert snap.truncated
+
+
+def test_conflicting_identifier_disqualifies_even_as_sole_candidate():
+    tree = textedit_like()
+    anchor = anchor_for(tree, identifier="doc-body")
+    body = tree.children()[0].children()[2].children()[0]
+    # A different non-empty identifier means a different element, even if
+    # everything structural matches perfectly.
+    body._identifier = "some-other-element"
+    with pytest.raises(anchors.AnchorLost):
+        anchors.resolve(tree, anchor)
+
+
+def test_recorded_window_title_penalizes_lookalike_window():
+    # Two structurally identical document windows; the anchor was recorded
+    # in one of them. With only the other window open, structure alone
+    # matches perfectly, and only the window title says it is the wrong
+    # document. Resolution must refuse rather than overwrite it.
+    def make_window(title, body_value):
+        return FakeElement(
+            "AXWindow",
+            title,
+            children=[
+                FakeElement(
+                    "AXScrollArea",
+                    children=[FakeElement("AXTextArea", value=body_value)],
+                )
+            ],
+        )
+
+    tree = FakeElement("AXApplication", "TextEdit", children=[make_window("notes.txt", "a")])
+    anchor = anchor_for(tree, role="AXTextArea")
+    assert anchor.window_title == "notes.txt"
+
+    wrong = FakeElement(
+        "AXApplication", "TextEdit", children=[make_window("taxes.txt", "b")]
+    )
+    with pytest.raises((anchors.AnchorLost, anchors.AnchorAmbiguous)):
+        anchors.resolve(wrong, anchor)
+
+
+def test_same_window_title_still_resolves():
+    tree = textedit_like()
+    anchor = anchor_for(tree, identifier="doc-body")
+    assert anchors.resolve(tree, anchor).value == "hello"

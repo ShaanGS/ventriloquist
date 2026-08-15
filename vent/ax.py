@@ -2,8 +2,15 @@
 
 Everything Ventriloquist knows about a running app flows through this module.
 It wraps the C-style AXUIElement API from ApplicationServices into a small
-`Element` class that supports attribute reads, action invocation, and stable
-path addressing — the foundation for deterministic replay.
+`Element` class that supports attribute reads, action invocation, and app
+lookup, the foundation the snapshot and anchor layers build on.
+
+Error semantics matter here and were a review finding: the AX API returns
+distinct error codes for "this attribute does not exist" versus "the app is
+not responding right now", and collapsing them both to None makes a busy app
+look like an empty app. Attribute-level absences return None; process-level
+failures raise AXTransientError so callers can abort instead of acting on a
+tree that is not really empty.
 """
 
 from __future__ import annotations
@@ -19,13 +26,32 @@ from ApplicationServices import (
     AXUIElementCreateApplication,
     AXUIElementPerformAction,
     AXUIElementSetAttributeValue,
+    AXUIElementSetMessagingTimeout,
     kAXErrorSuccess,
 )
-from Cocoa import NSRunningApplication, NSWorkspace
+from Cocoa import NSBundle, NSRunningApplication, NSWorkspace
+
+# AX error codes that matter to us. Values from AXError.h.
+AX_ERROR_API_DISABLED = -25211
+AX_ERROR_CANNOT_COMPLETE = -25204
+AX_ERROR_ATTRIBUTE_UNSUPPORTED = -25205
+AX_ERROR_NO_VALUE = -25212
+AX_ERROR_INVALID_ELEMENT = -25202
+AX_ERROR_NOT_IMPLEMENTED = -25208
+
+# A hung app blocks each AX call for 6 seconds by default. One second is
+# plenty for a healthy app and turns a beachballing one into a fast,
+# explicit failure instead of a slow mysterious one.
+MESSAGING_TIMEOUT_S = 1.0
 
 
 class AXError(RuntimeError):
     """Raised when an accessibility call fails in a way we can't ignore."""
+
+
+class AXTransientError(AXError):
+    """The target app is busy, hung, or gone. The tree is not readable right
+    now; nothing should be concluded from partial reads."""
 
 
 class NotTrustedError(AXError):
@@ -41,7 +67,7 @@ def require_trusted() -> None:
     if not is_trusted():
         raise NotTrustedError(
             "This process is not trusted for Accessibility. Grant access in "
-            "System Settings → Privacy & Security → Accessibility (add your "
+            "System Settings, Privacy & Security, Accessibility (add your "
             "terminal app), then rerun."
         )
 
@@ -71,7 +97,12 @@ def running_apps() -> list[RunningApp]:
 
 
 def find_app(name_or_bundle: str) -> RunningApp:
-    """Find a running app by (case-insensitive) name or bundle id."""
+    """Find a running app by (case-insensitive) name or bundle id.
+
+    Matching is exact-first, substring-last. Callers that know the bundle id
+    should use find_app_by_bundle instead; substring matching is a
+    convenience for humans typing CLI commands, not for packs.
+    """
     needle = name_or_bundle.strip().lower()
     candidates = running_apps()
     for app in candidates:
@@ -89,11 +120,62 @@ def find_app(name_or_bundle: str) -> RunningApp:
     )
 
 
+def find_app_by_bundle(bundle_id: str) -> RunningApp:
+    """Find a running app by exact bundle id. Packs resolve apps this way:
+    a pack for com.apple.Notes must never attach to 'Notes Plus' just
+    because the names look alike."""
+    needle = bundle_id.strip().lower()
+    for app in running_apps():
+        if app.bundle_id and app.bundle_id.lower() == needle:
+            return app
+    raise AXError(f"No running application with bundle id {bundle_id!r}. Is the app open?")
+
+
+def app_version(app: RunningApp) -> str:
+    """The app's CFBundleShortVersionString, or empty if unreadable.
+    Packs record this at compile time and compare it at load time to
+    detect staleness."""
+    ns_app = NSRunningApplication.runningApplicationWithProcessIdentifier_(app.pid)
+    if ns_app is None or ns_app.bundleURL() is None:
+        return ""
+    bundle = NSBundle.bundleWithURL_(ns_app.bundleURL())
+    if bundle is None:
+        return ""
+    version = bundle.objectForInfoDictionaryKey_("CFBundleShortVersionString")
+    return str(version) if version else ""
+
+
+def frontmost_app() -> Optional[RunningApp]:
+    ns_app = NSWorkspace.sharedWorkspace().frontmostApplication()
+    if ns_app is None:
+        return None
+    return RunningApp(
+        name=str(ns_app.localizedName() or ""),
+        bundle_id=str(ns_app.bundleIdentifier()) if ns_app.bundleIdentifier() else None,
+        pid=int(ns_app.processIdentifier()),
+    )
+
+
+def activate(app: RunningApp) -> bool:
+    """Bring the app frontmost. Returns False if the process is gone."""
+    ns_app = NSRunningApplication.runningApplicationWithProcessIdentifier_(app.pid)
+    if ns_app is None:
+        return False
+    return bool(ns_app.activateWithOptions_(0))
+
+
 def _ax_get(element: Any, attribute: str) -> Any:
     err, value = AXUIElementCopyAttributeValue(element, attribute, None)
-    if err != kAXErrorSuccess:
-        return None
-    return value
+    if err == kAXErrorSuccess:
+        return value
+    if err in (AX_ERROR_CANNOT_COMPLETE, AX_ERROR_API_DISABLED):
+        raise AXTransientError(
+            f"App is not answering accessibility queries (AXError {err}). "
+            "It may be busy or hung; retry when it responds."
+        )
+    # Attribute unsupported, no value, element destroyed mid-walk, or not
+    # implemented: all mean "nothing here", which None expresses honestly.
+    return None
 
 
 class Element:
@@ -185,4 +267,6 @@ class Element:
 def app_element(app: RunningApp) -> Element:
     """Root accessibility element for a running application."""
     require_trusted()
-    return Element(AXUIElementCreateApplication(app.pid))
+    ref = AXUIElementCreateApplication(app.pid)
+    AXUIElementSetMessagingTimeout(ref, MESSAGING_TIMEOUT_S)
+    return Element(ref)

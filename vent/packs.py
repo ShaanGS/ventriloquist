@@ -63,7 +63,7 @@ class Step:
         if op not in OPS:
             raise PackError(f"{where}: unknown op {op!r}. Allowed: {sorted(OPS)}")
         anchor = Anchor.from_dict(data["anchor"]) if "anchor" in data else None
-        if op in {"press", "set_value", "pick", "reveal", "read_value"} and anchor is None:
+        if op in {"press", "set_value", "pick", "reveal", "read_value", "wait_for"} and anchor is None:
             raise PackError(f"{where}: op {op!r} requires an anchor")
         return cls(
             op=op,
@@ -203,6 +203,8 @@ class Pack:
             raise PackError(f"unsupported pack format_version {version!r}, expected {FORMAT_VERSION}")
         if not data.get("bundle_id"):
             raise PackError("pack is missing bundle_id")
+        if not data.get("app_name"):
+            raise PackError("pack is missing app_name")
         tools = [ToolSpec.from_dict(t) for t in data.get("tools", [])]
         names = [t.name for t in tools]
         if len(names) != len(set(names)):
@@ -223,7 +225,10 @@ def load(path: Path) -> Pack:
         data = json.loads(Path(path).read_text())
     except json.JSONDecodeError as exc:
         raise PackError(f"{path} is not valid JSON: {exc}") from exc
-    return Pack.from_dict(data)
+    try:
+        return Pack.from_dict(data)
+    except PackError as exc:
+        raise PackError(f"{path}: {exc}") from exc
 
 
 def save(pack: Pack, path: Path) -> None:

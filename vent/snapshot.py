@@ -52,6 +52,11 @@ ALWAYS_SHOW_ROLES = {
 
 SECURE_SUBROLE = "AXSecureTextField"
 
+# One depth limit shared by snapshot walks and anchor resolution. If the
+# two disagreed, an anchor minted from a deep inspect could describe an
+# element the resolver structurally cannot reach.
+MAX_TREE_DEPTH = 25
+
 VALUE_PREVIEW_LIMIT = 80
 
 
@@ -137,7 +142,7 @@ def _has_sheet(window: Element) -> bool:
 
 def snapshot(
     root: Element,
-    max_depth: int = 25,
+    max_depth: int = MAX_TREE_DEPTH,
     max_nodes: int = 800,
     include_menus: bool = False,
 ) -> Snapshot:

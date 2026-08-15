@@ -56,6 +56,27 @@ class FakeElement:
         return f"<FakeElement {self.role} {self.label!r}>"
 
 
+class TickingElement(FakeElement):
+    """A fake whose value reads differently for the first `ticks` reads,
+    then holds still. Lets settle() tests exercise the change-then-quiet
+    path without threads or a real app."""
+
+    def __init__(self, *args, ticks: int = 0, **kwargs):
+        self._ticks_left = ticks
+        super().__init__(*args, **kwargs)
+
+    @property
+    def value(self):
+        if self._ticks_left > 0:
+            self._ticks_left -= 1
+            return f"changing-{self._ticks_left}"
+        return self._value
+
+    @value.setter
+    def value(self, v):
+        self._value = v
+
+
 def textedit_like() -> FakeElement:
     """A tree shaped like TextEdit: one window, toolbar buttons, a text area."""
     return FakeElement(

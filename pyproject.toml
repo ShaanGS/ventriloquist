@@ -4,10 +4,11 @@ version = "0.1.0"
 description = "Compile any Mac app into an MCP server: explore once, get typed tools backed by deterministic accessibility replay."
 requires-python = ">=3.11"
 dependencies = [
-    "pyobjc-framework-Cocoa>=10.0",
-    "pyobjc-framework-ApplicationServices>=10.0",
+    "pyobjc-framework-Cocoa>=10.0; sys_platform == 'darwin'",
+    "pyobjc-framework-ApplicationServices>=10.0; sys_platform == 'darwin'",
     "click>=8.1",
-    "mcp>=1.2",
+    "mcp>=2.0,<3",
+    "anyio>=4.0",
 ]
 
 [project.scripts]

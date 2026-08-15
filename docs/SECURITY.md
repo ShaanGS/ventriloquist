@@ -25,8 +25,9 @@ our own runtime. `read_value` is the one op that moves data outward: it
 returns an element's live value to the tool caller. It mutates nothing, but
 it is how app content reaches an MCP client, so T6's scrubbing rules apply
 to it and it is never valid against a secure field (T4 removes those before
-any op can see them). No op runs code, shell commands, or AppleScript. Adding an op is a
-breaking change to this threat model and requires updating it first. Model
+any op can see them). No op runs code, shell commands, or AppleScript.
+Adding an op is a breaking change to this threat model and requires
+updating it first. Model
 output is parsed against a JSON schema; anything outside it is rejected.
 
 ### T2. Destructive writes without a destructive verb
@@ -114,9 +115,10 @@ Containment therefore has one more layer than before:
 ### T6. Personal data leaving the machine
 
 Snapshots are the only thing ever sent to a model, scrubbed first: secure
-fields dropped, values truncated to short previews, and `--no-values`
-strips values entirely. Truncation is a privacy measure, not an injection
-defense (short payloads survive truncation; T5 handles that). Traces and
+fields dropped and values truncated to short previews. A `--no-values`
+flag that strips values entirely ships with the explorer; until then no
+snapshot is sent to any model at all. Truncation is a privacy measure, not
+an injection defense (short payloads survive truncation; T5 handles that). Traces and
 packs stay on local disk. No telemetry. All network calls live in
 `vent/llm.py`, one file to audit.
 
@@ -131,8 +133,9 @@ Staleness is the more common corruption: the app updated overnight and the
 pack is now wrong about the world. Packs record app version, macOS version,
 and locale at compile time. On mismatch, anchors load as low-confidence
 (raising the resolver's ambiguity bar, making it fail toward the healer
-rather than toward a plausible wrong element) and `vent verify <app>`
-dry-resolves every anchor to report durability without executing anything.
+rather than toward a plausible wrong element). The planned `vent verify`
+command will dry-resolve every anchor to report durability without
+executing anything.
 
 ### T8. The healer rewriting packs
 

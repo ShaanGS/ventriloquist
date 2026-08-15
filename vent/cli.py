@@ -29,7 +29,7 @@ def main() -> None:
 def doctor() -> None:
     """Check that Ventriloquist can use the Accessibility API."""
     if ax.is_trusted():
-        click.secho("✓ Accessibility permission granted — ready to go.", fg="green")
+        click.secho("✓ Accessibility permission granted. Ready to go.", fg="green")
     else:
         click.secho("✗ Accessibility permission missing.", fg="red")
         click.echo(
@@ -81,6 +81,7 @@ def act(app_name: str, node_id: int, action_name: str, menus: bool, text: str | 
             click.secho(f"No element #{node_id} (snapshot has {len(snap.nodes)}).", fg="red")
             sys.exit(1)
         node = snap.nodes[node_id]
+        click.echo(f"acting on: #{node.id} {node.role} {node.label!r} in {node.window_title!r}")
         if text is not None:
             node.element.set_value(text)
             click.secho(f"✓ Set value of #{node_id} {node.role} {node.label!r}", fg="green")
@@ -113,10 +114,14 @@ def anchor(app_name: str, node_id: int, menus: bool) -> None:
 
 
 def _find_pack(name: str) -> packs.Pack:
-    for pack in packs.load_all(PACKS_DIR):
+    try:
+        loaded = packs.load_all(PACKS_DIR)
+    except packs.PackError as exc:
+        raise click.ClickException(str(exc))
+    for pack in loaded:
         if name.lower() in {pack.bundle_id.lower(), pack.app_name.lower()}:
             return pack
-    available = ", ".join(p.app_name for p in packs.load_all(PACKS_DIR)) or "none"
+    available = ", ".join(p.app_name for p in loaded) or "none"
     raise click.ClickException(f"No pack for {name!r}. Available: {available}")
 
 
@@ -135,9 +140,12 @@ def run(app_name: str, tool_name: str, arg_pairs: tuple[str, ...]) -> None:
         args[key] = value
 
     try:
-        app = ax.find_app(pack.app_name)
+        app = ax.find_app_by_bundle(pack.bundle_id)
         root = ax.app_element(app)
-        result = runtime.execute(pack, tool_name, args, root)
+        low_confidence = packs.is_stale(pack, ax.app_version(app))
+        result = runtime.execute(
+            pack, tool_name, args, root, app=app, low_confidence=low_confidence
+        )
     except (ax.AXError, runtime.ToolExecutionError, packs.PackError) as exc:
         click.secho(f"✗ {exc}", fg="red")
         sys.exit(1)
@@ -149,7 +157,11 @@ def run(app_name: str, tool_name: str, arg_pairs: tuple[str, ...]) -> None:
 
 @main.command()
 def serve() -> None:
-    """Serve every compiled pack as MCP tools over stdio."""
+    """Serve every compiled pack as MCP tools over stdio.
+
+    High risk tools are refused unless the server was started with
+    VENT_ALLOW_HIGH=1 in the environment. See docs/SECURITY.md.
+    """
     from .server import serve_stdio
 
     serve_stdio(PACKS_DIR)

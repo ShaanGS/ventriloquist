@@ -70,16 +70,17 @@ the code must know which one it is talking to.
 - **Chromium and Electron hosts** (Spotify, Slack, VS Code, Discord): the
   renderer's accessibility tree is OFF by default and is only built when an
   assistive client signals demand. Before snapshotting these apps, `ax.py`
-  sets `AXManualAccessibility` and `AXEnhancedUserInterface` to true on the
-  app element and waits for the web area to populate. This has a real side
-  effect (the app spends more CPU on accessibility until relaunch) and is
+  must set `AXManualAccessibility` and `AXEnhancedUserInterface` to true on
+  the app element and wait for the web area to populate (planned for the
+  same milestone as the first Electron pack). This has a real side effect
+  (the app spends more CPU on accessibility until relaunch) and is
   documented as such.
 - **Catalyst and SwiftUI** apps: trees exist but lean heavily on
   `AXIdentifier` rather than labels, which the anchor design already prefers.
 
-`vent doctor <app>` probes and reports which class an app falls into and
-whether a usable tree came up. No app is promised in a milestone until this
-probe has passed against it.
+A planned `vent doctor <app>` probe will report which class an app falls
+into and whether a usable tree came up. No app is promised in a milestone
+until this probe has passed against it.
 
 ## 5. Core concepts
 
@@ -179,7 +180,7 @@ Notes on the shape:
   the app from a generic state to the tool's required state. Preambles are
   first-class steps, not assumptions.
 - Step ops are a closed set: `press`, `set_value`, `pick`, `reveal`,
-  `raise_window`, `open_app`, `wait_for`. `reveal` exists because lazily
+  `raise_window`, `open_app`, `wait_for`, `read_value`. `reveal` exists because lazily
   populated lists (every table in every Electron app, most AppKit outlines)
   only expose visible rows; it scrolls a target into existence via
   `AXScrollToVisible` or selection APIs. There is deliberately no `exec`, no
@@ -191,8 +192,8 @@ A versioned JSON file per app: `packs/<bundle-id>/pack.json`. Besides the
 ToolSpecs it records the compile-time environment: app version
 (`CFBundleShortVersionString`), macOS version, and locale. On load, a
 mismatch marks every anchor low-confidence (which raises the resolver's
-ambiguity bar) and `vent verify <app>` can dry-resolve every anchor without
-executing a step, reporting a durability percentage. Packs are
+ambiguity bar). A planned `vent verify <app>` command will dry-resolve every
+anchor without executing a step and report a durability percentage. Packs are
 human-readable and human-editable on purpose; hand-writing one is the
 supported way to bootstrap an app, and it is how the first end-to-end slice
 gets built.
@@ -281,7 +282,8 @@ Built last (section 10 explains the order). Three phases, strictly ordered:
    labeled as such at the approval gate, capped by the probe budget, and
    pointed at a user-designated scratch document where the app supports one.
 
-The human gate: `vent compile` shows each proposed tool two ways. The
+The human gate: the planned `vent compile` command shows each proposed
+tool two ways. The
 model's name and description, and below it a deterministic, non-model
 rendering of the actual steps (app, window, element role and label, op).
 The deterministic rendering is the ground truth a poisoned description

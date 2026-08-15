@@ -10,13 +10,23 @@ the contract; the short version:
   that ends in "search the window for the role" will happily bind the wrong
   element and report success, which is worse than failing.
 - An anchor resolves only when the best candidate clears an accept
-  threshold AND beats the runner-up by a clear margin. Two close candidates
-  raise AnchorAmbiguous. No viable candidate raises AnchorLost. Both are
-  the healer's cue. Guessing is banned.
-- Identifiers outrank labels. Labels are localized and state-dependent (a
-  Play button relabels itself Pause); AXIdentifier is set by developers and
-  survives both. Labels still matter, so an anchor remembers every label it
-  has seen the element wear.
+  threshold AND beats the runner-up by a margin. Two close candidates raise
+  AnchorAmbiguous; zero viable candidates raise AnchorLost. Both are the
+  healer's cue. Guessing is banned.
+- Identifiers outrank labels, and a conflicting identifier disqualifies:
+  when the anchor recorded an identifier and the candidate carries a
+  different non-empty one, that candidate is a different element, not a
+  degraded match. Labels are localized and state-dependent (a Play button
+  relabels itself Pause), so an anchor remembers every label it has seen
+  the element wear and treats them as hints.
+- Window identity is scored explicitly. AppKit window identifiers are
+  nib-derived and identical across documents, so the window title is the
+  only thing separating "vent-demo.txt" from "taxes-2025.txt". A recorded
+  window title that mismatches costs heavily.
+
+Scoring reads only the chain links captured during the walk, never the
+live element again; every attribute read is a cross-process call and the
+walk already paid for them once.
 """
 
 from __future__ import annotations
@@ -26,7 +36,7 @@ from difflib import SequenceMatcher
 from typing import Iterator
 
 from .ax import Element
-from .snapshot import ChainLink, Node
+from .snapshot import MAX_TREE_DEPTH, ChainLink, Node
 
 
 class AnchorLost(RuntimeError):
@@ -37,19 +47,19 @@ class AnchorAmbiguous(RuntimeError):
     """Two or more candidates scored too close to call. Guessing is banned."""
 
 
-# Scoring weights. Tuned by the durability harness, not by taste; if you
-# change one, rerun `vent harness` and put the new numbers in the commit.
+# Scoring weights. These will be tuned by the durability harness planned in
+# ARCHITECTURE.md section 10; when that lands, changes to these numbers
+# should come with harness results in the commit message.
 W_IDENTIFIER = 6.0
 W_ROLE = 3.0
 W_LABEL = 2.0
 W_CHAIN = 3.0
+W_WINDOW = 2.0
 W_ORDINAL = 1.0
 W_INDEX = 0.5
 
 ACCEPT_THRESHOLD = 6.0
 AMBIGUITY_MARGIN = 1.5
-
-MAX_CANDIDATE_DEPTH = 30
 
 
 @dataclass
@@ -101,7 +111,9 @@ class _Candidate:
     breakdown: dict = field(default_factory=dict)
 
 
-def _walk_with_chains(root: Element, max_depth: int) -> Iterator[tuple[Element, tuple[ChainLink, ...]]]:
+def _walk_with_chains(
+    root: Element, max_depth: int
+) -> Iterator[tuple[Element, tuple[ChainLink, ...]]]:
     """Yield every element with its ancestor chain, same shape as snapshot."""
 
     def visit(element: Element, chain: tuple[ChainLink, ...], depth: int):
@@ -132,64 +144,90 @@ def _walk_with_chains(root: Element, max_depth: int) -> Iterator[tuple[Element, 
     yield from visit(root, (root_link,), 0)
 
 
-def _chain_similarity(recorded: list[ChainLink], candidate: tuple[ChainLink, ...]) -> float:
+def _ancestry_similarity(recorded: list[ChainLink], candidate: tuple[ChainLink, ...]) -> float:
     """How alike two ancestor chains are, from 0 to 1.
 
-    Compared as sequences of (role, label-or-identifier) so that an app
-    update inserting or removing one wrapper AXGroup degrades the score a
-    little instead of zeroing it.
+    The leaf is excluded: its role, identifier, and label already carry
+    their own (heavier) weights, and counting them twice inflated
+    wrong-element scores in review. Window links are keyed by role only,
+    because window identity is scored separately against the recorded
+    window title; keying windows by their document-name labels would break
+    every anchor the moment a differently named document opened.
     """
 
     def key(link: ChainLink) -> str:
+        if link.role == "AXWindow":
+            return link.role
         return f"{link.role}:{link.identifier or link.label}"
 
     return SequenceMatcher(
         None,
-        [key(link) for link in recorded],
-        [key(link) for link in candidate],
+        [key(link) for link in recorded[:-1]],
+        [key(link) for link in candidate[:-1]],
     ).ratio()
 
 
-def _score(anchor: Anchor, element: Element, chain: tuple[ChainLink, ...]) -> tuple[float, dict]:
-    role = element.role
-    if role != anchor.role:
+def _candidate_window_title(chain: tuple[ChainLink, ...]) -> str:
+    for link in chain:
+        if link.role == "AXWindow":
+            return link.label
+    return ""
+
+
+def _score(anchor: Anchor, chain: tuple[ChainLink, ...]) -> tuple[float, dict]:
+    """Score one candidate from its recorded chain links alone."""
+    leaf = chain[-1]
+
+    if leaf.role != anchor.role:
         return -1.0, {"disqualified": "role mismatch"}
+
+    if anchor.identifier and leaf.identifier and leaf.identifier != anchor.identifier:
+        # A different non-empty identifier is a different element. This is
+        # a disqualification, not a penalty: review showed a penalty could
+        # be outscored by chain and position, binding the wrong element.
+        return -1.0, {"disqualified": "identifier mismatch"}
 
     breakdown: dict[str, float] = {"role": W_ROLE}
     score = W_ROLE
 
-    identifier = str(element.attribute("AXIdentifier") or "")
     if anchor.identifier:
-        if identifier == anchor.identifier:
+        if leaf.identifier == anchor.identifier:
             score += W_IDENTIFIER
             breakdown["identifier"] = W_IDENTIFIER
         else:
+            # The candidate has no identifier at all. Possible after an app
+            # update drops them wholesale, so degrade rather than disqualify.
             score -= W_IDENTIFIER / 2
             breakdown["identifier"] = -W_IDENTIFIER / 2
 
-    label = element.label
     if anchor.labels:
-        if label in anchor.labels:
+        if leaf.label in anchor.labels:
             score += W_LABEL
             breakdown["label"] = W_LABEL
-        elif label:
+        elif leaf.label:
             score -= W_LABEL / 2
             breakdown["label"] = -W_LABEL / 2
 
-    similarity = _chain_similarity(anchor.chain, chain)
+    if anchor.window_title:
+        candidate_title = _candidate_window_title(chain)
+        if candidate_title == anchor.window_title:
+            score += W_WINDOW
+            breakdown["window"] = W_WINDOW
+        elif candidate_title:
+            score -= W_WINDOW
+            breakdown["window"] = -W_WINDOW
+
+    similarity = _ancestry_similarity(anchor.chain, chain)
     score += W_CHAIN * similarity
     breakdown["chain"] = round(W_CHAIN * similarity, 2)
 
-    if anchor.chain and chain:
+    if anchor.chain:
         recorded_leaf = anchor.chain[-1]
-        candidate_leaf = chain[-1]
-        ordinal_gap = abs(recorded_leaf.ordinal - candidate_leaf.ordinal)
-        index_gap = abs(recorded_leaf.index - candidate_leaf.index)
-        score += max(0.0, W_ORDINAL - 0.5 * ordinal_gap)
-        score += max(0.0, W_INDEX - 0.1 * index_gap)
-        breakdown["position"] = round(
-            max(0.0, W_ORDINAL - 0.5 * ordinal_gap) + max(0.0, W_INDEX - 0.1 * index_gap), 2
-        )
+        ordinal_gap = abs(recorded_leaf.ordinal - leaf.ordinal)
+        index_gap = abs(recorded_leaf.index - leaf.index)
+        position = max(0.0, W_ORDINAL - 0.5 * ordinal_gap) + max(0.0, W_INDEX - 0.1 * index_gap)
+        score += position
+        breakdown["position"] = round(position, 2)
 
     return score, breakdown
 
@@ -205,13 +243,13 @@ def resolve(root: Element, anchor: Anchor, low_confidence: bool = False) -> Elem
     threshold = ACCEPT_THRESHOLD + (2.0 if low_confidence else 0.0)
 
     candidates: list[_Candidate] = []
-    for element, chain in _walk_with_chains(root, MAX_CANDIDATE_DEPTH):
-        score, breakdown = _score(anchor, element, chain)
+    for element, chain in _walk_with_chains(root, MAX_TREE_DEPTH):
+        score, breakdown = _score(anchor, chain)
         if score >= 0:
             candidates.append(_Candidate(element=element, chain=chain, score=score, breakdown=breakdown))
 
     if not candidates:
-        raise AnchorLost(f"No element with role {anchor.role} found at all")
+        raise AnchorLost(f"No viable element with role {anchor.role} found")
 
     candidates.sort(key=lambda c: c.score, reverse=True)
     best = candidates[0]
