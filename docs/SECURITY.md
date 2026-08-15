@@ -130,7 +130,10 @@ a probe session does send up to the preview length of non-secure field
 content (a note body, a draft) to the model, so `--no-values` is the switch
 to reach for on an app holding sensitive text. Traces and packs stay on
 local disk. No telemetry. All network calls live in `vent/llm.py`, one file
-to audit.
+to audit. That includes the fallback backend that shells out to the Claude
+Code CLI (`claude -p`, print mode, tools disabled): a different transport
+to the same model endpoint, initiated from the same one file, carrying the
+same scrubbed snapshot content and nothing else.
 
 Probe reversibility has an honest limit too: the explorer writes a short
 probe string into an empty field and restores the prior value immediately,

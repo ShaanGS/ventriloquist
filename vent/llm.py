@@ -23,6 +23,8 @@ from __future__ import annotations
 import json
 import os
 import secrets
+import shutil
+import subprocess
 from typing import Any, Callable, Optional
 
 EXPLORER_MODEL = "claude-sonnet-5"
@@ -74,6 +76,77 @@ def wrap_untrusted(label: str, content: str) -> str:
     )
 
 
+def _claude_cli() -> Optional[str]:
+    """Path to the Claude Code CLI, or None. A separate function so tests
+    can pretend it is absent or present."""
+    return shutil.which("claude")
+
+
+def _complete_via_cli(system: str, user_text: str, schema: dict, model: str) -> dict:
+    """One model call through `claude -p`, for machines with a Claude Code
+    login but no API key.
+
+    Print mode with tools disabled is a plain completion: one request in,
+    one response out, nothing executed. The CLI cannot enforce a response
+    schema server-side the way the API's structured output does, so the
+    schema travels in the prompt and the response is parsed strictly:
+    non-JSON output, code fences included, is rejected, never repaired.
+    """
+    prompt = (
+        f"{user_text}\n\n"
+        "Respond with a single JSON object conforming exactly to this JSON "
+        "Schema. Output only the JSON object itself: no prose, no markdown, "
+        "no code fences.\n"
+        f"{json.dumps(schema)}"
+    )
+    try:
+        proc = subprocess.run(
+            [
+                _claude_cli() or "claude",
+                "-p",
+                "--output-format", "json",
+                "--model", model,
+                "--tools", "",
+                "--system-prompt", system,
+            ],
+            input=prompt,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        raise ModelError(f"claude CLI call failed: {exc}") from exc
+
+    if proc.returncode != 0:
+        raise ModelError(
+            f"claude CLI exited with {proc.returncode}: {proc.stderr.strip()[:300]}"
+        )
+    try:
+        envelope = json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        raise ModelError(f"claude CLI returned a malformed envelope: {exc}") from exc
+
+    result_text = str(envelope.get("result", ""))
+    if envelope.get("is_error"):
+        lowered = result_text.lower()
+        if "auth" in lowered or "login" in lowered:
+            raise ModelUnavailable(
+                f"The claude CLI is installed but not signed in ({result_text}). "
+                "Run `claude login` once, then retry."
+            )
+        raise ModelError(f"claude CLI reported an error: {result_text[:300]}")
+
+    try:
+        parsed = json.loads(result_text)
+    except json.JSONDecodeError as exc:
+        raise ModelError(
+            f"Model returned non-JSON despite instructions: {result_text[:200]!r}"
+        ) from exc
+    if not isinstance(parsed, dict):
+        raise ModelError(f"Model returned {type(parsed).__name__}, expected a JSON object")
+    return parsed
+
+
 def complete_json(
     system: str,
     user_text: str,
@@ -82,9 +155,11 @@ def complete_json(
 ) -> dict:
     """One model call, returning a dict validated against the schema.
 
-    Uses the API's structured output support so the response is guaranteed
-    to parse; a response that somehow does not raises ModelError rather
-    than being repaired.
+    Backends, in order: the Anthropic SDK when it has credentials (the
+    API's structured output guarantees the response parses), then the
+    Claude Code CLI when one is installed and signed in (subscription
+    auth, no API key needed; schema held to by strict parsing). A response
+    outside its schema raises ModelError rather than being repaired.
     """
     if _completer_override is not None:
         return _completer_override(system=system, user_text=user_text, schema=schema, model=model)
@@ -92,16 +167,24 @@ def complete_json(
     try:
         import anthropic
     except ImportError as exc:
-        raise ModelUnavailable("The anthropic package is not installed.") from exc
+        if _claude_cli():
+            return _complete_via_cli(system, user_text, schema, model)
+        raise ModelUnavailable(
+            "The anthropic package is not installed and no claude CLI was "
+            "found. Install one of them (pip install anthropic, or install "
+            "Claude Code and run `claude login`)."
+        ) from exc
 
     try:
         # Construction raises anthropic.AnthropicError when no credential
         # resolves (env var or `ant auth login` profile), so wrap it.
         client = anthropic.Anthropic()
     except anthropic.AnthropicError as exc:
+        if _claude_cli():
+            return _complete_via_cli(system, user_text, schema, model)
         raise ModelUnavailable(
-            "No working Anthropic credentials. Export ANTHROPIC_API_KEY or "
-            "run `ant auth login`, then retry."
+            "No working Anthropic credentials. Export ANTHROPIC_API_KEY, run "
+            "`ant auth login`, or install Claude Code and run `claude login`."
         ) from exc
 
     try:

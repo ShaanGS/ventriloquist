@@ -43,10 +43,12 @@ next began, and each review's findings were fixed in a follow-up commit.
 ## What is NOT yet done (the release checklist)
 
 1. **Live model-in-the-loop validation.** `vent explore` and
-   `vent run --heal` call a model and need `ANTHROPIC_API_KEY` (or an
-   `ant auth login` profile). This machine had no credentials, so the
-   model-driven paths are covered only by the offline scripted-model seam,
-   never against the real API. First real-credential task: run
+   `vent run --heal` call a model. llm.py now has two backends: the
+   Anthropic SDK (needs `ANTHROPIC_API_KEY` or an `ant auth login`
+   profile) and a fallback through the Claude Code CLI (`claude -p`,
+   subscription auth, no API key), tried in that order. This machine has
+   the CLI installed but its OAuth session is expired, so the one human
+   step left is running `claude login` once. After that: run
    `vent explore Notes --no-values` end to end, then `vent compile Notes`,
    and confirm the compiled pack matches the hand-written one. Then break an
    anchor and confirm `vent run --heal` + `vent verify` promote it.
