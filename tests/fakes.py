@@ -55,6 +55,17 @@ class FakeElement:
     def ref_key(self):
         return id(self)
 
+
+    def walk(self, max_depth: int = 25, _depth: int = 0):
+        """Depth-first traversal yielding (depth, element), mirroring
+        ax.Element.walk so runtime helpers that crawl the tree work on
+        fakes too."""
+        yield _depth, self
+        if _depth >= max_depth:
+            return
+        for child in self._children:
+            yield from child.walk(max_depth, _depth + 1)
+
     def __repr__(self) -> str:
         return f"<FakeElement {self.role} {self.label!r}>"
 

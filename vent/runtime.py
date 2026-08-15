@@ -156,6 +156,29 @@ def _check_expect(element: Element, expect: Optional[dict], where: str) -> None:
         )
 
 
+WAIT_FOR_POLL_S = 0.3  # wait_for pumps between polls; pumping at the
+# settle poll rate would be an IPC storm for no faster an answer.
+
+
+def _pump_anywhere(root: Element) -> None:
+    """Pump the tree when no acted-on element is at hand (see _pump_tree).
+
+    Walks shallowly for the first element advertising scroll-to-visible,
+    which in a Chromium host is the web area a few levels down. Bounded so
+    a native app with no such element costs a quick no-op, not a crawl."""
+    inspected = 0
+    for _, element in root.walk(max_depth=20):
+        inspected += 1
+        if inspected > 100:
+            return
+        try:
+            if "AXScrollToVisible" in element.actions():
+                element.perform("AXScrollToVisible")
+                return
+        except ax.AXError:
+            continue
+
+
 def _pump_tree(element: Element) -> None:
     """Nudge a Chromium host into republishing its accessibility tree.
 
@@ -213,7 +236,12 @@ def _run_step(
                 anchors.resolve(root, step.anchor, low_confidence=low_confidence)
                 return StepReport(op=step.op, ok=True)
             except (anchors.AnchorLost, anchors.AnchorAmbiguous):
-                time.sleep(SETTLE_POLL_S)
+                # Resolution only reads, and reads never flush a Chromium
+                # host's lazily-published tree: content that rendered after
+                # the last action stays invisible to every poll, however
+                # long we wait. Nudge with a benign action between polls.
+                _pump_anywhere(root)
+                time.sleep(WAIT_FOR_POLL_S)
         raise ToolExecutionError(f"{where}: element did not appear within {step.timeout_s}s")
 
     if step.op == "open_app":
