@@ -7,6 +7,7 @@ dependencies = [
     "pyobjc-framework-Cocoa>=10.0",
     "pyobjc-framework-ApplicationServices>=10.0",
     "click>=8.1",
+    "mcp>=1.2",
 ]
 
 [project.scripts]

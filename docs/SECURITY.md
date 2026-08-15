@@ -20,8 +20,12 @@ gap, open an issue with the `security` label.
 
 Agent frameworks that `exec()` model output hand the model a shell. Our
 action space is a closed set of typed ops (`press`, `set_value`, `pick`,
-`reveal`, `raise_window`, `open_app`, `wait_for`) executed by our own
-runtime. No op runs code, shell commands, or AppleScript. Adding an op is a
+`reveal`, `raise_window`, `open_app`, `wait_for`, `read_value`) executed by
+our own runtime. `read_value` is the one op that moves data outward: it
+returns an element's live value to the tool caller. It mutates nothing, but
+it is how app content reaches an MCP client, so T6's scrubbing rules apply
+to it and it is never valid against a secure field (T4 removes those before
+any op can see them). No op runs code, shell commands, or AppleScript. Adding an op is a
 breaking change to this threat model and requires updating it first. Model
 output is parsed against a JSON schema; anything outside it is rejected.
 

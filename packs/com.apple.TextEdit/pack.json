@@ -1,0 +1,174 @@
+{
+  "format_version": 1,
+  "bundle_id": "com.apple.TextEdit",
+  "app_name": "TextEdit",
+  "app_version": "",
+  "os_version": "26.3.1",
+  "locale": "C",
+  "tools": [
+    {
+      "name": "write_document",
+      "description": "Replace the entire text of the frontmost TextEdit document.",
+      "risk": "mutating",
+      "requires_frontmost": false,
+      "params": {
+        "text": {
+          "type": "string",
+          "description": "The new document content."
+        }
+      },
+      "preconditions": [
+        {
+          "kind": "window_exists"
+        }
+      ],
+      "steps": [
+        {
+          "op": "set_value",
+          "anchor": {
+            "role": "AXTextArea",
+            "identifier": "First Text View",
+            "labels": [],
+            "window_title": "vent-demo.txt",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "TextEdit",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0
+              },
+              {
+                "role": "AXWindow",
+                "label": "vent-demo.txt",
+                "identifier": "_NS:34",
+                "ordinal": 0,
+                "index": 0
+              },
+              {
+                "role": "AXScrollArea",
+                "label": "",
+                "identifier": "_NS:8",
+                "ordinal": 0,
+                "index": 0
+              },
+              {
+                "role": "AXTextArea",
+                "label": "",
+                "identifier": "First Text View",
+                "ordinal": 0,
+                "index": 0
+              }
+            ]
+          },
+          "value": {
+            "param": "text"
+          },
+          "expect": {
+            "role": "AXTextArea"
+          }
+        }
+      ],
+      "verify": [
+        {
+          "kind": "value_contains",
+          "anchor": {
+            "role": "AXTextArea",
+            "identifier": "First Text View",
+            "labels": [],
+            "window_title": "vent-demo.txt",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "TextEdit",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0
+              },
+              {
+                "role": "AXWindow",
+                "label": "vent-demo.txt",
+                "identifier": "_NS:34",
+                "ordinal": 0,
+                "index": 0
+              },
+              {
+                "role": "AXScrollArea",
+                "label": "",
+                "identifier": "_NS:8",
+                "ordinal": 0,
+                "index": 0
+              },
+              {
+                "role": "AXTextArea",
+                "label": "",
+                "identifier": "First Text View",
+                "ordinal": 0,
+                "index": 0
+              }
+            ]
+          },
+          "param": "text"
+        }
+      ]
+    },
+    {
+      "name": "read_document",
+      "description": "Read the full text of the frontmost TextEdit document.",
+      "risk": "read_only",
+      "requires_frontmost": false,
+      "params": {},
+      "preconditions": [
+        {
+          "kind": "window_exists"
+        }
+      ],
+      "steps": [
+        {
+          "op": "read_value",
+          "anchor": {
+            "role": "AXTextArea",
+            "identifier": "First Text View",
+            "labels": [],
+            "window_title": "vent-demo.txt",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "TextEdit",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0
+              },
+              {
+                "role": "AXWindow",
+                "label": "vent-demo.txt",
+                "identifier": "_NS:34",
+                "ordinal": 0,
+                "index": 0
+              },
+              {
+                "role": "AXScrollArea",
+                "label": "",
+                "identifier": "_NS:8",
+                "ordinal": 0,
+                "index": 0
+              },
+              {
+                "role": "AXTextArea",
+                "label": "",
+                "identifier": "First Text View",
+                "ordinal": 0,
+                "index": 0
+              }
+            ]
+          },
+          "expect": {
+            "role": "AXTextArea"
+          }
+        }
+      ],
+      "verify": []
+    }
+  ],
+  "healed_pending": []
+}

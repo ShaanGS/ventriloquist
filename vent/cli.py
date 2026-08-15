@@ -1,17 +1,23 @@
 """Ventriloquist CLI: compile Mac apps into MCP servers.
 
-Current commands cover the foundation layer (doctor / apps / inspect).
-Explore, compile, and serve land next.
+Foundation commands (doctor / apps / inspect / act) talk to live apps
+directly. Pack commands (anchor / run / serve) exercise the compiled
+path: anchor helps author packs by hand, run executes one tool locally,
+and serve exposes every pack to MCP clients.
 """
 
 from __future__ import annotations
 
+import json
 import sys
+from pathlib import Path
 
 import click
 
-from . import ax
+from . import anchors, ax, packs, runtime
 from .snapshot import render, snapshot
+
+PACKS_DIR = Path(__file__).resolve().parent.parent / "packs"
 
 
 @click.group()
@@ -84,6 +90,69 @@ def act(app_name: str, node_id: int, action_name: str, menus: bool, text: str | 
     except ax.AXError as exc:
         click.secho(str(exc), fg="red")
         sys.exit(1)
+
+
+@main.command()
+@click.argument("app_name")
+@click.argument("node_id", type=int)
+@click.option("--menus", is_flag=True, help="Include the menu bar when resolving ids.")
+def anchor(app_name: str, node_id: int, menus: bool) -> None:
+    """Print the durable anchor for element NODE_ID, for authoring packs."""
+    try:
+        app = ax.find_app(app_name)
+        root = ax.app_element(app)
+        snap = snapshot(root, include_menus=menus)
+        if node_id >= len(snap.nodes):
+            click.secho(f"No element #{node_id} (snapshot has {len(snap.nodes)}).", fg="red")
+            sys.exit(1)
+        built = anchors.build(snap.nodes[node_id])
+    except ax.AXError as exc:
+        click.secho(str(exc), fg="red")
+        sys.exit(1)
+    click.echo(json.dumps(built.to_dict(), indent=2))
+
+
+def _find_pack(name: str) -> packs.Pack:
+    for pack in packs.load_all(PACKS_DIR):
+        if name.lower() in {pack.bundle_id.lower(), pack.app_name.lower()}:
+            return pack
+    available = ", ".join(p.app_name for p in packs.load_all(PACKS_DIR)) or "none"
+    raise click.ClickException(f"No pack for {name!r}. Available: {available}")
+
+
+@main.command()
+@click.argument("app_name")
+@click.argument("tool_name")
+@click.option("--arg", "arg_pairs", multiple=True, help="Tool argument as key=value. Repeatable.")
+def run(app_name: str, tool_name: str, arg_pairs: tuple[str, ...]) -> None:
+    """Execute one compiled tool against the live app, without MCP."""
+    pack = _find_pack(app_name)
+    args = {}
+    for pair in arg_pairs:
+        if "=" not in pair:
+            raise click.ClickException(f"--arg must be key=value, got {pair!r}")
+        key, value = pair.split("=", 1)
+        args[key] = value
+
+    try:
+        app = ax.find_app(pack.app_name)
+        root = ax.app_element(app)
+        result = runtime.execute(pack, tool_name, args, root)
+    except (ax.AXError, runtime.ToolExecutionError, packs.PackError) as exc:
+        click.secho(f"✗ {exc}", fg="red")
+        sys.exit(1)
+
+    click.secho(f"✓ {pack.app_name}.{tool_name}: {result.detail}", fg="green")
+    for value in result.values:
+        click.echo(value)
+
+
+@main.command()
+def serve() -> None:
+    """Serve every compiled pack as MCP tools over stdio."""
+    from .server import serve_stdio
+
+    serve_stdio(PACKS_DIR)
 
 
 if __name__ == "__main__":
