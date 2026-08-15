@@ -246,7 +246,20 @@ def run(app_name: str, tool_name: str, arg_pairs: tuple[str, ...], do_heal: bool
 
 @main.command()
 @click.argument("app_name")
-def verify(app_name: str) -> None:
+@click.option(
+    "--report",
+    "report_path",
+    default=None,
+    type=click.Path(dir_okay=False, writable=True),
+    help=(
+        "Write a JSON portability report and skip the interactive promotion "
+        "walk. Made for running a pack on a machine other than the one that "
+        "recorded it: no model calls, and the only app content included is "
+        "the live label of each resolved element, so the file can be read "
+        "before it is shared."
+    ),
+)
+def verify(app_name: str, report_path: str | None) -> None:
     """Dry-resolve every anchor in a pack and offer to promote healed ones.
 
     Reports a durability percentage without executing any step, then walks
@@ -274,6 +287,7 @@ def verify(app_name: str) -> None:
     seen: set = set()
     total = resolved = 0
     drift: list = []
+    entries: list = []
     for tool in pack.tools:
         anchored = [(s.op, s.anchor) for s in tool.steps if s.anchor]
         anchored += [("verify", v.anchor) for v in tool.verify if v.anchor]
@@ -284,13 +298,28 @@ def verify(app_name: str) -> None:
                 continue
             seen.add(key)
             total += 1
+            entry = {
+                "tool": tool.name,
+                "op": op,
+                "role": anchor.role,
+                "recorded_labels": list(anchor.labels),
+                "recorded_identifier": anchor.identifier,
+            }
             try:
                 element = anchors.resolve(root, anchor, low_confidence=low_confidence)
                 resolved += 1
             except (anchors.AnchorLost, anchors.AnchorAmbiguous) as exc:
                 click.secho(f"  {tool.name} ({op}): {exc}", fg="yellow")
+                entry["outcome"] = "ambiguous" if isinstance(exc, anchors.AnchorAmbiguous) else "lost"
+                entry["detail"] = str(exc)[:200]
+                entries.append(entry)
                 continue
-            if anchors.semantic_drift(anchor, element):
+            drifted = anchors.semantic_drift(anchor, element)
+            entry["outcome"] = "resolved"
+            entry["live_label"] = element.label[:80]
+            entry["drift"] = drifted
+            entries.append(entry)
+            if drifted:
                 drift.append((tool.name, op, anchor.labels, element.label))
 
     pct = (resolved / total * 100) if total else 100.0
@@ -308,6 +337,41 @@ def verify(app_name: str) -> None:
         )
         for tool_name, op, known, live in drift:
             click.echo(f"  {tool_name} ({op}): recorded {known!r}, live label {live!r}")
+
+    if report_path:
+        import platform as platform_mod
+        from datetime import datetime, timezone
+
+        report = {
+            "vent_report_version": 1,
+            "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "host": {
+                "os_version": platform_mod.mac_ver()[0],
+                "arch": platform_mod.machine(),
+            },
+            "app": {
+                "name": pack.app_name,
+                "bundle_id": pack.bundle_id,
+                "live_version": ax.app_version(app),
+                "pack_recorded_version": pack.app_version,
+                "pack_recorded_os": pack.os_version,
+            },
+            "summary": {
+                "total": total,
+                "resolved": resolved,
+                "drift_flagged": len(drift),
+            },
+            "anchors": entries,
+        }
+        Path(report_path).write_text(json.dumps(report, indent=2) + "\n")
+        click.echo()
+        click.echo(f"Report written to {report_path}.")
+        click.echo(
+            "It contains no packs, no snapshots, and no model output; the only "
+            "app content is each resolved element's live label. Read it before "
+            "sharing it."
+        )
+        return
 
     if not pack.healed_pending:
         return

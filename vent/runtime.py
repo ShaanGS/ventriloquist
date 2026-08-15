@@ -270,6 +270,21 @@ def _run_step(
     element = _resolve(step.anchor, root, low_confidence, heal, where)
     _check_expect(element, step.expect, where)
 
+    # Semantic drift guard (SECURITY.md T11), acting ops only. When the
+    # recorded element is absent, resolution can score a same-role
+    # neighbor above threshold; in a collapsed-sidebar VS Code the search
+    # box anchor bound an open editor pane, and typing into it would have
+    # passed verify because verify re-reads the value just written. An
+    # element wearing a label the anchor has never been recorded under is
+    # not acted on, ever. Reads stay permitted: reading a drifted element
+    # returns data a caller can judge, acting on one edits the wrong thing.
+    if step.op in ("press", "set_value", "pick") and anchors.semantic_drift(step.anchor, element):
+        raise ToolExecutionError(
+            f"{where}: resolved element wears label {element.label[:60]!r}, which this "
+            "anchor has never been recorded under. Refusing to act on it; re-record "
+            "the anchor or approve the new label through vent verify."
+        )
+
     if step.op == "read_value":
         value = "" if element.value is None else str(element.value)
         return StepReport(op=step.op, ok=True, detail=value)

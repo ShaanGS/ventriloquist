@@ -168,6 +168,24 @@ every failing call. That gap between 87.5% per-anchor and 75% per-tool
 is the honest cost of state in a GUI, and stateful preconditions are the
 planned fix.
 
+There is also a first portability data point, from a deliberately
+degraded environment rather than a second machine: the VS Code pack was
+re-verified after collapsing the sidebar, closing every file and folder,
+switching theme, disabling extensions, and resizing the window. The
+three activity bar anchors resolved exactly, unmoved by the extension
+removals that changed their sibling set. The two view-content anchors
+whose views no longer existed failed the right way, one by refusing
+outright, and one by binding a same-role neighbor, an open editor pane,
+which the semantic drift check flagged. That near-miss became a runtime
+rule: an element wearing a label its anchor has never been recorded
+under is never acted on, so the call that would have typed into the open
+editor now refuses and names the element it declined to touch. What this
+run does not show is cross-machine portability; it was the same machine,
+account, and app install. `vent verify <app> --report out.json` exists
+for the real test: it produces a small JSON resolution table with no
+model calls and no app content beyond each element's live label, meant
+to be run on someone else's Mac and sent back.
+
 One thing to know for VS Code specifically: launch it with
 `--force-renderer-accessibility`. Without that flag the tree can still be
 read, but actions get silently ignored, which looks healthy right up until

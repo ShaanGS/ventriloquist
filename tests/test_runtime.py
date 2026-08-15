@@ -248,3 +248,23 @@ def test_press_pumps_web_backed_elements_only():
     result = runtime.execute(press_pack(native_tree), "open_friends", {}, native_tree)
     assert result.ok
     assert native_button.performed == ["AXPress"]
+
+
+def test_acting_on_a_drifted_element_is_refused():
+    """T11 at runtime: when the recorded element is absent, resolution can
+    score a same-role neighbor above threshold. Acting on an element whose
+    live label the anchor has never seen is refused; the degraded-state
+    alternative was typing into whatever editor happened to be open, with
+    verify passing because it re-reads the value just written."""
+    tree = textedit_like()
+    body = doc_body(tree)
+    body.label = "Document"          # recorded label at pack-build time
+    pack = build_write_tool(tree)
+    body.label = "keybindings.json, Editor Group 2"
+    body.title = body.label
+    with pytest.raises(runtime.ToolExecutionError, match="never been recorded under"):
+        runtime.execute(pack, "write_document", {"text": "oops"}, tree)
+    assert body.value == "hello", "the drifted element must not have been written"
+    # Reading a drifted element stays permitted; the caller can judge data.
+    result = runtime.execute(pack, "read_document", {}, tree)
+    assert result.ok

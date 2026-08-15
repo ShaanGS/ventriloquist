@@ -150,6 +150,19 @@ the code and docs, plus a queue of open work in priority order:
    select over the DM list, which is virtualized, so select must compose
    with scrolling.
 
+   Degraded-environment result (same machine, sidebar collapsed, files
+   closed, theme switched, extensions disabled, window resized): the
+   three activity bar anchors resolved exactly despite their sibling set
+   changing, so the ordinal-decay prediction did not bite where the
+   element still existed. Both failures were absence, not decay: one
+   refusal, and one same-role substitution onto an open editor pane that
+   only the T11 drift check caught. That produced the runtime rule that
+   acting ops refuse any element wearing a label its anchor has never
+   recorded. Reads are still permitted on drifted elements. The claim
+   this licenses: anchors survive heavy same-machine environment change,
+   and state-absence degrades safely. It says nothing about a second
+   machine; `vent verify --report` exists for that.
+
    The portability probe should target VS Code, not TextEdit. AppKit
    anchors ride nib identifiers and are expected to travel; the test
    with information in it is an Electron pack under a fresh user account
