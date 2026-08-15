@@ -161,11 +161,32 @@ executing anything.
 The healer exists to fix broken anchors, which means it can re-point them,
 which means a hostile UI state could steer a benign tool's anchor onto a
 dangerous element. And "the replay succeeded" is not a safety check, because
-destructive replays also succeed. So healed anchors are never silently
-persisted: they land in a quarantine section of the pack, get re-screened by
-policy (including the destructive-verb check against the new target), and
-are promoted to the anchor of record only by the user. A healer handed a
-truncated snapshot must refuse rather than guess at the nearest lookalike.
+destructive replays also succeed. The fences, in layers:
+
+- A healer handed a truncated snapshot refuses rather than guess at the
+  nearest lookalike; it cannot choose in a window it cannot fully see.
+- A re-grounding must land on the same kind of control the broken anchor
+  described (same role). A step that pressed a button cannot heal onto a
+  text field, and vice versa. This sharply narrows what a hostile UI can
+  steer the choice toward.
+- Every re-grounding is re-screened by policy against the new target,
+  including destructive and contextual verbs and authentication windows.
+- Anchor matching for reuse and promotion includes the chain signature, so
+  two structurally identical elements (unlabeled twins in one window) are
+  never confused for one another.
+
+Honest scope of "never silently persisted": promotion into a tool's anchor
+of record happens only through `vent verify`, under a human who is shown
+the target window and the risk of every tool the promotion would rewrite.
+A quarantined fix that has not been promoted does not change any tool's
+stored anchor. It can, however, be reused to satisfy a live call while it
+sits in quarantine: on a repeat break the runtime reuses a matching
+quarantined fix deterministically (no model call), re-screening the live
+target every time. So an un-promoted fix affects behavior for the calls it
+rescues, but it never becomes the durable anchor and never escapes the
+per-call re-screen. Model-backed healing that mints new quarantine entries
+is opt-in (`VENT_HEAL=1` on the server, `--heal` on `vent run`); the served
+default neither calls a model nor writes quarantine entries.
 
 ### T9. The MCP client side
 
