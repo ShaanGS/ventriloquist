@@ -42,16 +42,34 @@ next began, and each review's findings were fixed in a follow-up commit.
 
 ## What is NOT yet done (the release checklist)
 
-1. **Live model-in-the-loop validation.** `vent explore` and
-   `vent run --heal` call a model. llm.py now has two backends: the
-   Anthropic SDK (needs `ANTHROPIC_API_KEY` or an `ant auth login`
-   profile) and a fallback through the Claude Code CLI (`claude -p`,
-   subscription auth, no API key), tried in that order. This machine has
-   the CLI installed but its OAuth session is expired, so the one human
-   step left is running `claude login` once. After that: run
-   `vent explore Notes --no-values` end to end, then `vent compile Notes`,
-   and confirm the compiled pack matches the hand-written one. Then break an
-   anchor and confirm `vent run --heal` + `vent verify` promote it.
+1. **Live model-in-the-loop validation: DONE** (August 2026, through the
+   claude CLI backend after the user ran `claude login`). Every
+   model-driven path ran live:
+   - `vent explore Notes --no-values`: the model nominated targets over
+     multiple rounds, the policy screened all of them (0 refusals
+     needed), probes executed and the trace saved.
+   - `vent compile Notes`: the approval gate earned its keep twice. A
+     three-round trace compiled into a tool that would press New Note
+     three times per call; the deterministic step summary exposed it and
+     it was declined. A single-round trace compiled into a clean
+     press-then-set_value tool that matches the hand-written pack's
+     structure. That tool also demonstrated why descriptions are not
+     ground truth: the model said "types into the resulting note", the
+     steps typed into the toolbar search field, and only the live run
+     revealed which field the probe had actually touched.
+   - Anchor healing, full lifecycle: an anchor was broken on purpose,
+     `vent run --heal` re-grounded it live (the model correctly refused
+     everything but the true text area), the fix stayed quarantined, and
+     `vent verify` promotion rewrote all three anchor sites, capturing
+     the element's true current identifier.
+
+   Two compiler findings for a future pass: `vent compile` OVERWRITES an
+   existing pack rather than merging into it (the hand-written Notes pack
+   was restored from a backup), and reviewers at the gate must map roles
+   to what they mean in the app; the summary tells the truth but tersely.
+   One llm.py finding, fixed: chat-tuned models fence their JSON even
+   when told not to; exactly one wrapping fence is stripped as transport
+   framing, everything else still rejects.
 2. **A third-party Electron app pack: DONE (VS Code).**
    `packs/com.microsoft.VSCode/pack.json` ships four tools (Explorer,
    Search, and Source Control view switches plus a parameterized

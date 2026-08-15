@@ -24,9 +24,12 @@ and quarantined healing with `vent verify` promotion. 79 offline tests run
 in CI on every push; live behavior is verified against TextEdit, Notes,
 and VS Code. Two hand-written packs ship: TextEdit, and VS Code — the
 Electron proof, with view navigation and a parameterized workspace search
-replayed through the deterministic runtime. What remains before a release:
-live model-in-the-loop runs of `vent explore` and `--heal` (they need an
-`ANTHROPIC_API_KEY`) and a demo recording.
+replayed through the deterministic runtime. The model-driven paths have
+all run live: exploration under the safety policy, compilation through
+the human approval gate, and the full healing lifecycle (break, re-ground
+under quarantine, promote through `vent verify`). Model calls work with
+an `ANTHROPIC_API_KEY` or, with no key at all, through a signed-in Claude
+Code CLI.
 
 ## Quick start
 

@@ -36,28 +36,32 @@
                 "label": "TextEdit",
                 "identifier": "",
                 "ordinal": 0,
-                "index": 0
+                "index": 0,
+                "subrole": ""
               },
               {
                 "role": "AXWindow",
                 "label": "",
                 "identifier": "_NS:34",
                 "ordinal": 0,
-                "index": 0
+                "index": 0,
+                "subrole": "AXStandardWindow"
               },
               {
                 "role": "AXScrollArea",
                 "label": "",
                 "identifier": "_NS:8",
                 "ordinal": 0,
-                "index": 0
+                "index": 0,
+                "subrole": ""
               },
               {
                 "role": "AXTextArea",
                 "label": "",
                 "identifier": "First Text View",
                 "ordinal": 0,
-                "index": 0
+                "index": 0,
+                "subrole": ""
               }
             ]
           },
@@ -83,28 +87,32 @@
                 "label": "TextEdit",
                 "identifier": "",
                 "ordinal": 0,
-                "index": 0
+                "index": 0,
+                "subrole": ""
               },
               {
                 "role": "AXWindow",
                 "label": "",
                 "identifier": "_NS:34",
                 "ordinal": 0,
-                "index": 0
+                "index": 0,
+                "subrole": "AXStandardWindow"
               },
               {
                 "role": "AXScrollArea",
                 "label": "",
                 "identifier": "_NS:8",
                 "ordinal": 0,
-                "index": 0
+                "index": 0,
+                "subrole": ""
               },
               {
                 "role": "AXTextArea",
                 "label": "",
                 "identifier": "First Text View",
                 "ordinal": 0,
-                "index": 0
+                "index": 0,
+                "subrole": ""
               }
             ]
           },
@@ -137,28 +145,32 @@
                 "label": "TextEdit",
                 "identifier": "",
                 "ordinal": 0,
-                "index": 0
+                "index": 0,
+                "subrole": ""
               },
               {
                 "role": "AXWindow",
                 "label": "",
                 "identifier": "_NS:34",
                 "ordinal": 0,
-                "index": 0
+                "index": 0,
+                "subrole": "AXStandardWindow"
               },
               {
                 "role": "AXScrollArea",
                 "label": "",
                 "identifier": "_NS:8",
                 "ordinal": 0,
-                "index": 0
+                "index": 0,
+                "subrole": ""
               },
               {
                 "role": "AXTextArea",
                 "label": "",
                 "identifier": "First Text View",
                 "ordinal": 0,
-                "index": 0
+                "index": 0,
+                "subrole": ""
               }
             ]
           },

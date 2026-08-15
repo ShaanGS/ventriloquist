@@ -55,10 +55,19 @@ def test_cli_backend_rejects_non_json_result(monkeypatch):
         call(monkeypatch, FakeProc(envelope("Sure! Here is the JSON you asked for")))
 
 
-def test_cli_backend_rejects_fenced_json(monkeypatch):
+def test_cli_backend_unwraps_a_single_fence(monkeypatch):
+    """Chat-tuned models habitually fence their JSON even when told not
+    to (observed on the first live call). Exactly one wrapping fence is
+    transport framing and is stripped; the content is still parsed
+    strictly."""
     fenced = '```json\n{"ok": true}\n```'
+    assert call(monkeypatch, FakeProc(envelope(fenced))) == {"ok": True}
+
+
+def test_cli_backend_rejects_prose_around_fence(monkeypatch):
+    noisy = 'Here you go!\n```json\n{"ok": true}\n```'
     with pytest.raises(llm.ModelError, match="non-JSON"):
-        call(monkeypatch, FakeProc(envelope(fenced)))
+        call(monkeypatch, FakeProc(envelope(noisy)))
 
 
 def test_cli_backend_auth_failure_is_unavailable_not_error(monkeypatch):

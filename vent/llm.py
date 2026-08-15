@@ -89,8 +89,11 @@ def _complete_via_cli(system: str, user_text: str, schema: dict, model: str) -> 
     Print mode with tools disabled is a plain completion: one request in,
     one response out, nothing executed. The CLI cannot enforce a response
     schema server-side the way the API's structured output does, so the
-    schema travels in the prompt and the response is parsed strictly:
-    non-JSON output, code fences included, is rejected, never repaired.
+    schema travels in the prompt and the response is parsed strictly.
+    One transport allowance: chat-tuned models habitually wrap the object
+    in a single markdown fence even when told not to (observed on the
+    first live call), so exactly that wrapper is stripped before parsing.
+    Anything else that is not the JSON object is rejected, never repaired.
     """
     prompt = (
         f"{user_text}\n\n"
@@ -136,8 +139,13 @@ def _complete_via_cli(system: str, user_text: str, schema: dict, model: str) -> 
             )
         raise ModelError(f"claude CLI reported an error: {result_text[:300]}")
 
+    body = result_text.strip()
+    if body.startswith("```"):
+        first_newline = body.find("\n")
+        if first_newline != -1 and body.endswith("```"):
+            body = body[first_newline + 1 : -3].strip()
     try:
-        parsed = json.loads(result_text)
+        parsed = json.loads(body)
     except json.JSONDecodeError as exc:
         raise ModelError(
             f"Model returned non-JSON despite instructions: {result_text[:200]!r}"
