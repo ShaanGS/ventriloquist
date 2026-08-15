@@ -57,6 +57,7 @@ W_CHAIN = 3.0
 W_WINDOW = 2.0
 W_ORDINAL = 1.0
 W_INDEX = 0.5
+W_SUBROLE = 2.0
 
 ACCEPT_THRESHOLD = 6.0
 AMBIGUITY_MARGIN = 1.5
@@ -116,7 +117,14 @@ def _walk_with_chains(
 ) -> Iterator[tuple[Element, tuple[ChainLink, ...]]]:
     """Yield every element with its ancestor chain, same shape as snapshot."""
 
+    seen: set[int] = set()
+
     def visit(element: Element, chain: tuple[ChainLink, ...], depth: int):
+        key = element.ref_key()
+        if key is not None:
+            if key in seen:
+                return
+            seen.add(key)
         yield element, chain
         if depth >= max_depth:
             return
@@ -131,6 +139,7 @@ def _walk_with_chains(
                 identifier=str(child.attribute("AXIdentifier") or ""),
                 ordinal=ordinal,
                 index=index,
+                subrole=child.subrole,
             )
             yield from visit(child, chain + (link,), depth + 1)
 
@@ -187,6 +196,17 @@ def _score(anchor: Anchor, chain: tuple[ChainLink, ...]) -> tuple[float, dict]:
         # be outscored by chain and position, binding the wrong element.
         return -1.0, {"disqualified": "identifier mismatch"}
 
+    recorded_leaf = anchor.chain[-1] if anchor.chain else None
+    if (
+        recorded_leaf is not None
+        and recorded_leaf.subrole
+        and leaf.subrole
+        and recorded_leaf.subrole != leaf.subrole
+    ):
+        # Subroles separate elements that look like twins by role alone:
+        # a close button and a zoom button are both unlabeled AXButtons.
+        return -1.0, {"disqualified": "subrole mismatch"}
+
     breakdown: dict[str, float] = {"role": W_ROLE}
     score = W_ROLE
 
@@ -228,6 +248,10 @@ def _score(anchor: Anchor, chain: tuple[ChainLink, ...]) -> tuple[float, dict]:
         position = max(0.0, W_ORDINAL - 0.5 * ordinal_gap) + max(0.0, W_INDEX - 0.1 * index_gap)
         score += position
         breakdown["position"] = round(position, 2)
+
+        if recorded_leaf.subrole and recorded_leaf.subrole == leaf.subrole:
+            score += W_SUBROLE
+            breakdown["subrole"] = W_SUBROLE
 
     return score, breakdown
 

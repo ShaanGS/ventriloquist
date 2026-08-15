@@ -74,6 +74,7 @@ class ChainLink:
     identifier: str
     ordinal: int
     index: int
+    subrole: str = ""  # AXCloseButton and friends; separates window-control twins
 
 
 @dataclass
@@ -154,6 +155,7 @@ def snapshot(
     """
     nodes: list[Node] = []
     truncated = False
+    seen: set[int] = set()
 
     def visit(element: Element, chain: tuple[ChainLink, ...], depth: int, shown_depth: int) -> None:
         nonlocal truncated
@@ -163,6 +165,14 @@ def snapshot(
         if len(nodes) >= max_nodes:
             truncated = True
             return
+        # Real AX trees can contain cycles: a wedged TextEdit was observed
+        # returning the app element as its own child. Without this guard a
+        # cyclic tree makes the walk explode instead of terminate.
+        key = element.ref_key()
+        if key is not None:
+            if key in seen:
+                return
+            seen.add(key)
 
         role = element.role
         subrole = element.subrole
@@ -199,7 +209,9 @@ def snapshot(
             ordinal = role_counts.get(child_role, 0)
             role_counts[child_role] = ordinal + 1
 
-            if depth == 0 and not include_menus and child_role == "AXMenuBar":
+            if not include_menus and child_role == "AXMenuBar":
+                # Menu bars can appear at any depth (and duplicated) in
+                # some app states; skip them everywhere unless asked.
                 continue
 
             link = ChainLink(
@@ -208,6 +220,7 @@ def snapshot(
                 identifier=_identifier(child),
                 ordinal=ordinal,
                 index=index,
+                subrole=child.subrole,
             )
             visit(child, chain + (link,), depth + 1, shown_depth + (1 if interesting else 0))
 

@@ -52,6 +52,9 @@ class FakeElement:
     def set_value(self, value: Any) -> None:
         self.value = value
 
+    def ref_key(self):
+        return id(self)
+
     def __repr__(self) -> str:
         return f"<FakeElement {self.role} {self.label!r}>"
 
@@ -87,8 +90,8 @@ def textedit_like() -> FakeElement:
                 "AXWindow",
                 "untitled.txt",
                 children=[
-                    FakeElement("AXButton", "", identifier="_NS:close", actions=["AXPress"]),
-                    FakeElement("AXButton", "", identifier="_NS:zoom", actions=["AXPress"]),
+                    FakeElement("AXButton", "", subrole="AXCloseButton", actions=["AXPress"]),
+                    FakeElement("AXButton", "", subrole="AXFullScreenButton", actions=["AXPress"]),
                     FakeElement(
                         "AXScrollArea",
                         children=[

@@ -60,8 +60,14 @@ class ToolResult:
 def _shape_hash(element: Element, depth: int = SETTLE_DEPTH) -> int:
     """A cheap fingerprint of the tree's current shape and values."""
     parts: list[str] = []
+    seen: set[int] = set()
 
     def visit(el: Element, d: int) -> None:
+        key = el.ref_key() if hasattr(el, "ref_key") else None
+        if key is not None:
+            if key in seen:
+                return
+            seen.add(key)
         parts.append(f"{el.role}|{el.label}|{el.value}")
         if d >= depth:
             return

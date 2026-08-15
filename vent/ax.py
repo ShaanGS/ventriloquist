@@ -255,9 +255,21 @@ class Element:
             raise AXError(f"Action {action!r} failed on {self!r} (AXError {err})")
 
     def set_value(self, value: Any) -> None:
-        err = AXUIElementSetAttributeValue(self._ref, "AXValue", value)
+        self.set_attribute("AXValue", value)
+
+    def set_attribute(self, name: str, value: Any) -> None:
+        err = AXUIElementSetAttributeValue(self._ref, name, value)
         if err != kAXErrorSuccess:
-            raise AXError(f"Setting value failed on {self!r} (AXError {err})")
+            raise AXError(f"Setting {name} failed on {self!r} (AXError {err})")
+
+    def ref_key(self):
+        """A hashable identity for cycle detection during walks. CF refs
+        hash and compare by CFHash/CFEqual through pyobjc; fall back to
+        None (no cycle protection) if that ever fails."""
+        try:
+            return hash(self._ref)
+        except TypeError:
+            return None
 
     def __repr__(self) -> str:
         label = self.label

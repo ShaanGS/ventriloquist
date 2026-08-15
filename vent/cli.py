@@ -26,17 +26,70 @@ def main() -> None:
 
 
 @main.command()
-def doctor() -> None:
-    """Check that Ventriloquist can use the Accessibility API."""
-    if ax.is_trusted():
-        click.secho("✓ Accessibility permission granted. Ready to go.", fg="green")
-    else:
+@click.argument("app_name", required=False)
+def doctor(app_name: str | None) -> None:
+    """Check Accessibility permission, or probe APP_NAME's tree health.
+
+    With an app name, reports whether the app exposes a usable tree and
+    whether web-content accessibility had to be requested (Chromium and
+    Electron apps ship with it off).
+    """
+    if not ax.is_trusted():
         click.secho("✗ Accessibility permission missing.", fg="red")
         click.echo(
-            "  Open System Settings → Privacy & Security → Accessibility and "
+            "  Open System Settings, Privacy & Security, Accessibility, and "
             "enable your terminal (or the app running vent), then rerun."
         )
         sys.exit(1)
+    click.secho("✓ Accessibility permission granted. Ready to go.", fg="green")
+
+    if not app_name:
+        return
+    from . import harness as harness_mod
+
+    try:
+        app = ax.find_app(app_name)
+        root = ax.app_element(app)
+        before = len(snapshot(root).nodes)
+        harness_mod.enable_web_accessibility(root)
+        import time as time_mod
+
+        time_mod.sleep(1.0)
+        after = len(snapshot(root).nodes)
+    except ax.AXError as exc:
+        click.secho(str(exc), fg="red")
+        sys.exit(1)
+
+    click.echo(f"{app.name}: {before} elements before web-accessibility request, {after} after")
+    if after == 0:
+        click.secho("✗ No usable tree. This app cannot be packed yet.", fg="red")
+    elif after > before:
+        click.secho("✓ Tree present (web content appeared after the request).", fg="green")
+    else:
+        click.secho("✓ Tree present.", fg="green")
+
+
+@main.command("harness")
+@click.argument("app_name")
+@click.option("--cap", default=40, show_default=True, help="How many anchors to record.")
+@click.option("--restart", is_flag=True, help="Also quit and relaunch the app (strongest churn).")
+@click.option("--reopen", default=None, help="File to reopen after --restart, restoring the app's document state.")
+def harness_cmd(app_name: str, cap: int, restart: bool, reopen: str | None) -> None:
+    """Measure anchor durability for a running app.
+
+    Records anchors, perturbs the app (zoom resize, and optionally a full
+    restart), and reports how many anchors still resolve to the right
+    element. WRONG resolutions are the number to watch; the design goal
+    is zero.
+    """
+    from . import harness as harness_mod
+
+    try:
+        report = harness_mod.run(app_name, cap=cap, restart=restart, reopen=reopen)
+    except ax.AXError as exc:
+        click.secho(str(exc), fg="red")
+        sys.exit(1)
+    click.echo(report.render())
 
 
 @main.command()
