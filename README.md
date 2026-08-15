@@ -100,16 +100,20 @@ as survivors.
 Current numbers on this machine (macOS 26, small anchor sets, early days):
 
 ```
-TextEdit: baseline 100%,  resized 100%,  0 wrong
-Finder:   baseline 100%,  resized 100%,  0 wrong
-VS Code:  baseline  95%,  resized  77.5%, 0 wrong  (40 anchors, Chromium tree)
+TextEdit: baseline 100%,  resized 100%,   0 wrong
+Finder:   baseline 100%,  resized 100%,   0 wrong
+VS Code:  baseline  95%,  resized  87.5%, restart 92.5%, 0 wrong  (40 anchors)
 ```
 
-VS Code's non-survivors are all ambiguity refusals, not wrong bindings:
-Chromium trees are full of unlabeled twin groups, and when candidates
-score too close the resolver refuses to guess. The compiled VS Code pack's
-own curated anchors resolve 6/6 after view switches, a window resize, and
-an app update.
+The VS Code restart round quits and relaunches the app entirely; 37 of 40
+anchors still bind to provably the same element afterward, with zero wrong
+bindings. The non-survivors are ambiguity refusals and one loss: Chromium
+trees are full of unlabeled twin groups, and when candidates score too
+close the resolver refuses to guess. The compiled VS Code pack's own
+curated anchors resolve 6/6 after view switches, a window resize, and an
+app update. One operational requirement: VS Code must be launched with
+`--force-renderer-accessibility`. Without it the tree can still be read
+after a web-accessibility request, but actions are silently ignored.
 
 Field notes from measuring, kept because they shaped the code: macOS AX
 trees can be cyclic (a wedged TextEdit returned the app element as its own

@@ -56,10 +56,8 @@ next began, and each review's findings were fixed in a follow-up commit.
    `search_workspace`), all passing live through `vent run`, with
    `vent verify` at 6/6 anchors. Harness numbers are in the README
    (95% baseline, 77.5% resized, zero wrong bindings over 40 anchors).
-   Still open from this item: a `--restart` harness round for VS Code;
-   two attempts were eaten by a screen lock and slow relaunches, and the
-   harness fixes that came out of them (pid-aware relaunch waits, tree
-   readiness gates) are committed and untested against a live restart.
+   The full harness now passes live including `--restart`: baseline 95%,
+   resized 87.5%, restart 92.5%, zero wrong bindings over 40 anchors.
    The user has ordered that Discord must not be touched or read; do not
    target it for packs, probes, or demos.
 3. **Demo recording and a tagged release.** The split-screen story is a
@@ -88,11 +86,17 @@ are now handled in code:
   permission check still passes. `vent doctor` now names this state
   instead of blaming the app.
 
-VS Code specifics: launch with `--force-renderer-accessibility`, its
-process name is `Code` but its AppleScript name is `Visual Studio Code`
-(activating "Code" silently fails), and an in-place auto-update can wedge
-its AX bridge (AXWindows returns a bogus Application-role element) until
-the app is fully quit and relaunched.
+VS Code specifics: launch with `--force-renderer-accessibility` — the
+AXManualAccessibility request alone yields a tree that READS fine but
+silently ignores every action, a trap because everything looks healthy
+until a press does nothing. Its process name is `Code` but its
+AppleScript name is `Visual Studio Code` (activating "Code" silently
+fails), and an in-place auto-update can wedge its AX bridge (AXWindows
+returns a bogus Application-role element) until the app is fully quit
+and relaunched. Two more environment truths from the harness work:
+NSWorkspace's running-app list freezes in a process that never pumps
+the run loop (ax.running_apps now pumps), and VS Code can ignore the
+first polite terminate and honor a repeat (the harness re-asks).
 
 ## Gotchas the next session will hit
 
