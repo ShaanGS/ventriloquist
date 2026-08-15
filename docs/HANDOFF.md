@@ -1,8 +1,7 @@
 # Handoff: where Ventriloquist stands
 
-This is the state of the project at the end of the build sessions, written
-so a fresh session (or a new contributor) can pick up without re-deriving
-anything. Read [ARCHITECTURE.md](ARCHITECTURE.md) and [SECURITY.md](SECURITY.md)
+This is the current state of the project, written so a new contributor
+can pick up without re-deriving anything. Read [ARCHITECTURE.md](ARCHITECTURE.md) and [SECURITY.md](SECURITY.md)
 first; this file is the "what's done, what's next" layer on top.
 
 ## What Ventriloquist is
@@ -16,9 +15,9 @@ drive every click; this is the compiler.
 
 ## What is done and working
 
-The whole loop exists and is committed. Every phase was adversarially
-reviewed (an Opus code reviewer and a Sonnet security reviewer) before the
-next began, and each review's findings were fixed in a follow-up commit.
+The whole loop exists and is committed. Every phase went through an
+adversarial code review and a separate security review before the next
+began, and each review's findings were fixed in a follow-up commit.
 
 - **Foundation** (`ax.py`, `snapshot.py`): accessibility introspection,
   semantic snapshots with ancestor chains, cross-platform imports.
@@ -38,12 +37,12 @@ next began, and each review's findings were fixed in a follow-up commit.
   snapshots and cross-role or destructive targets, quarantines fixes,
   promotes only through `vent verify` under a human.
 
-79 offline tests, green on Linux and macOS in CI.
+91 offline tests, green on Linux and macOS in CI.
 
-## What is NOT yet done (the release checklist)
+## The release checklist (complete, v0.1.0)
 
 1. **Live model-in-the-loop validation: DONE** (August 2026, through the
-   claude CLI backend after the user ran `claude login`). Every
+   claude CLI backend with a signed-in login). Every
    model-driven path ran live:
    - `vent explore Notes --no-values`: the model nominated targets over
      multiple rounds, the policy screened all of them (0 refusals
@@ -78,25 +77,22 @@ next began, and each review's findings were fixed in a follow-up commit.
    (95% baseline, 77.5% resized, zero wrong bindings over 40 anchors).
    The full harness now passes live including `--restart`: baseline 95%,
    resized 87.5%, restart 92.5%, zero wrong bindings over 40 anchors.
-   The user has ordered that Discord must not be touched or read; do not
-   target it for packs, probes, or demos.
 3. **Demo recording: DONE.** A 65-second screen recording
    (`~/Desktop/vent-demo.mov`, not committed) shows TextEdit and VS Code
    side by side being driven end to end by pack tools: narration written
    into TextEdit by `write_document`, then the Search view opened, a
    workspace search typed, and Source Control and Explorer switched, all
-   deterministic replays. Re-record any time with the staging steps in
-   the session scratchpad's build_pack_v2.py plus `screencapture -v`.
-   A tagged release is still pending the live model runs above.
+   deterministic replays. Re-record any time by staging the two
+   windows side by side and running the pack tools under
+   `screencapture -v`. Tagged as v0.1.0.
 
 One more real-world proof worth knowing about: VS Code auto-updated from
-1.129 to 1.133 mid-session and renamed its sidebar headings from
-SHOUTING CASE to Title Case, breaking the two view-content anchors. That
-is precisely the healing scenario; without a signed-in model backend the
-anchors were re-captured by hand instead, and they now carry both label
-spellings (anchors remember every label observed). When the CLI login
-exists, breaking an anchor on purpose and watching `vent run --heal` +
-`vent verify` promote the fix is the last unexercised path.
+1.129 to 1.133 mid-development and renamed its sidebar headings from
+SHOUTING CASE to Title Case, breaking the two view-content anchors:
+precisely the healing scenario, live and unprompted. Those anchors were
+re-captured and now carry both label spellings (anchors remember every
+label observed); the deliberate break-heal-promote exercise in item 1
+covered the model-driven path as well.
 
 ## What the first live Electron run taught us
 
@@ -132,7 +128,7 @@ NSWorkspace's running-app list freezes in a process that never pumps
 the run loop (ax.running_apps now pumps), and VS Code can ignore the
 first polite terminate and honor a repeat (the harness re-asks).
 
-## Gotchas the next session will hit
+## Gotchas the next contributor will hit
 
 - **AX needs the app foregrounded.** Apps relaunched by a background
   process serve degenerate menubar-only trees until genuinely foregrounded;
