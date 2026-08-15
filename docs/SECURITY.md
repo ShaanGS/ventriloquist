@@ -103,24 +103,43 @@ Containment therefore has one more layer than before:
 
 - Model output is schema-constrained and the action space is closed; policy
   screening runs after the model and cannot be bypassed by it.
-- Snapshot text sent to models is delimited and tagged as untrusted app
-  content, so prompts distinguish data from instructions instead of relying
-  on the model to guess.
+- Snapshot text sent to models is wrapped in a delimiter carrying a
+  per-call random nonce and tagged as untrusted app content, so an app
+  cannot forge the closing tag to break out, and prompts distinguish data
+  from instructions instead of relying on the model to guess.
+- Model-authored tool names and descriptions are stripped of control and
+  bidirectional-override characters and length-capped before they reach the
+  approval gate, so they cannot forge structure or hide their true target in
+  the text shown to the human.
 - The approval gate renders a deterministic, non-model summary of every
   step (app, window, element role and label, op) next to the model's
   description. The steps are the ground truth; the description is marketing.
-  Tools whose steps touch an app or window their description does not
-  mention are flagged loudly.
+  The gate emits a loud warning when a tool's steps act on a window its
+  description never mentions, and marks high risk tools in red.
 
 ### T6. Personal data leaving the machine
 
 Snapshots are the only thing ever sent to a model, scrubbed first: secure
-fields dropped and values truncated to short previews. A `--no-values`
-flag that strips values entirely ships with the explorer; until then no
-snapshot is sent to any model at all. Truncation is a privacy measure, not
-an injection defense (short payloads survive truncation; T5 handles that). Traces and
-packs stay on local disk. No telemetry. All network calls live in
-`vent/llm.py`, one file to audit.
+fields are dropped entirely, and other field values are truncated to short
+previews. `vent explore --no-values` replaces every value with a length
+marker (`<N chars redacted>`) so exploration can run without any field
+content leaving the machine; element structure and labels still go through.
+Truncation is a privacy measure, not an injection defense (short payloads
+survive truncation; T5 handles that). Honest limits: without `--no-values`,
+a probe session does send up to the preview length of non-secure field
+content (a note body, a draft) to the model, so `--no-values` is the switch
+to reach for on an app holding sensitive text. Traces and packs stay on
+local disk. No telemetry. All network calls live in `vent/llm.py`, one file
+to audit.
+
+Probe reversibility has an honest limit too: the explorer writes a short
+probe string into an empty field and restores the prior value immediately,
+but an app that transmits on every keystroke (iCloud-syncing Notes, a
+live-collaboration document, search-as-you-type) may have already sent that
+string before the restore. Probing is reversible on the local field, not
+across a network the app owns. When a restore fails outright, the trace
+action is reclassified destructive so neither the compiler nor a reviewer
+treats it as clean.
 
 ### T7. Poisoned or stale packs
 

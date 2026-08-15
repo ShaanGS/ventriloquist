@@ -28,6 +28,32 @@ def test_destructive_verb_blocked():
     assert not pol.screen_press(node(label="Send")).allowed
 
 
+def test_punctuation_glued_verbs_still_blocked():
+    pol = policy_mod.Policy()
+    for label in ["Delete!", "Send,", "Send/Receive", "Erase—All", "Delete…"]:
+        assert not pol.screen_press(node(label=label)).allowed, label
+
+
+def test_generic_confirm_on_destructive_sheet_blocked():
+    pol = policy_mod.Policy()
+    ok = make_node_with_window("OK", "Delete Report.docx?")
+    assert not pol.screen_press(ok).allowed
+    # But OK on a benign sheet is fine.
+    fine = make_node_with_window("OK", "Preferences")
+    assert pol.screen_press(fine).allowed
+
+
+def test_risky_key_survives_relabel():
+    pol = policy_mod.Policy()
+    from vent.snapshot import ChainLink
+    chain = (ChainLink(role="AXWindow", label="Main", identifier="w1", ordinal=0, index=0),)
+    n1 = node(label="Options", identifier="btn-1"); n1.chain = chain
+    pol.mark_risky(n1)
+    # Same element, relabelled and window retitled: still risky.
+    n2 = node(label="Preferences", identifier="btn-1"); n2.chain = chain
+    assert not pol.screen_press(n2).allowed
+
+
 def test_unlabeled_default_deny():
     pol = policy_mod.Policy()
     verdict = pol.screen_press(node(label=""))

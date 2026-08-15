@@ -215,7 +215,8 @@ def run(app_name: str, tool_name: str, arg_pairs: tuple[str, ...]) -> None:
 @main.command()
 @click.argument("app_name")
 @click.option("--rounds", default=3, show_default=True, help="Probe rounds to run.")
-def explore(app_name: str, rounds: int) -> None:
+@click.option("--no-values", is_flag=True, help="Redact field values from snapshots sent to the model.")
+def explore(app_name: str, rounds: int, no_values: bool) -> None:
     """Probe a running app under the safety policy and record a trace.
 
     The model nominates elements; the policy screens every nomination;
@@ -229,7 +230,7 @@ def explore(app_name: str, rounds: int) -> None:
         root = ax.app_element(app)
         ax.activate(app)
         pol = policy_mod.Policy()
-        trace = explorer.explore(app, root, pol, rounds=rounds, notify=click.echo)
+        trace = explorer.explore(app, root, pol, rounds=rounds, notify=click.echo, redact_values=no_values)
     except (ax.AXError, llm.ModelError, explorer.ExplorationBlocked) as exc:
         click.secho(f"✗ {exc}", fg="red")
         sys.exit(1)
@@ -282,13 +283,19 @@ def compile_cmd(app_name: str) -> None:
 
     approved = []
     for proposal in proposals:
-        spec = compiler.build_spec(proposal)
-        if not spec.steps:
+        try:
+            spec = compiler.build_spec(proposal)
+        except compiler.CompileError as exc:
+            click.secho(f"  skipping a proposal: {exc}", fg="yellow")
             continue
         click.echo()
         click.secho(f"Proposed: {spec.name}", bold=True)
         click.echo(f"  Model description: {spec.description}")
         click.echo(compiler.deterministic_summary(spec, trace.app_name))
+        for warning in compiler.description_mismatch(spec, trace.app_name):
+            click.secho(f"  ⚠ {warning}", fg="yellow")
+        if spec.risk == "high":
+            click.secho("  ⚠ high risk tool", fg="red")
         if click.confirm("Approve this tool?", default=False):
             approved.append(spec)
 

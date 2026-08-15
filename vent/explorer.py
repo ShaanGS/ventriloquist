@@ -125,9 +125,9 @@ def load_trace(traces_dir: Path, bundle_id: str) -> Trace:
     return Trace.from_dict(json.loads(path.read_text()))
 
 
-def _nominate(snap: Snapshot) -> list[dict]:
+def _nominate(snap: Snapshot, redact_values: bool = False) -> list[dict]:
     """Ask the model which elements to probe. Snapshot text is untrusted."""
-    rendered = llm.wrap_untrusted("app snapshot", render(snap))
+    rendered = llm.wrap_untrusted("app snapshot", render(snap, redact_values=redact_values))
     result = llm.complete_json(
         system=NOMINATE_SYSTEM.format(max_targets=MAX_TARGETS_PER_ROUND),
         user_text=rendered,
@@ -175,6 +175,7 @@ def explore(
     pol: policy_mod.Policy,
     rounds: int = 3,
     notify: Callable[[str], None] = lambda message: None,
+    redact_values: bool = False,
 ) -> Trace:
     """Run survey and probe phases against a live app, returning the trace."""
     trace = Trace(
@@ -193,9 +194,13 @@ def explore(
             notify("Snapshot is empty; stopping this round.")
             break
 
-        targets = _nominate(snap)
+        targets = _nominate(snap, redact_values)
         notify(f"Round {round_index + 1}: model nominated {len(targets)} target(s).")
 
+        # The nominated ids index THIS snapshot. Once an executed probe
+        # changes the tree, those ids no longer mean what the model chose,
+        # so the round ends and the next round re-nominates against a fresh
+        # snapshot. This closes the stale-id binding the review found.
         for target in targets:
             node_id = target.get("id")
             op = target.get("op")
@@ -206,7 +211,9 @@ def explore(
             if op == "press":
                 verdict = pol.screen_press(node)
             elif op == "set_value":
-                verdict = pol.screen_set_value(node, node.value_preview)
+                # Re-read the live value; the cached preview is truncated
+                # and may be stale (TOCTOU). Empty is required to probe.
+                verdict = pol.screen_set_value(node, _live_value(node))
             else:
                 continue
 
@@ -229,11 +236,21 @@ def explore(
                         "manually; the element is marked risky."
                     )
 
-            # Re-snapshot so later targets in this round act on reality,
-            # not on a tree the previous action may have changed.
-            snap = snapshot(root)
+            if action.executed and action.nodes_after != action.nodes_before:
+                # The tree shifted. Remaining ids in this round are stale;
+                # stop and re-nominate next round rather than act on them.
+                notify("tree changed after probe; re-nominating next round")
+                break
 
     return trace
+
+
+def _live_value(node: Node) -> str:
+    try:
+        value = node.element.value
+        return "" if value is None else str(value)
+    except ax.AXError:
+        return ""
 
 
 def _execute_probe(
@@ -244,6 +261,7 @@ def _execute_probe(
     notify: Callable[[str], None],
 ) -> TraceAction:
     anchor = anchors.build(node)
+    original_value = _live_value(node) if op == "set_value" else ""
     before = snapshot(root)
 
     action = TraceAction(
@@ -280,12 +298,16 @@ def _execute_probe(
     )
 
     if op == "set_value":
-        # Reversible probing: the field was empty (policy guarantees it),
-        # so restoring it is putting it back exactly as found.
+        # Restore the field to exactly what it held before the probe,
+        # read live rather than assumed empty. If the restore fails, the
+        # probe text was left behind: mark the action non-reversible so
+        # neither the compiler nor a human reviewer treats it as clean.
         try:
-            node.element.set_value("")
+            node.element.set_value(original_value)
             settle(root, 2.0)
         except ax.AXError:
-            notify(f"could not restore probed field {node.label!r}")
+            notify(f"could not restore probed field {node.label!r}; marking destructive")
+            action.classification = "destructive"
+            action.reason = "probe text could not be restored"
 
     return action

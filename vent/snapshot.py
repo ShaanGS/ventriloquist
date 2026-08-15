@@ -245,14 +245,25 @@ def snapshot(
     )
 
 
-def render(snap: Snapshot) -> str:
-    """One line per element, readable by humans and models alike."""
+def render(snap: Snapshot, redact_values: bool = False) -> str:
+    """One line per element, readable by humans and models alike.
+
+    redact_values replaces field contents with a length marker so a
+    snapshot can be sent to a model without leaking what the user typed
+    (SECURITY.md T6). Element structure and labels still go through; only
+    values are withheld.
+    """
     lines = []
     for node in snap.nodes:
         indent = "  " * node.depth
         label = f" {node.label!r}" if node.label else ""
         ident = f" id={node.identifier}" if node.identifier else ""
-        value = f" = {node.value_preview!r}" if node.value_preview else ""
+        if node.value_preview and redact_values:
+            value = f" = <{len(node.value_preview)} chars redacted>"
+        elif node.value_preview:
+            value = f" = {node.value_preview!r}"
+        else:
+            value = ""
         cleaned = [" ".join(a.removeprefix("AX").split()) for a in node.actions]
         actions = f" [{','.join(c[:30] for c in cleaned)}]" if cleaned else ""
         lines.append(f"{indent}#{node.id} {node.role.removeprefix('AX')}{label}{ident}{value}{actions}")

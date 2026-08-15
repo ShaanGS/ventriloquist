@@ -87,7 +87,7 @@ class Anchor:
 
         known = {f.name for f in dc_fields(ChainLink)}
         return cls(
-            role=data["role"],
+            role=data.get("role", ""),
             identifier=data.get("identifier", ""),
             labels=list(data.get("labels", [])),
             window_title=data.get("window_title", ""),

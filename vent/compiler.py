@@ -14,6 +14,8 @@ then only ever raised by the human at the gate, never lowered.
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from dataclasses import dataclass
 
 from . import llm
@@ -126,21 +128,79 @@ def propose(trace: Trace) -> list[Proposal]:
 
 
 def _risk_for(actions: list[TraceAction]) -> str:
-    if any(a.classification == "destructive" for a in actions):
-        return "high"
+    from .policy import DESTRUCTIVE_VERBS, _matches_verb
+
+    # A press whose recorded label carries a destructive verb is high risk
+    # even though it executed (the policy only blocks such presses during
+    # probing; a hand-authored or drifted trace can still carry one). This
+    # makes the mechanical floor meaningful rather than dead.
+    for action in actions:
+        if action.classification == "destructive":
+            return "high"
+        if action.op == "press" and any(
+            _matches_verb(action.label.lower(), verb) for verb in DESTRUCTIVE_VERBS
+        ):
+            return "high"
     if any(a.op == "set_value" or a.classification == "cumulative" for a in actions):
         return "mutating"
     return "mutating" if any(a.op == "press" for a in actions) else "read_only"
 
 
+def description_mismatch(spec: ToolSpec, trace_app: str) -> list[str]:
+    """Warnings when a tool's steps touch a window its description does not
+    mention (SECURITY.md T5). Surfaced loudly at the approval gate so a
+    poisoned description cannot hide which surface it drives."""
+    warnings = []
+    described = spec.description.lower()
+    windows = {
+        s.anchor.window_title for s in spec.steps if s.anchor and s.anchor.window_title
+    }
+    for window in windows:
+        # If the window title has a distinctive word absent from the
+        # description, flag it. Document names are noisy, so only flag
+        # multi-character alphabetic tokens.
+        tokens = [t for t in re.findall(r"[^\W_]+", window.lower()) if len(t) > 3]
+        if tokens and not any(t in described for t in tokens):
+            warnings.append(
+                f"steps act on window {window!r} but the description does not mention it"
+            )
+    return warnings
+
+
+def _clean_text(text: str, limit: int) -> str:
+    """Strip control and bidi-override characters and cap length. Model
+    text is shown next to the deterministic summary; it must not be able to
+    forge structure or hide characters there (review findings)."""
+    out = []
+    for ch in text:
+        category = unicodedata.category(ch)
+        if category.startswith("C"):  # control, format, surrogate, etc.
+            continue
+        out.append(ch)
+    cleaned = " ".join("".join(out).split())
+    return cleaned[:limit]
+
+
+class CompileError(ValueError):
+    """A proposal could not be turned into a valid tool."""
+
+
 def build_spec(proposal: Proposal) -> ToolSpec:
     """Turn a proposal into a ToolSpec using only recorded anchors."""
+    name = _clean_text(proposal.name, 64)
+    if not name.replace("_", "").isalnum():
+        raise CompileError(f"proposed tool name {proposal.name!r} is not snake_case alphanumeric")
+
     steps = []
     params: dict[str, dict] = {}
     verify: list[Verify] = []
 
     for action in proposal.actions:
-        anchor = Anchor.from_dict(action.anchor or {})
+        if not action.anchor or not action.anchor.get("role"):
+            # An executed action with no usable anchor cannot be replayed.
+            # Skip it rather than emit a step that resolves nothing.
+            continue
+        anchor = Anchor.from_dict(action.anchor)
         if action.op == "press":
             steps.append(Step(op="press", anchor=anchor, expect={"role": action.role}))
         elif action.op == "set_value":
@@ -163,9 +223,12 @@ def build_spec(proposal: Proposal) -> ToolSpec:
                     Step(op="set_value", anchor=anchor, expect={"role": action.role}, value={"literal": ""})
                 )
 
+    if not steps:
+        raise CompileError(f"proposal {name!r} had no replayable steps")
+
     return ToolSpec(
-        name=proposal.name,
-        description=proposal.description,
+        name=name,
+        description=_clean_text(proposal.description, 300),
         risk=_risk_for(proposal.actions),
         requires_frontmost=True,
         params=params,
@@ -178,7 +241,7 @@ def build_spec(proposal: Proposal) -> ToolSpec:
 def deterministic_summary(spec: ToolSpec, app_name: str) -> str:
     """The ground-truth rendering shown at the approval gate. Built from the
     steps themselves, never from model text (SECURITY.md T5)."""
-    lines = [f"{spec.name} (risk: {spec.risk}) does exactly this to {app_name}:"]
+    lines = [f"{spec.name!r} (risk: {spec.risk}) does exactly this to {app_name!r}:"]
     for index, step in enumerate(spec.steps):
         target = ""
         if step.anchor:

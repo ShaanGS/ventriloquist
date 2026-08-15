@@ -23,6 +23,8 @@ their insufficiency is documented rather than papered over.
 
 from __future__ import annotations
 
+import re
+
 from dataclasses import dataclass, field
 
 from .snapshot import Node
@@ -44,6 +46,10 @@ DANGEROUS_CONTEXT_WORDS = {"all", "history", "everything", "account", "library",
 CUMULATIVE_VERBS = {"new", "add", "create", "duplicate", "insert", "compose"}
 
 AUTH_WINDOW_WORDS = {"password", "login", "log in", "sign in", "unlock", "authenticate"}
+
+# Short labels that carry no verb of their own but confirm whatever sheet
+# they sit on. Judged against the window/sheet title (SECURITY.md T2).
+GENERIC_CONFIRM_LABELS = {"ok", "yes", "confirm", "continue", "proceed", "done", "apply"}
 
 DEFAULT_CUMULATIVE_BUDGET = 3
 
@@ -69,7 +75,11 @@ class Policy:
         self.risky_ids.add(self._node_key(node))
 
     def _node_key(self, node: Node) -> str:
-        return f"{node.role}|{node.identifier}|{node.label}|{node.window_title}"
+        # Keyed on stable facets only. Label and window title are
+        # app-controlled and state-dependent, so an element that relabels
+        # itself after triggering a dialog must still count as risky.
+        ordinals = ",".join(str(link.ordinal) for link in node.chain)
+        return f"{node.role}|{node.identifier}|{ordinals}"
 
     def screen_press(self, node: Node) -> Verdict:
         """May the explorer press this element?"""
@@ -99,8 +109,21 @@ class Policy:
                     return Verdict(False, f"contextual verb {verb!r} in dangerous context", "destructive")
                 return Verdict(True, f"contextual verb {verb!r}, context looks benign", "reversible")
 
-        if any(word in node.window_title.lower() for word in AUTH_WINDOW_WORDS):
+        window = node.window_title.lower()
+        if any(word in window for word in AUTH_WINDOW_WORDS):
             return Verdict(False, "element inside an authentication window", "destructive")
+
+        # A destructive verb in the WINDOW or SHEET title makes even a
+        # verb-free confirm button ("OK" on a "Delete Report?" sheet)
+        # dangerous. This is the compound-context case from review.
+        window_words = set(re.findall(r"[^\W_]+", window))
+        if window_words & (DESTRUCTIVE_VERBS | CONTEXTUAL_VERBS):
+            if label in GENERIC_CONFIRM_LABELS or _matches_verb(label, "delete"):
+                return Verdict(
+                    False,
+                    "confirms a window whose title carries a destructive verb",
+                    "destructive",
+                )
 
         for verb in CUMULATIVE_VERBS:
             if _matches_verb(label, verb):
@@ -136,10 +159,13 @@ class Policy:
 
 
 def _matches_verb(label: str, verb: str) -> bool:
-    """Word-boundary match so 'end' does not fire on 'calendar'."""
-    words = label.replace("…", " ").replace(".", " ").split()
+    """Word-boundary match so 'end' does not fire on 'calendar', but
+    'Delete!' and 'Send/Receive' still fire. Tokenizes on Unicode word
+    boundaries rather than whitespace, so punctuation glued to a verb no
+    longer hides it (SECURITY.md T2)."""
     if " " in verb:
         return verb in label
+    words = re.findall(r"[^\W_]+", label)
     return verb in words
 
 
