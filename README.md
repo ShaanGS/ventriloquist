@@ -2,9 +2,11 @@
 
 Turn a Mac app into an MCP server using the accessibility API. An agent
 explores the app once, the interesting actions get compiled into a JSON
-"pack" of typed tools, and after that everything is deterministic replay.
-There's no LLM in the loop at runtime, no screenshots, and no pixel
-coordinates anywhere in the codebase.
+"pack" of typed tools, and after that each tool call is deterministic
+replay. No model runs per UI step and none runs on the serving path. The
+client composing tool calls is still a model, so a multi-step workflow
+has one model in it, but it's deciding which tools to call, not where to
+click. No screenshots and no pixel coordinates anywhere in the codebase.
 
 The idea is that most computer-use agents are interpreters. A model looks
 at your screen and decides every single click, every time, which is slow
@@ -17,13 +19,6 @@ but the fix sits in quarantine until you approve it.
 The accessibility layer has been in every Mac app for decades because
 screen readers depend on it. It turns out it's also a pretty good API for
 driving apps, if you're careful about how you find elements again later.
-
-## Demo
-
-[Watch the demo](docs/demo.mp4): TextEdit and VS Code side by side, both
-driven entirely by compiled pack tools. The narration gets typed into
-TextEdit by one tool while others switch VS Code's views and run a
-workspace search. Every action in the video is a deterministic replay.
 
 ## How it works
 
@@ -129,6 +124,25 @@ that don't survive are refusals, not mistakes: Chromium trees are full of
 unlabeled twin groups, and when two candidates score too close together
 the resolver refuses to pick one. The VS Code pack's own curated anchors
 went 6 for 6 across view switches, a resize, and an actual app update.
+
+Per-anchor survival flatters what a caller actually experiences, because
+a tool touches several anchors plus settling and verification, so there
+is a second harness mode that runs whole tools end to end.
+`vent harness <app> --tools` executes every tool in the app's pack
+repeatedly, resizing the window every other cycle:
+
+```
+TextEdit: 8/8 calls passed   (4 cycles)
+VS Code:  12/16 calls passed (4 cycles, every failure the same tool)
+```
+
+The VS Code failures are all `search_workspace` called cold. Its
+description says to open the Search view first, but that dependency is
+prose, not a machine-checked precondition, so a caller who ignores it
+fails and so does this harness, on purpose. The anchors were fine in
+every failing call. That gap between 87.5% per-anchor and 75% per-tool
+is the honest cost of state in a GUI, and stateful preconditions are the
+planned fix.
 
 One thing to know for VS Code specifically: launch it with
 `--force-renderer-accessibility`. Without that flag the tree can still be

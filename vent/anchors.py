@@ -284,6 +284,22 @@ def _score(anchor: Anchor, chain: tuple[ChainLink, ...]) -> tuple[float, dict]:
     return score, breakdown
 
 
+def semantic_drift(anchor: Anchor, element: Element) -> bool:
+    """Whether a resolved element wears a label the anchor has never seen.
+
+    Surviving a relabel is durability. Surviving a relabel the anchor has
+    no record of may mean the control's meaning changed while its position
+    did not (SECURITY.md T11): an archive button becoming a delete button
+    binds just as confidently. Electron apps relabel server-side with no
+    version bump, so this is judged on the mismatch itself. The caller
+    decides what to do; this only says "a human should look".
+    """
+    if not anchor.labels:
+        return False
+    live = element.label
+    return bool(live) and live not in anchor.labels
+
+
 def resolve(root: Element, anchor: Anchor, low_confidence: bool = False) -> Element:
     """Find the element an anchor describes, or refuse.
 

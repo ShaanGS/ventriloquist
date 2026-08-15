@@ -219,6 +219,48 @@ used for Ventriloquist, review packs before serving them, and treat
 `vent serve` as giving the connected MCP client exactly the capabilities the
 approved packs describe, unattended.
 
+### T11. Semantic drift under a stable anchor
+
+Anchor durability and semantic safety pull in opposite directions, and
+the resolver deliberately optimizes the first. An anchor is built to keep
+resolving through relabels, moves, and rebuilds; that same strength means
+an app update can change what a control does while the anchor still binds
+confidently. Verify checks assert values and existence, not intent. A
+tool named archive_note keeps working after the button underneath it
+becomes delete, and every durability number in the README celebrates
+exactly the property that makes this possible.
+
+Mitigation: anchors record every label they have been observed under, and
+`vent verify` flags any resolution onto a label outside that set as a
+semantic drift suspect requiring human re-confirmation, rather than
+counting it as survival. The trigger is the label mismatch itself, not an
+app version change: Electron apps relabel server-side and behind feature
+flags with no version bump at all, so gating on versions would miss the
+apps most likely to drift. A version change is an aggravating factor
+(stale packs already resolve low-confidence), never the trigger. The
+residual risk is a control whose meaning changed while its label did not;
+no anchor-side check can see that, which is one more reason risk levels
+and the high-risk server gate exist.
+
+### T12. Read tools feeding the client model
+
+Not yet shipped, recorded before it is. Today the server exposes tools
+that act; the moment it exposes tools that read (list rows, read a
+document, dump search results), the trust picture changes shape. App
+content is attacker-influenced text, and a read tool hands it directly to
+the client model, which also holds this server's mutating tool handles.
+The structural invariant that `server.py` never imports `llm.py` still
+holds, but the protection it provided is gone: the injection no longer
+needs our model because the caller brought their own.
+
+The client's defenses are not ours to assume. Minimum bar for shipping
+read tools: mark read-tool output as untrusted app content at the MCP
+boundary with the same nonce-delimited wrapping `llm.py` uses internally,
+so a well-behaved client can quarantine it, and say plainly in the tool
+description that the output is app-controlled data, not instructions.
+This does not make injection impossible; it makes the boundary visible
+to the party who can act on it.
+
 ## Standing rules for contributors
 
 - New step ops require an update to this document and a policy review.

@@ -89,18 +89,30 @@ def doctor(app_name: str | None) -> None:
 @click.option("--cap", default=40, show_default=True, help="How many anchors to record.")
 @click.option("--restart", is_flag=True, help="Also quit and relaunch the app (strongest churn).")
 @click.option("--reopen", default=None, help="File to reopen after --restart, restoring the app's document state.")
-def harness_cmd(app_name: str, cap: int, restart: bool, reopen: str | None) -> None:
+@click.option("--tools", "tools_mode", is_flag=True, help="Measure end-to-end tool success instead of per-anchor survival. Runs every non-high tool in the app's pack for real.")
+@click.option("--cycles", default=3, show_default=True, help="With --tools: how many run cycles (every second cycle is resized).")
+def harness_cmd(app_name: str, cap: int, restart: bool, reopen: str | None, tools_mode: bool, cycles: int) -> None:
     """Measure anchor durability for a running app.
 
     Records anchors, perturbs the app (zoom resize, and optionally a full
     restart), and reports how many anchors still resolve to the right
     element. WRONG resolutions are the number to watch; the design goal
     is zero.
+
+    With --tools, measures what a caller actually experiences instead:
+    every tool in the app's pack is executed end to end, repeatedly, with
+    a window resize between cycles. A tool touches several anchors plus
+    settling and verification, so this number is always at or below the
+    per-anchor one, and it is the honest headline.
     """
     from . import harness as harness_mod
 
     try:
-        report = harness_mod.run(app_name, cap=cap, restart=restart, reopen=reopen)
+        if tools_mode:
+            pack = _find_pack(app_name)
+            report = harness_mod.run_tools(pack, app_name, cycles=cycles)
+        else:
+            report = harness_mod.run(app_name, cap=cap, restart=restart, reopen=reopen)
     except ax.AXError as exc:
         click.secho(str(exc), fg="red")
         sys.exit(1)
@@ -261,6 +273,7 @@ def verify(app_name: str) -> None:
     # too, so they belong in the durability number.
     seen: set = set()
     total = resolved = 0
+    drift: list = []
     for tool in pack.tools:
         anchored = [(s.op, s.anchor) for s in tool.steps if s.anchor]
         anchored += [("verify", v.anchor) for v in tool.verify if v.anchor]
@@ -272,14 +285,29 @@ def verify(app_name: str) -> None:
             seen.add(key)
             total += 1
             try:
-                anchors.resolve(root, anchor, low_confidence=low_confidence)
+                element = anchors.resolve(root, anchor, low_confidence=low_confidence)
                 resolved += 1
             except (anchors.AnchorLost, anchors.AnchorAmbiguous) as exc:
                 click.secho(f"  {tool.name} ({op}): {exc}", fg="yellow")
+                continue
+            if anchors.semantic_drift(anchor, element):
+                drift.append((tool.name, op, anchor.labels, element.label))
 
     pct = (resolved / total * 100) if total else 100.0
     color = "green" if resolved == total else "yellow"
     click.secho(f"{pack.app_name}: {resolved}/{total} anchors resolve ({pct:.0f}%)", fg=color)
+
+    if drift:
+        click.echo()
+        click.secho(
+            f"⚠ {len(drift)} anchor(s) resolved onto a label they have never "
+            "been recorded under. The element was found, but its meaning may "
+            "have changed. Re-confirm these tools do what their names say, "
+            "then re-record the anchors to adopt the new labels:",
+            fg="yellow",
+        )
+        for tool_name, op, known, live in drift:
+            click.echo(f"  {tool_name} ({op}): recorded {known!r}, live label {live!r}")
 
     if not pack.healed_pending:
         return

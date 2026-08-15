@@ -99,3 +99,50 @@ def test_anchor_resolution_survives_self_reference():
     anchor = anchors.build(next(n for n in snapshot(tree).nodes if n.identifier == "doc-body"))
     tree._children.insert(0, tree)
     assert anchors.resolve(tree, anchor).value == "hello"
+
+
+def test_semantic_drift_flags_unseen_labels_only():
+    """T11: a resolution onto a label the anchor has never been recorded
+    under is flagged for human re-confirmation. Known labels, including
+    ones adopted through re-recording, stay quiet, as do unlabeled
+    elements and anchors with no label history to compare against."""
+    anchor = anchors.Anchor(
+        role="AXButton", identifier="", labels=["Archive", "Archive Note"],
+        window_title="", chain=[],
+    )
+    assert not anchors.semantic_drift(anchor, FakeElement("AXButton", "Archive"))
+    assert not anchors.semantic_drift(anchor, FakeElement("AXButton", "Archive Note"))
+    assert anchors.semantic_drift(anchor, FakeElement("AXButton", "Delete Note"))
+    assert not anchors.semantic_drift(anchor, FakeElement("AXButton", ""))
+    unlabeled = anchors.Anchor(role="AXButton", identifier="x", labels=[], window_title="", chain=[])
+    assert not anchors.semantic_drift(unlabeled, FakeElement("AXButton", "Anything"))
+
+
+def test_run_tools_measures_end_to_end_success(monkeypatch):
+    """The tool-level harness runs whole tools (steps plus verify), which
+    is the number a caller experiences. Per-anchor survival flatters it."""
+    from tests.test_runtime import build_write_tool
+    from tests.fakes import textedit_like
+    from vent import harness as hm
+
+    tree = textedit_like()
+    pack = build_write_tool(tree)
+
+    monkeypatch.setattr(hm.ax, "find_app", lambda q: type("A", (), {"name": "TextEdit", "pid": 1, "bundle_id": "com.apple.TextEdit"})())
+    monkeypatch.setattr(hm.ax, "app_element", lambda app: tree)
+    monkeypatch.setattr(hm, "enable_web_accessibility", lambda root: None)
+    monkeypatch.setattr(hm, "_wait_for_tree", lambda root, **kw: True)
+
+    report = hm.run_tools(pack, "TextEdit", cycles=1)
+    rnd = report.rounds[0]
+    assert (rnd.passed, rnd.failed) == (2, 0)
+
+    # Break the document anchor's role expectation path by renaming the
+    # element's identifier: write_document now fails end to end, and the
+    # report says which tool and why instead of hiding it in an average.
+    body = tree.children()[0].children()[2].children()[0]
+    body._identifier = "someone-else"
+    report2 = hm.run_tools(pack, "TextEdit", cycles=1)
+    rnd2 = report2.rounds[0]
+    assert rnd2.failed >= 1
+    assert any("write_document" in t or "read_document" in t for t, _ in rnd2.failures)

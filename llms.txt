@@ -2,9 +2,10 @@
 
 > Turn a Mac app into an MCP server using the macOS accessibility API. An agent
 > explores the app once, the useful actions are compiled into a JSON "pack" of
-> typed tools, and after that every call is a deterministic replay that takes
-> milliseconds and never touches a model. No screenshots, no vision, no pixel
-> coordinates anywhere in the codebase.
+> typed tools, and after that each tool call is a deterministic replay that
+> takes milliseconds. No model runs per UI step and none runs on the serving
+> path; the client model composing tool calls is the only model in a workflow.
+> No screenshots, no vision, no pixel coordinates anywhere in the codebase.
 
 This file is the whole project explained in one place, written for both people
 and language models. The repo is https://github.com/ShaanGS/ventriloquist. The

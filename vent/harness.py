@@ -366,3 +366,80 @@ def enable_web_accessibility(root: ax.Element) -> None:
             root.set_attribute(attr, True)
         except ax.AXError:
             pass
+
+
+@dataclass
+class ToolRound:
+    phase: str
+    passed: int = 0
+    failed: int = 0
+    failures: list = field(default_factory=list)  # (tool, message)
+
+
+@dataclass
+class ToolReport:
+    """End-to-end tool success under perturbation.
+
+    The anchor numbers above measure parts; this measures the thing a
+    caller experiences. A tool with three steps and a verify touches
+    several anchors, waits, settles, and re-reads, and any of it can
+    break. Per-anchor survival flatters that compound risk."""
+
+    app_name: str = ""
+    rounds: list = field(default_factory=list)
+
+    def render(self) -> str:
+        lines = [f"{self.app_name}: tool-level success"]
+        for r in self.rounds:
+            total = r.passed + r.failed
+            pct = (r.passed / total * 100) if total else 0.0
+            lines.append(f"  {r.phase:10} {r.passed}/{total} calls passed ({pct:.0f}%)")
+            for tool, message in r.failures:
+                lines.append(f"    ✗ {tool}: {message}")
+        return "\n".join(lines)
+
+
+def _sample_args(tool) -> dict:
+    """Placeholder arguments for measurement runs. Strings are visibly
+    probe-flavored so anything left behind in a text field explains itself."""
+    return {name: f"vent harness probe ({name})" for name in tool.params}
+
+
+def run_tools(pack, app_query: str, cycles: int = 3) -> ToolReport:
+    """Run every non-high tool in the pack end to end, repeatedly, with a
+    window resize between cycles. Reports per-phase pass counts and every
+    failure message. Mutating tools do run for real; point this at scratch
+    documents, not work."""
+    from . import runtime
+
+    app = ax.find_app(app_query)
+    root = ax.app_element(app)
+    enable_web_accessibility(root)
+    _wait_for_tree(root)
+
+    report = ToolReport(app_name=app.name)
+    tools = [t for t in pack.tools if t.risk != "high"]
+
+    for cycle in range(cycles):
+        restore = None
+        if cycle % 2 == 1:
+            restore = _resize_window(root)
+            time.sleep(0.8)
+        phase = f"cycle {cycle + 1}" + (" (resized)" if restore else "")
+        rnd = ToolRound(phase=phase)
+        for tool in tools:
+            if ax.session_locked():
+                rnd.failures.append((tool.name, "screen locked; call not attempted"))
+                rnd.failed += 1
+                continue
+            try:
+                runtime.execute(pack, tool.name, _sample_args(tool), root, app=app)
+                rnd.passed += 1
+            except runtime.ToolExecutionError as exc:
+                rnd.failed += 1
+                rnd.failures.append((tool.name, str(exc)[:120]))
+        report.rounds.append(rnd)
+        if restore is not None:
+            restore()
+            time.sleep(0.5)
+    return report

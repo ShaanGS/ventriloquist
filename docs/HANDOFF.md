@@ -128,6 +128,39 @@ NSWorkspace's running-app list freezes in a process that never pumps
 the run loop (ax.running_apps now pumps), and VS Code can ignore the
 first polite terminate and honor a repeat (the harness re-asks).
 
+## Where the design gets pushed next
+
+An outside review (August 2026) landed several points now reflected in
+the code and docs, plus a queue of open work in priority order:
+
+1. Portability is the untested load-bearing claim. Packs carry window
+   titles and chain ordinals that may be coupled to one machine's state.
+   AppKit identifiers ship in compiled nibs and should travel; Electron
+   anchors ride on labels and ordinals that depend on window width,
+   sidebar state, and extensions, and Electron is the target market.
+   First cheap probe: a fresh macOS user account on the same machine
+   (clean geometry, no extensions, no workspace state), then a real
+   second machine.
+2. Tool-level success is the honest headline, and it is measured now:
+   `vent harness <app> --tools`. The per-anchor and per-tool gap on VS
+   Code (87.5% vs 75%) is entirely state-dependence, which is the case
+   for stateful preconditions. Do not design preconditions until a
+   hostile Electron app (Slack) has been probed; "the Search view is
+   open" assumes the app exposes a stable assertable element for view
+   state, and Chromium was already unreliable about exactly that.
+3. T11 (semantic drift under a stable anchor) is written up and
+   `vent verify` now flags any resolution onto a label outside the
+   anchor's recorded set, version change or not.
+4. T12 (read tools feeding the client model) is written down before read
+   tools exist. Read it before shipping any read tool.
+5. A parameter-bound `select` op (press the row whose label equals the
+   parameter) is the highest-value capability gap. Design it against
+   Chromium list virtualization from day one: a Slack DM list only
+   publishes rendered rows, so select must compose with scrolling, and
+   that constraint shapes the op more than the threat model does.
+6. Control flow stays in the MCP client, not in packs. The pitch is
+   "no model per UI step, none on the serving path", not "no model".
+
 ## Gotchas the next contributor will hit
 
 - **AX needs the app foregrounded.** Apps relaunched by a background
