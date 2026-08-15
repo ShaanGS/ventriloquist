@@ -186,8 +186,11 @@ def _find_pack(name: str) -> packs.Pack:
 @click.argument("app_name")
 @click.argument("tool_name")
 @click.option("--arg", "arg_pairs", multiple=True, help="Tool argument as key=value. Repeatable.")
-def run(app_name: str, tool_name: str, arg_pairs: tuple[str, ...]) -> None:
+@click.option("--heal", "do_heal", is_flag=True, help="Re-ground broken anchors with a model and quarantine the fix.")
+def run(app_name: str, tool_name: str, arg_pairs: tuple[str, ...], do_heal: bool) -> None:
     """Execute one compiled tool against the live app, without MCP."""
+    from . import heal as heal_mod
+
     pack = _find_pack(app_name)
     args = {}
     for pair in arg_pairs:
@@ -200,8 +203,12 @@ def run(app_name: str, tool_name: str, arg_pairs: tuple[str, ...]) -> None:
         app = ax.find_app_by_bundle(pack.bundle_id)
         root = ax.app_element(app)
         low_confidence = packs.is_stale(pack, ax.app_version(app))
+        heal_cb = None
+        if do_heal or pack.healed_pending:
+            pack_path = PACKS_DIR / pack.bundle_id / "pack.json"
+            heal_cb = heal_mod.make_heal_callback(pack, pack_path, notify=click.echo, ask_model=do_heal)
         result = runtime.execute(
-            pack, tool_name, args, root, app=app, low_confidence=low_confidence
+            pack, tool_name, args, root, app=app, low_confidence=low_confidence, heal=heal_cb,
         )
     except (ax.AXError, runtime.ToolExecutionError, packs.PackError) as exc:
         click.secho(f"✗ {exc}", fg="red")
@@ -210,6 +217,75 @@ def run(app_name: str, tool_name: str, arg_pairs: tuple[str, ...]) -> None:
     click.secho(f"✓ {pack.app_name}.{tool_name}: {result.detail}", fg="green")
     for value in result.values:
         click.echo(value)
+
+
+@main.command()
+@click.argument("app_name")
+def verify(app_name: str) -> None:
+    """Dry-resolve every anchor in a pack and offer to promote healed ones.
+
+    Reports a durability percentage without executing any step, then walks
+    any quarantined re-groundings and asks whether to promote each into the
+    tool's anchor of record. Promotion is the only path that rewrites a
+    tool's anchors, and it always passes through this human gate.
+    """
+    from . import anchors, heal as heal_mod
+
+    pack = _find_pack(app_name)
+    try:
+        app = ax.find_app_by_bundle(pack.bundle_id)
+        root = ax.app_element(app)
+    except ax.AXError as exc:
+        click.secho(str(exc), fg="red")
+        sys.exit(1)
+
+    low_confidence = packs.is_stale(pack, ax.app_version(app))
+    if low_confidence:
+        click.secho("Pack is stale for this app version; anchors load low-confidence.", fg="yellow")
+
+    total = resolved = 0
+    for tool in pack.tools:
+        step_anchors = [(s.op, s.anchor) for s in tool.steps if s.anchor]
+        for op, anchor in step_anchors:
+            total += 1
+            try:
+                anchors.resolve(root, anchor, low_confidence=low_confidence)
+                resolved += 1
+            except (anchors.AnchorLost, anchors.AnchorAmbiguous) as exc:
+                click.secho(f"  {tool.name} ({op}): {exc}", fg="yellow")
+
+    pct = (resolved / total * 100) if total else 100.0
+    color = "green" if resolved == total else "yellow"
+    click.secho(f"{pack.app_name}: {resolved}/{total} anchors resolve ({pct:.0f}%)", fg=color)
+
+    if not pack.healed_pending:
+        return
+
+    click.echo()
+    click.secho(f"{len(pack.healed_pending)} quarantined re-grounding(s):", bold=True)
+    approved = []
+    for entry in pack.healed_pending:
+        original = entry.get("original", {})
+        click.echo(
+            f"  a broken {original.get('role', '?')} "
+            f"{original.get('labels') or original.get('identifier') or ''} "
+            f"was healed onto {entry.get('target_role', '?')} {entry.get('target_label', '')!r}"
+        )
+        if click.confirm("  Promote this fix into the tool?", default=False):
+            approved.append(entry)
+
+    # Apply after all decisions, matching by object identity so pops during
+    # promotion cannot shift the wrong entry out.
+    promoted_any = False
+    for entry in approved:
+        index = next(i for i, e in enumerate(pack.healed_pending) if e is entry)
+        count = heal_mod.promote(pack, index)
+        click.secho(f"  ✓ rewrote {count} anchor(s)", fg="green")
+        promoted_any = True
+
+    if promoted_any:
+        packs.save(pack, PACKS_DIR / pack.bundle_id / "pack.json")
+        click.secho("Pack updated.", fg="green")
 
 
 @main.command()

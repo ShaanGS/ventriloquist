@@ -158,6 +158,38 @@ class Policy:
         return Verdict(True, "empty field", "reversible")
 
 
+def screen_heal_target(role: str, label: str, window_title: str, subrole: str = "") -> Verdict:
+    """May a healed anchor re-point a tool's step onto this element?
+
+    The core T8 concern: a hostile UI state steers healing so a benign
+    tool's anchor lands on a dangerous element (a re-grounded "save" step
+    now pressing "Send"). Healing may only re-ground onto an element whose
+    label and window carry no destructive signal. This runs on every heal,
+    on first derivation and on every deterministic reuse, so a heal derived
+    once from a hostile state cannot be trusted forever without re-passing
+    it. Stateless by design; it takes plain facets so both the healer and
+    `vent verify` can call it without a Policy instance.
+    """
+    if subrole == "AXSecureTextField":
+        return Verdict(False, "healed onto a secure field", "destructive")
+    text = label.strip().lower()
+    window = window_title.lower()
+    if any(w in window for w in AUTH_WINDOW_WORDS):
+        return Verdict(False, "healed onto an element in an authentication window", "destructive")
+    for verb in DESTRUCTIVE_VERBS:
+        if _matches_verb(text, verb):
+            return Verdict(False, f"healed onto an element with destructive verb {verb!r}", "destructive")
+    window_words = set(re.findall(r"[^\W_]+", window))
+    if window_words & (DESTRUCTIVE_VERBS | CONTEXTUAL_VERBS):
+        if text in GENERIC_CONFIRM_LABELS or _matches_verb(text, "delete"):
+            return Verdict(
+                False,
+                "healed onto a confirm control on a window with a destructive title",
+                "destructive",
+            )
+    return Verdict(True, "no destructive signal on the healed target", "reversible")
+
+
 def _matches_verb(label: str, verb: str) -> bool:
     """Word-boundary match so 'end' does not fire on 'calendar', but
     'Delete!' and 'Send/Receive' still fire. Tokenizes on Unicode word

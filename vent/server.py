@@ -30,7 +30,7 @@ import mcp.types as types
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 
-from . import ax, packs, runtime
+from . import ax, heal, packs, runtime
 
 LOCK_TIMEOUT_S = 180.0
 
@@ -95,6 +95,11 @@ def build_server(packs_dir: Path) -> Server:
 
     locks: dict[str, threading.Lock] = {pack.bundle_id: threading.Lock() for pack in loaded}
     allow_high = os.getenv("VENT_ALLOW_HIGH") == "1"
+    # Model-backed healing is opt-in: it spends model tokens and writes
+    # quarantine entries to the pack. Off by default keeps the served path
+    # fully deterministic. Deterministic reuse of an already-quarantined
+    # fix still runs (it costs nothing and re-screens on every use).
+    allow_heal = os.getenv("VENT_HEAL") == "1"
 
     async def on_list_tools(ctx, params) -> types.ListToolsResult:
         tools = []
@@ -132,9 +137,13 @@ def build_server(packs_dir: Path) -> Server:
                 app = ax.find_app_by_bundle(pack.bundle_id)
                 root = ax.app_element(app)
                 low_confidence = packs.is_stale(pack, ax.app_version(app))
+                heal_cb = None
+                if allow_heal or pack.healed_pending:
+                    pack_path = packs_dir / pack.bundle_id / "pack.json"
+                    heal_cb = heal.make_heal_callback(pack, pack_path, ask_model=allow_heal)
                 return runtime.execute(
                     pack, spec.name, arguments, root,
-                    app=app, low_confidence=low_confidence,
+                    app=app, low_confidence=low_confidence, heal=heal_cb,
                 )
             finally:
                 lock.release()
