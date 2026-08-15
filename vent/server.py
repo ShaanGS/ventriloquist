@@ -140,7 +140,9 @@ def build_server(packs_dir: Path) -> Server:
                 heal_cb = None
                 if allow_heal or pack.healed_pending:
                     pack_path = packs_dir / pack.bundle_id / "pack.json"
-                    heal_cb = heal.make_heal_callback(pack, pack_path, ask_model=allow_heal)
+                    heal_cb = heal.make_heal_callback(
+                        pack, pack_path, ask_model=allow_heal, low_confidence=low_confidence,
+                    )
                 return runtime.execute(
                     pack, spec.name, arguments, root,
                     app=app, low_confidence=low_confidence, heal=heal_cb,

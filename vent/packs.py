@@ -243,9 +243,26 @@ def load(path: Path) -> Pack:
 
 
 def save(pack: Pack, path: Path) -> None:
+    """Write a pack atomically: a concurrent reader (a server healing while
+    the user runs `vent verify`) never sees a half-written file. The temp
+    file is in the same directory so os.replace is a same-filesystem rename."""
+    import os
+    import tempfile
+
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(pack.to_dict(), indent=2) + "\n")
+    payload = json.dumps(pack.to_dict(), indent=2) + "\n"
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".pack-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as handle:
+            handle.write(payload)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def load_all(packs_dir: Path) -> list[Pack]:

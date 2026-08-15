@@ -71,24 +71,46 @@ def _describe_anchor(anchor: anchors.Anchor) -> str:
     )
 
 
+def _chain_sig(chain: list) -> tuple:
+    """A positional signature of an ancestor chain: (role, ordinal) per
+    link. This is what tells two otherwise-identical anchors apart (the
+    review found role+label+identifier+window alone cannot distinguish two
+    unlabeled twins in one window). Accepts either ChainLink objects or the
+    dicts they serialize to."""
+    out = []
+    for link in chain:
+        if isinstance(link, dict):
+            out.append((link.get("role", ""), link.get("ordinal", -1)))
+        else:
+            out.append((link.role, link.ordinal))
+    return tuple(out)
+
+
 def _same_broken(a: dict, anchor: anchors.Anchor) -> bool:
     """Whether a quarantine entry's original anchor is the one that broke.
-    Matched on the stable facets an anchor carries; refs are not comparable."""
+
+    Matched on the stable facets an anchor carries, INCLUDING the chain
+    signature. Without the chain, two structurally identical twins (two
+    unlabeled buttons, two empty text fields in one window) would match
+    each other, so a fix for one could be reused for or promoted onto the
+    other. The chain is the discriminator anchors.resolve itself relies on;
+    matching must use it too."""
     return (
         a.get("role") == anchor.role
         and a.get("identifier", "") == anchor.identifier
         and list(a.get("labels", [])) == anchor.labels
         and a.get("window_title", "") == anchor.window_title
+        and _chain_sig(a.get("chain", [])) == _chain_sig(anchor.chain)
     )
 
 
-def _target_facets(node: Node) -> tuple[str, str, str, str]:
-    return node.role, node.label, node.window_title, node.subrole
-
-
-def _screen(node: Node) -> policy_mod.Verdict:
-    role, label, window, subrole = _target_facets(node)
-    return policy_mod.screen_heal_target(role, label, window, subrole)
+def _screen_element(element: ax.Element, window_title: str) -> policy_mod.Verdict:
+    """Screen a re-grounding target read live from the element itself,
+    rather than round-tripping through a snapshot node. The window title
+    comes from the anchor, which is stable."""
+    return policy_mod.screen_heal_target(
+        element.role, element.label, window_title, element.subrole
+    )
 
 
 def make_heal_callback(
@@ -96,11 +118,14 @@ def make_heal_callback(
     pack_path: Path,
     notify: Callable[[str], None] = lambda message: None,
     ask_model: bool = True,
+    low_confidence: bool = False,
 ) -> Callable[[anchors.Anchor, ax.Element], Optional[anchors.Anchor]]:
     """Build the heal callback runtime.execute() calls on a broken anchor.
 
     ask_model=False disables the model step, so healing then relies only on
-    the deterministic quarantine reuse. Useful for offline runs and tests.
+    the deterministic quarantine reuse. low_confidence propagates the
+    caller's stale-pack bar into the reuse resolve, so a fix from an older
+    state is accepted at the raised threshold (SECURITY.md T7).
     """
 
     def heal(broken: anchors.Anchor, root: ax.Element) -> Optional[anchors.Anchor]:
@@ -116,7 +141,7 @@ def make_heal_callback(
             notify("heal: snapshot is truncated; refusing to guess")
             return None
 
-        reused = _reuse_from_quarantine(pack, broken, root, snap, notify)
+        reused = _reuse_from_quarantine(pack, broken, root, low_confidence, notify)
         if reused is not None:
             return reused
 
@@ -127,7 +152,18 @@ def make_heal_callback(
         if node is None:
             return None
 
-        verdict = _screen(node)
+        # Same-role fence (T8): a re-grounding must land on the same kind of
+        # control the broken anchor described. A step that pressed a button
+        # cannot heal onto a text field, and a text step cannot heal onto a
+        # button. This sharply narrows what a hostile UI can steer healing
+        # toward, on top of the destructive-verb screen below.
+        if broken.role and node.role != broken.role:
+            notify(f"heal: model picked a {node.role}, but the broken anchor was a {broken.role}; refusing")
+            return None
+
+        verdict = policy_mod.screen_heal_target(
+            node.role, node.label, node.window_title, node.subrole
+        )
         if not verdict.allowed:
             notify(f"heal: refusing re-grounding, {verdict.reason}")
             return None
@@ -152,35 +188,34 @@ def _reuse_from_quarantine(
     pack: packs.Pack,
     broken: anchors.Anchor,
     root: ax.Element,
-    snap: Snapshot,
+    low_confidence: bool,
     notify: Callable[[str], None],
 ) -> Optional[anchors.Anchor]:
-    """Deterministically reuse a prior fix, re-screened, with no model call."""
-    pending = [e for e in pack.healed_pending if _same_broken(e.get("original", {}), broken)]
-    for entry in pending:
+    """Deterministically reuse a prior fix, re-screened, with no model call.
+
+    The re-screen reads the target live from the resolved element rather
+    than looking it up in a snapshot node, so it does not depend on ref_key
+    matching across two separate tree walks (a fragile round-trip the review
+    flagged). The window title comes from the candidate anchor, which is
+    stable."""
+    for entry in pack.healed_pending:
+        if not _same_broken(entry.get("original", {}), broken):
+            continue
         candidate = anchors.Anchor.from_dict(entry["healed"])
+        # Same-role fence applies to reuse too: never redirect a call onto a
+        # different kind of control than the tool was built for.
+        if broken.role and candidate.role != broken.role:
+            continue
         try:
-            element = anchors.resolve(root, candidate)
+            element = anchors.resolve(root, candidate, low_confidence=low_confidence)
         except (anchors.AnchorLost, anchors.AnchorAmbiguous):
             continue
-        node = _node_for_element(snap, element)
-        if node is None:
-            continue
-        verdict = _screen(node)
+        verdict = _screen_element(element, candidate.window_title)
         if not verdict.allowed:
             notify(f"heal: quarantined fix no longer safe, {verdict.reason}")
             continue
         notify("heal: reused a quarantined fix (no model call)")
         return candidate
-    return None
-
-
-def _node_for_element(snap: Snapshot, element: ax.Element) -> Optional[Node]:
-    key = element.ref_key() if hasattr(element, "ref_key") else None
-    for node in snap.nodes:
-        node_key = node.element.ref_key() if hasattr(node.element, "ref_key") else None
-        if key is not None and node_key == key:
-            return node
     return None
 
 
@@ -225,12 +260,22 @@ def _quarantine(
         "healed": healed.to_dict(),
         "target_label": node.label,
         "target_role": node.role,
+        "target_window": node.window_title,
     }
-    for existing in pack.healed_pending:
-        if _same_broken(existing.get("original", {}), broken) and existing.get("healed") == entry["healed"]:
-            return  # already quarantined this exact fix
+    # Coalesce: one pending fix per broken anchor. A recurring break that
+    # heals onto varying targets must not grow the quarantine without bound
+    # (review finding). The newest re-grounding replaces any prior pending
+    # one for the same broken anchor.
+    pack.healed_pending = [
+        e for e in pack.healed_pending if not _same_broken(e.get("original", {}), broken)
+    ]
     pack.healed_pending.append(entry)
-    packs.save(pack, pack_path)
+    try:
+        packs.save(pack, pack_path)
+    except OSError as exc:
+        # Persistence failing must not fail a re-grounding that otherwise
+        # succeeded; the fix is still valid for this call, just not durable.
+        notify(f"heal: could not persist quarantine ({exc}); fix used for this call only")
     notify(f"heal: quarantined a re-grounding onto {node.role} {node.label!r} (approve with vent verify)")
 
 
@@ -261,5 +306,9 @@ def promote(pack: packs.Pack, index: int) -> int:
                 check.anchor = healed
                 rewritten += 1
 
-    pack.healed_pending.pop(index)
+    # Only consume the quarantine entry if it actually rewrote something.
+    # A promote that matches no live anchor (the tool changed underneath it)
+    # must not silently discard the fix with a success message.
+    if rewritten:
+        pack.healed_pending.pop(index)
     return rewritten

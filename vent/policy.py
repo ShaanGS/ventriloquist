@@ -179,6 +179,14 @@ def screen_heal_target(role: str, label: str, window_title: str, subrole: str = 
     for verb in DESTRUCTIVE_VERBS:
         if _matches_verb(text, verb):
             return Verdict(False, f"healed onto an element with destructive verb {verb!r}", "destructive")
+    # Contextual verbs (Clear, Reset, Replace, Cancel, Stop) are also
+    # refused as heal targets. During exploration they can be probed when
+    # their context looks benign, but re-grounding a durable tool onto one
+    # is exactly the "benign save step now wipes the document" outcome T8
+    # exists to prevent, so healing takes the strict reading.
+    for verb in CONTEXTUAL_VERBS:
+        if _matches_verb(text, verb):
+            return Verdict(False, f"healed onto an element with contextual verb {verb!r}", "destructive")
     window_words = set(re.findall(r"[^\W_]+", window))
     if window_words & (DESTRUCTIVE_VERBS | CONTEXTUAL_VERBS):
         if text in GENERIC_CONFIRM_LABELS or _matches_verb(text, "delete"):

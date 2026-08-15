@@ -206,11 +206,13 @@ def run(app_name: str, tool_name: str, arg_pairs: tuple[str, ...], do_heal: bool
         heal_cb = None
         if do_heal or pack.healed_pending:
             pack_path = PACKS_DIR / pack.bundle_id / "pack.json"
-            heal_cb = heal_mod.make_heal_callback(pack, pack_path, notify=click.echo, ask_model=do_heal)
+            heal_cb = heal_mod.make_heal_callback(
+                pack, pack_path, notify=click.echo, ask_model=do_heal, low_confidence=low_confidence,
+            )
         result = runtime.execute(
             pack, tool_name, args, root, app=app, low_confidence=low_confidence, heal=heal_cb,
         )
-    except (ax.AXError, runtime.ToolExecutionError, packs.PackError) as exc:
+    except (ax.AXError, runtime.ToolExecutionError, packs.PackError, OSError) as exc:
         click.secho(f"✗ {exc}", fg="red")
         sys.exit(1)
 
@@ -243,10 +245,20 @@ def verify(app_name: str) -> None:
     if low_confidence:
         click.secho("Pack is stale for this app version; anchors load low-confidence.", fg="yellow")
 
+    # Dry-resolve every distinct anchor across steps AND verify blocks. An
+    # anchor shared by several steps is counted once; verify anchors break
+    # too, so they belong in the durability number.
+    seen: set = set()
     total = resolved = 0
     for tool in pack.tools:
-        step_anchors = [(s.op, s.anchor) for s in tool.steps if s.anchor]
-        for op, anchor in step_anchors:
+        anchored = [(s.op, s.anchor) for s in tool.steps if s.anchor]
+        anchored += [("verify", v.anchor) for v in tool.verify if v.anchor]
+        for op, anchor in anchored:
+            key = (anchor.role, anchor.identifier, tuple(anchor.labels), anchor.window_title,
+                   tuple((l.role, l.ordinal) for l in anchor.chain))
+            if key in seen:
+                continue
+            seen.add(key)
             total += 1
             try:
                 anchors.resolve(root, anchor, low_confidence=low_confidence)
@@ -266,11 +278,23 @@ def verify(app_name: str) -> None:
     approved = []
     for entry in pack.healed_pending:
         original = entry.get("original", {})
+        window = entry.get("target_window", "")
         click.echo(
             f"  a broken {original.get('role', '?')} "
             f"{original.get('labels') or original.get('identifier') or ''} "
             f"was healed onto {entry.get('target_role', '?')} {entry.get('target_label', '')!r}"
+            + (f" in window {window!r}" if window else "")
         )
+        # Show which tools this promotion would rewrite and their risk, so a
+        # reviewer can weigh a re-grounding against what the tool can do.
+        broken = anchors.Anchor.from_dict(original)
+        for tool in pack.tools:
+            touched = any(
+                s.anchor and heal_mod._same_broken(s.anchor.to_dict(), broken) for s in tool.steps
+            )
+            if touched:
+                risk_color = "red" if tool.risk == "high" else "yellow"
+                click.secho(f"    would rewrite tool {tool.name!r} (risk: {tool.risk})", fg=risk_color)
         if click.confirm("  Promote this fix into the tool?", default=False):
             approved.append(entry)
 
@@ -280,8 +304,11 @@ def verify(app_name: str) -> None:
     for entry in approved:
         index = next(i for i, e in enumerate(pack.healed_pending) if e is entry)
         count = heal_mod.promote(pack, index)
-        click.secho(f"  ✓ rewrote {count} anchor(s)", fg="green")
-        promoted_any = True
+        if count:
+            click.secho(f"  ✓ rewrote {count} anchor(s)", fg="green")
+            promoted_any = True
+        else:
+            click.secho("  ⚠ nothing to rewrite; the tool changed since this fix. Kept in quarantine.", fg="yellow")
 
     if promoted_any:
         packs.save(pack, PACKS_DIR / pack.bundle_id / "pack.json")

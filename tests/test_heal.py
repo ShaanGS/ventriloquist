@@ -170,3 +170,78 @@ def test_promoted_pack_still_validates(tmp_path):
     heal.promote(pack, 0)
     # Round-trip through the validator: a healed pack is a valid pack.
     packs.Pack.from_dict(pack.to_dict())
+
+
+def test_twins_are_not_confused_by_matching(tmp_path):
+    """A fix for one unlabeled twin must not match or reuse for the other.
+    The chain signature is what tells them apart."""
+    from vent.snapshot import ChainLink
+    win = ChainLink(role="AXWindow", label="", identifier="", ordinal=0, index=0)
+    twin_a = anchors.Anchor(role="AXTextField", identifier="", labels=[], window_title="Form",
+                            chain=[win, ChainLink(role="AXTextField", label="", identifier="", ordinal=0, index=1)])
+    twin_b = anchors.Anchor(role="AXTextField", identifier="", labels=[], window_title="Form",
+                            chain=[win, ChainLink(role="AXTextField", label="", identifier="", ordinal=1, index=2)])
+    # An entry recorded for twin_a must not be seen as the original of twin_b.
+    assert heal._same_broken(twin_a.to_dict(), twin_a)
+    assert not heal._same_broken(twin_a.to_dict(), twin_b)
+
+
+def test_same_role_fence_refuses_cross_role_heal(tmp_path):
+    tree = textedit_like()
+    # Add a button; break the body; make the model pick the button for a
+    # text-field anchor.
+    window = tree.children()[0]
+    window._children.append(FakeElement("AXButton", "Harmless", actions=["AXPress"]))
+    pack, path, anchor = pack_with_step(tree, tmp_path)
+    break_body(tree)
+    snap = snapshot(tree)
+    btn_id = next(n.id for n in snap.nodes if n.label == "Harmless")
+    scripted({"node_id": btn_id, "confident": True})
+    cb = heal.make_heal_callback(pack, path, ask_model=True)
+    # The broken anchor was an AXTextArea; a button is a different role.
+    assert cb(anchor, tree) is None
+
+
+def test_contextual_verb_target_refused(tmp_path):
+    tree = textedit_like()
+    window = tree.children()[0]
+    # Same role as the broken body would be needed; instead test the policy
+    # screen directly for a contextual-verb label.
+    from vent import policy as policy_mod
+    verdict = policy_mod.screen_heal_target("AXButton", "Reset", "Untitled")
+    assert not verdict.allowed
+
+
+def test_quarantine_coalesces_per_broken_anchor(tmp_path):
+    tree = textedit_like()
+    pack, path, anchor = pack_with_step(tree, tmp_path)
+    break_body(tree)
+    snap = snapshot(tree)
+    new_id = next(n.id for n in snap.nodes if n.identifier == "renamed-after-update")
+
+    cb = heal.make_heal_callback(pack, path, ask_model=True)
+    scripted({"node_id": new_id, "confident": True})
+    cb(anchor, tree)
+    # Heal the same broken anchor again: quarantine must not grow past one
+    # entry for that anchor.
+    scripted({"node_id": new_id, "confident": True})
+    cb(anchor, tree)
+    assert len(pack.healed_pending) == 1
+
+
+def test_promote_no_match_keeps_entry(tmp_path):
+    tree = textedit_like()
+    pack, path, anchor = pack_with_step(tree, tmp_path)
+    snap = snapshot(tree)
+    body_node = next(n for n in snap.nodes if n.identifier == "doc-body")
+    healed = anchors.build(body_node)
+    # A quarantine entry whose original matches no step in the pack.
+    bogus_original = anchors.Anchor(role="AXButton", identifier="nonexistent", labels=["Ghost"], window_title="", chain=[])
+    pack.healed_pending.append({
+        "original": bogus_original.to_dict(), "healed": healed.to_dict(),
+        "target_role": "AXTextArea", "target_label": "",
+    })
+    rewritten = heal.promote(pack, 0)
+    assert rewritten == 0
+    # The entry is kept, not silently discarded.
+    assert len(pack.healed_pending) == 1
