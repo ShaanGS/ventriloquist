@@ -62,9 +62,23 @@ next began, and each review's findings were fixed in a follow-up commit.
    resized 87.5%, restart 92.5%, zero wrong bindings over 40 anchors.
    The user has ordered that Discord must not be touched or read; do not
    target it for packs, probes, or demos.
-3. **Demo recording and a tagged release.** The split-screen story is a
-   vision agent fumbling with an app versus vent-compiled tools doing it in
-   milliseconds.
+3. **Demo recording: DONE.** A 65-second screen recording
+   (`~/Desktop/vent-demo.mov`, not committed) shows TextEdit and VS Code
+   side by side being driven end to end by pack tools: narration written
+   into TextEdit by `write_document`, then the Search view opened, a
+   workspace search typed, and Source Control and Explorer switched, all
+   deterministic replays. Re-record any time with the staging steps in
+   the session scratchpad's build_pack_v2.py plus `screencapture -v`.
+   A tagged release is still pending the live model runs above.
+
+One more real-world proof worth knowing about: VS Code auto-updated from
+1.129 to 1.133 mid-session and renamed its sidebar headings from
+SHOUTING CASE to Title Case, breaking the two view-content anchors. That
+is precisely the healing scenario; without a signed-in model backend the
+anchors were re-captured by hand instead, and they now carry both label
+spellings (anchors remember every label observed). When the CLI login
+exists, breaking an anchor on purpose and watching `vent run --heal` +
+`vent verify` promote the fix is the last unexercised path.
 
 ## What the first live Electron run taught us
 

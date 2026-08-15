@@ -2,7 +2,7 @@
   "format_version": 2,
   "bundle_id": "com.microsoft.VSCode",
   "app_name": "Code",
-  "app_version": "1.129.0",
+  "app_version": "1.133.0",
   "os_version": "26.3.1",
   "locale": "C",
   "tools": [
@@ -49,7 +49,7 @@
               },
               {
                 "role": "AXGroup",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -97,7 +97,7 @@
               },
               {
                 "role": "AXWebArea",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -211,6 +211,7 @@
             "role": "AXHeading",
             "identifier": "",
             "labels": [
+              "Explorer",
               "EXPLORER"
             ],
             "window_title": "",
@@ -233,7 +234,7 @@
               },
               {
                 "role": "AXGroup",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -281,7 +282,7 @@
               },
               {
                 "role": "AXWebArea",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -361,7 +362,7 @@
               },
               {
                 "role": "AXHeading",
-                "label": "EXPLORER",
+                "label": "Explorer",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -379,6 +380,7 @@
             "role": "AXHeading",
             "identifier": "",
             "labels": [
+              "Explorer",
               "EXPLORER"
             ],
             "window_title": "",
@@ -401,7 +403,7 @@
               },
               {
                 "role": "AXGroup",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -449,7 +451,7 @@
               },
               {
                 "role": "AXWebArea",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -529,7 +531,7 @@
               },
               {
                 "role": "AXHeading",
-                "label": "EXPLORER",
+                "label": "Explorer",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -583,7 +585,7 @@
               },
               {
                 "role": "AXGroup",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -631,7 +633,7 @@
               },
               {
                 "role": "AXWebArea",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -745,7 +747,9 @@
             "role": "AXTextArea",
             "identifier": "",
             "labels": [
-              "Search: Type Search Term and press Enter to search"
+              "Search: Type Search Term and press Enter to search",
+              "Search: Type Search Term And Press Enter To Search",
+              "SEARCH: TYPE SEARCH TERM AND PRESS ENTER TO SEARCH"
             ],
             "window_title": "",
             "chain": [
@@ -767,7 +771,7 @@
               },
               {
                 "role": "AXGroup",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -815,7 +819,7 @@
               },
               {
                 "role": "AXWebArea",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -985,7 +989,9 @@
             "role": "AXTextArea",
             "identifier": "",
             "labels": [
-              "Search: Type Search Term and press Enter to search"
+              "Search: Type Search Term and press Enter to search",
+              "Search: Type Search Term And Press Enter To Search",
+              "SEARCH: TYPE SEARCH TERM AND PRESS ENTER TO SEARCH"
             ],
             "window_title": "",
             "chain": [
@@ -1007,7 +1013,7 @@
               },
               {
                 "role": "AXGroup",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -1055,7 +1061,7 @@
               },
               {
                 "role": "AXWebArea",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -1261,7 +1267,7 @@
               },
               {
                 "role": "AXGroup",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -1309,7 +1315,7 @@
               },
               {
                 "role": "AXWebArea",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -1423,6 +1429,7 @@
             "role": "AXHeading",
             "identifier": "",
             "labels": [
+              "Source Control",
               "SOURCE CONTROL"
             ],
             "window_title": "",
@@ -1445,7 +1452,7 @@
               },
               {
                 "role": "AXGroup",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -1493,7 +1500,7 @@
               },
               {
                 "role": "AXWebArea",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -1573,7 +1580,7 @@
               },
               {
                 "role": "AXHeading",
-                "label": "SOURCE CONTROL",
+                "label": "Source Control",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -1591,6 +1598,7 @@
             "role": "AXHeading",
             "identifier": "",
             "labels": [
+              "Source Control",
               "SOURCE CONTROL"
             ],
             "window_title": "",
@@ -1613,7 +1621,7 @@
               },
               {
                 "role": "AXGroup",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -1661,7 +1669,7 @@
               },
               {
                 "role": "AXWebArea",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -1741,7 +1749,7 @@
               },
               {
                 "role": "AXHeading",
-                "label": "SOURCE CONTROL",
+                "label": "Source Control",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -1778,7 +1786,9 @@
             "role": "AXTextArea",
             "identifier": "",
             "labels": [
-              "Search: Type Search Term and press Enter to search"
+              "Search: Type Search Term and press Enter to search",
+              "Search: Type Search Term And Press Enter To Search",
+              "SEARCH: TYPE SEARCH TERM AND PRESS ENTER TO SEARCH"
             ],
             "window_title": "",
             "chain": [
@@ -1800,7 +1810,7 @@
               },
               {
                 "role": "AXGroup",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -1848,7 +1858,7 @@
               },
               {
                 "role": "AXWebArea",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -2016,7 +2026,9 @@
             "role": "AXTextArea",
             "identifier": "",
             "labels": [
-              "Search: Type Search Term and press Enter to search"
+              "Search: Type Search Term and press Enter to search",
+              "Search: Type Search Term And Press Enter To Search",
+              "SEARCH: TYPE SEARCH TERM AND PRESS ENTER TO SEARCH"
             ],
             "window_title": "",
             "chain": [
@@ -2038,7 +2050,7 @@
               },
               {
                 "role": "AXGroup",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -2086,7 +2098,7 @@
               },
               {
                 "role": "AXWebArea",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -2261,7 +2273,9 @@
             "role": "AXTextArea",
             "identifier": "",
             "labels": [
-              "Search: Type Search Term and press Enter to search"
+              "Search: Type Search Term and press Enter to search",
+              "Search: Type Search Term And Press Enter To Search",
+              "SEARCH: TYPE SEARCH TERM AND PRESS ENTER TO SEARCH"
             ],
             "window_title": "",
             "chain": [
@@ -2283,7 +2297,7 @@
               },
               {
                 "role": "AXGroup",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -2331,7 +2345,7 @@
               },
               {
                 "role": "AXWebArea",
-                "label": "Untitled-1",
+                "label": "Welcome",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
