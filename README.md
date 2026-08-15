@@ -1,42 +1,42 @@
 # Ventriloquist
 
-**Compile any Mac app into an MCP server.**
+Turn a Mac app into an MCP server using the accessibility API. An agent
+explores the app once, the interesting actions get compiled into a JSON
+"pack" of typed tools, and after that everything is deterministic replay.
+There's no LLM in the loop at runtime, no screenshots, and no pixel
+coordinates anywhere in the codebase.
 
-Every computer-use agent today is an interpreter: a language model stares at
-your screen and drives every click, every time. Slow, expensive, flaky.
-Ventriloquist is a compiler. Point it at a running app and an agent explores
-the app's accessibility tree once. Out comes a persistent MCP server with
-typed, semantic tools like `write_document(text)`, each backed by a
-deterministic accessibility replay that runs with zero model calls. The model
-is only re-engaged when a replay breaks, and its fix is quarantined until you
-approve it.
+The idea is that most computer-use agents are interpreters. A model looks
+at your screen and decides every single click, every time, which is slow
+and expensive and breaks in weird ways. This is the compiler version of
+that. You pay the model cost once during exploration, get back tools like
+`write_document(text)`, and calling them later takes milliseconds. When an
+app update breaks a recorded action, a model is brought back in to fix it,
+but the fix sits in quarantine until you approve it.
 
-No screenshots. No vision models. No pixel coordinates. The accessibility
-layer has shipped with every Mac app for decades. Screen readers proved it
-works; Ventriloquist makes it programmable.
+The accessibility layer has been in every Mac app for decades because
+screen readers depend on it. It turns out it's also a pretty good API for
+driving apps, if you're careful about how you find elements again later.
 
 ## Status
 
-The full loop exists: introspection, scored anchor resolution, the pack
-format, the deterministic replay runtime, the MCP server, the durability
-harness, the model-driven explorer and compiler with a human approval gate,
-and quarantined healing with `vent verify` promotion. 79 offline tests run
-in CI on every push; live behavior is verified against TextEdit, Notes,
-and VS Code. Two hand-written packs ship: TextEdit, and VS Code — the
-Electron proof, with view navigation and a parameterized workspace search
-replayed through the deterministic runtime. The model-driven paths have
-all run live: exploration under the safety policy, compilation through
-the human approval gate, and the full healing lifecycle (break, re-ground
-under quarantine, promote through `vent verify`). Model calls work with
-an `ANTHROPIC_API_KEY` or, with no key at all, through a signed-in Claude
-Code CLI.
+The whole loop works and has been run live: exploration under the safety
+policy, compilation with a human approval step, deterministic replay over
+MCP, and the full healing cycle (break an anchor, re-ground it, promote
+the fix through `vent verify`). 91 offline tests run in CI on Linux and
+macOS. Two packs ship in the repo: TextEdit, and VS Code, which matters
+because VS Code is Electron and Electron accessibility is where most of
+the hard-won fixes in this codebase came from.
+
+Model calls work with an `ANTHROPIC_API_KEY`, or with no key at all if
+you have the Claude Code CLI installed and signed in.
 
 ## Quick start
 
-Requires macOS and Python 3.11 or newer.
+Needs macOS and Python 3.11+.
 
 ```bash
-git clone <this repo> && cd Panther
+git clone https://github.com/ShaanGS/ventriloquist && cd ventriloquist
 python3 -m venv .venv && .venv/bin/pip install -e .
 
 .venv/bin/vent doctor            # check Accessibility permission
@@ -44,9 +44,8 @@ python3 -m venv .venv && .venv/bin/pip install -e .
 .venv/bin/vent inspect Notes     # semantic snapshot of a live app
 ```
 
-`vent` needs Accessibility permission for whatever runs it: System
-Settings, then Privacy & Security, then Accessibility, then enable your
-terminal.
+`vent` needs Accessibility permission for whatever runs it. System
+Settings > Privacy & Security > Accessibility, then enable your terminal.
 
 ## Try the shipped TextEdit pack
 
@@ -59,18 +58,19 @@ echo "hello" > /tmp/vent-demo.txt && open -a TextEdit /tmp/vent-demo.txt
 .venv/bin/vent run TextEdit read_document
 ```
 
-Anchors are recorded per machine and per app version. The shipped pack is an
-example of the format, not a guarantee for your exact setup; if it refuses to
-resolve, that refusal is the safety design working, and you can re-record it
-in about a minute with `vent inspect` plus `vent anchor` (see
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) section 5).
+Anchors are recorded per machine and per app version, so the shipped packs
+are examples of the format more than guarantees for your exact setup. If a
+tool refuses to resolve, that's the safety design doing its job (it never
+guesses between lookalike elements), and re-recording takes about a minute
+with `vent inspect` and `vent anchor`. See section 5 of
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Wire it into an MCP client
 
 `vent serve` speaks MCP over stdio. For Claude Code:
 
 ```bash
-claude mcp add ventriloquist -- /FULL/PATH/TO/Panther/.venv/bin/vent serve
+claude mcp add ventriloquist -- /FULL/PATH/TO/ventriloquist/.venv/bin/vent serve
 ```
 
 For Claude Desktop, add to `claude_desktop_config.json`:
@@ -79,28 +79,26 @@ For Claude Desktop, add to `claude_desktop_config.json`:
 {
   "mcpServers": {
     "ventriloquist": {
-      "command": "/FULL/PATH/TO/Panther/.venv/bin/vent",
+      "command": "/FULL/PATH/TO/ventriloquist/.venv/bin/vent",
       "args": ["serve"]
     }
   }
 }
 ```
 
-Tools appear as `textedit_write_document` and friends. Tools marked
-`risk: high` in a pack are refused unless the server is started with
-`VENT_ALLOW_HIGH=1` in its environment; see
-[docs/SECURITY.md](docs/SECURITY.md) for why.
+Tools show up as `textedit_write_document` and so on. Anything marked
+`risk: high` in a pack is refused unless the server was started with
+`VENT_ALLOW_HIGH=1`. [docs/SECURITY.md](docs/SECURITY.md) explains why.
 
 ## Anchor durability, measured
 
-`vent harness <app>` records anchors for an app's elements, perturbs the
-app (verified window resize, and optionally a full quit and relaunch), and
-re-resolves every anchor. Survival only counts when the element found is
-provably the element recorded; lookalike bindings count as WRONG, and
-anchors with nothing to verify identity against count as unverifiable, not
-as survivors.
+`vent harness <app>` records anchors for an app's elements, messes with
+the app (a real window resize, and optionally a full quit and relaunch),
+and then tries to resolve every anchor again. Survival only counts when
+the element found is provably the one that was recorded. Binding a
+lookalike counts as WRONG, which is the number that actually matters.
 
-Current numbers on this machine (macOS 26, small anchor sets, early days):
+Numbers from this machine (macOS 26, small anchor sets, early days):
 
 ```
 TextEdit: baseline 100%,  resized 100%,   0 wrong
@@ -108,30 +106,32 @@ Finder:   baseline 100%,  resized 100%,   0 wrong
 VS Code:  baseline  95%,  resized  87.5%, restart 92.5%, 0 wrong  (40 anchors)
 ```
 
-The VS Code restart round quits and relaunches the app entirely; 37 of 40
-anchors still bind to provably the same element afterward, with zero wrong
-bindings. The non-survivors are ambiguity refusals and one loss: Chromium
-trees are full of unlabeled twin groups, and when candidates score too
-close the resolver refuses to guess. The compiled VS Code pack's own
-curated anchors resolve 6/6 after view switches, a window resize, and an
-app update. One operational requirement: VS Code must be launched with
-`--force-renderer-accessibility`. Without it the tree can still be read
-after a web-accessibility request, but actions are silently ignored.
+The VS Code restart round quits and relaunches the app completely, and 37
+of 40 anchors still bind to provably the same element afterward. The ones
+that don't survive are refusals, not mistakes: Chromium trees are full of
+unlabeled twin groups, and when two candidates score too close together
+the resolver refuses to pick one. The VS Code pack's own curated anchors
+went 6 for 6 across view switches, a resize, and an actual app update.
 
-Field notes from measuring, kept because they shaped the code: macOS AX
-trees can be cyclic (a wedged TextEdit returned the app element as its own
-child, which is why every walk carries an ancestor-path cycle guard); apps
-relaunched by a background process can serve degenerate menubar-only trees
-until genuinely foregrounded; a pending accessibility permission dialog
-silently degrades AX for every app launched after it appears; and
-AXZoomWindow advertises itself on buttons that then refuse to perform it.
+One thing to know for VS Code specifically: launch it with
+`--force-renderer-accessibility`. Without that flag the tree can still be
+read, but actions get silently ignored, which looks healthy right up until
+a press does nothing.
+
+Some field notes that ended up shaping the code: macOS AX trees can be
+cyclic (a wedged TextEdit once returned the app element as its own child,
+so every walk carries a cycle guard), apps relaunched from a background
+process serve junk menubar-only trees until they're genuinely foregrounded,
+a pending permission dialog silently degrades AX for every app launched
+after it, and a locked screen makes every app read as empty while the
+permission check still passes.
 
 ## Design
 
-Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before reading the code.
-The threat model lives in [docs/SECURITY.md](docs/SECURITY.md). Both were
-adversarially reviewed before implementation and rewritten from the
-findings, and every phase since gets the same treatment.
+Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before the code, and
+[docs/SECURITY.md](docs/SECURITY.md) for the threat model. Both went
+through adversarial review before implementation and got rewritten from
+the findings, and each phase since has gotten the same treatment.
 
 ## The full workflow
 
@@ -144,14 +144,5 @@ vent run Notes create_note --arg body="..."   # or call one tool directly
 vent verify Notes                   # dry-resolve anchors; promote quarantined heals
 ```
 
-`vent explore` and `vent run --heal` call a model and need Anthropic
-credentials (`ANTHROPIC_API_KEY`). Everything else, including serving
-compiled packs and reusing already-quarantined heals, runs with no model
-and no network.
-
-## Roadmap to release
-
-1. Live model-in-the-loop validation of explore and heal (needs a key).
-2. A compiled pack for a third-party Electron app via the `vent doctor`
-   tree probe.
-3. Demo recording and a tagged release.
+Only `vent explore` and `vent run --heal` talk to a model. Everything
+else, including serving compiled packs, runs offline.

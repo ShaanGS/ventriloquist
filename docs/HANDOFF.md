@@ -116,8 +116,8 @@ are now handled in code:
   permission check still passes. `vent doctor` now names this state
   instead of blaming the app.
 
-VS Code specifics: launch with `--force-renderer-accessibility` — the
-AXManualAccessibility request alone yields a tree that READS fine but
+VS Code specifics: launch with `--force-renderer-accessibility`. The
+AXManualAccessibility request alone yields a tree that reads fine but
 silently ignores every action, a trap because everything looks healthy
 until a press does nothing. Its process name is `Code` but its
 AppleScript name is `Visual Studio Code` (activating "Code" silently
