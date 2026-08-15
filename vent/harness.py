@@ -83,10 +83,22 @@ class HarnessReport:
 
 def _pick_nodes(nodes: list[Node], cap: int) -> list[Node]:
     """Prefer elements a pack would actually anchor: actionable or
-    identified ones first, then the rest, up to the cap."""
+    identified ones first, then the rest, up to the cap.
+
+    Scroll-to-visible does not count as actionable: Chromium advertises it
+    on every node, which otherwise floods the cap with unlabeled twin
+    groups no pack would ever anchor."""
+
+    def actionable(n: Node) -> bool:
+        return any(a != "AXScrollToVisible" for a in n.actions)
+
     prioritized = sorted(
         nodes,
-        key=lambda n: (bool(n.actions) or bool(n.identifier), bool(n.identifier)),
+        key=lambda n: (
+            (actionable(n) or bool(n.identifier)) and bool(n.label or n.identifier),
+            bool(n.identifier),
+            actionable(n),
+        ),
         reverse=True,
     )
     return prioritized[:cap]
@@ -209,7 +221,24 @@ def _resize_window(root: ax.Element):
     return restore
 
 
-def _wait_for_window(root: ax.Element, timeout_s: float = 10.0) -> bool:
+def _wait_for_tree(root: ax.Element, min_nodes: int = 10, timeout_s: float = 20.0) -> bool:
+    """Wait until the app serves a tree with real content in it.
+
+    A window existing is not enough for Chromium hosts: the web tree is
+    built lazily after window creation, so resolving against a
+    just-restarted Electron app measures startup timing, not anchors."""
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        try:
+            if len(snapshot(root).nodes) >= min_nodes:
+                return True
+        except ax.AXTransientError:
+            pass
+        time.sleep(1.0)
+    return False
+
+
+def _wait_for_window(root: ax.Element, timeout_s: float = 30.0) -> bool:
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
         try:
@@ -225,6 +254,9 @@ def run(app_query: str, cap: int = 40, restart: bool = False, reopen: str | None
     app = ax.find_app(app_query)
     root = ax.app_element(app)
     enable_web_accessibility(root)
+    # Recording against a still-loading app yields a handful of window
+    # chrome anchors and nothing else; wait for real content first.
+    _wait_for_tree(root)
 
     records = _record(root, cap)
     report = HarnessReport(app_name=app.name, anchor_count=len(records))
@@ -250,7 +282,17 @@ def run(app_query: str, cap: int = 40, restart: bool = False, reopen: str | None
         # AppleScript source from an app-controlled name is an injection
         # vector (SECURITY.md T1 applies to us too, not just to packs).
         ax.terminate(app)
-        time.sleep(2.0)
+        # Termination is asynchronous and heavyweight apps quit slowly.
+        # Relaunching before the old process exits re-binds the dying pid
+        # and every later read comes back empty, so wait it out first.
+        deadline = time.monotonic() + 20.0
+        while time.monotonic() < deadline:
+            try:
+                if ax.find_app_by_bundle(app.bundle_id).pid != app.pid:
+                    break
+            except ax.AXError:
+                break
+            time.sleep(0.5)
         launch = ["open", "-b", app.bundle_id]
         if reopen:
             launch.append(reopen)
@@ -258,11 +300,28 @@ def run(app_query: str, cap: int = 40, restart: bool = False, reopen: str | None
             subprocess.run(launch, check=True, timeout=15)
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
             raise ax.AXError(f"could not relaunch {app.bundle_id}: {exc}") from exc
-        time.sleep(3.0)
-        fresh_app = ax.find_app_by_bundle(app.bundle_id or "")
+        fresh_app = None
+        deadline = time.monotonic() + 60.0
+        while time.monotonic() < deadline:
+            try:
+                candidate = ax.find_app_by_bundle(app.bundle_id)
+                if candidate.pid != app.pid:
+                    fresh_app = candidate
+                    break
+            except ax.AXError:
+                pass
+            time.sleep(0.5)
+        if fresh_app is None:
+            report.rounds.append(
+                RoundResult(name="restart", note="app never relaunched; round skipped")
+            )
+            return report
         fresh_root = ax.app_element(fresh_app)
         enable_web_accessibility(fresh_root)
-        if _wait_for_window(fresh_root):
+        # Background-launched apps serve degraded trees until genuinely
+        # foregrounded; activation also lets Chromium hosts build web AX.
+        ax.activate(fresh_app)
+        if _wait_for_window(fresh_root) and _wait_for_tree(fresh_root):
             time.sleep(1.0)
             report.rounds.append(_resolve_round("restart", fresh_root, records))
         else:

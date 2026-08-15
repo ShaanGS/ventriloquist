@@ -50,12 +50,18 @@ next began, and each review's findings were fixed in a follow-up commit.
    `vent explore Notes --no-values` end to end, then `vent compile Notes`,
    and confirm the compiled pack matches the hand-written one. Then break an
    anchor and confirm `vent run --heal` + `vent verify` promote it.
-2. **A third-party Electron app pack.** `vent doctor <app>` already probes
-   whether an app exposes a usable tree (it sets AXManualAccessibility /
-   AXEnhancedUserInterface for Chromium hosts). Pick one that passes the
-   probe (Spotify, Slack, VS Code), compile a pack, and add its numbers to
-   the README durability table. This is the headline demo: an Electron app
-   made programmable.
+2. **A third-party Electron app pack: DONE (VS Code).**
+   `packs/com.microsoft.VSCode/pack.json` ships four tools (Explorer,
+   Search, and Source Control view switches plus a parameterized
+   `search_workspace`), all passing live through `vent run`, with
+   `vent verify` at 6/6 anchors. Harness numbers are in the README
+   (95% baseline, 77.5% resized, zero wrong bindings over 40 anchors).
+   Still open from this item: a `--restart` harness round for VS Code;
+   two attempts were eaten by a screen lock and slow relaunches, and the
+   harness fixes that came out of them (pid-aware relaunch waits, tree
+   readiness gates) are committed and untested against a live restart.
+   The user has ordered that Discord must not be touched or read; do not
+   target it for packs, probes, or demos.
 3. **Demo recording and a tagged release.** The split-screen story is a
    vision agent fumbling with an app versus vent-compiled tools doing it in
    milliseconds.

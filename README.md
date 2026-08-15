@@ -21,11 +21,12 @@ The full loop exists: introspection, scored anchor resolution, the pack
 format, the deterministic replay runtime, the MCP server, the durability
 harness, the model-driven explorer and compiler with a human approval gate,
 and quarantined healing with `vent verify` promotion. 79 offline tests run
-in CI on every push; live behavior is verified against TextEdit and Notes.
-One hand-written pack ships (TextEdit). What remains before a release:
+in CI on every push; live behavior is verified against TextEdit, Notes,
+and VS Code. Two hand-written packs ship: TextEdit, and VS Code — the
+Electron proof, with view navigation and a parameterized workspace search
+replayed through the deterministic runtime. What remains before a release:
 live model-in-the-loop runs of `vent explore` and `--heal` (they need an
-`ANTHROPIC_API_KEY`), a compiled pack for a third-party Electron app, and
-a demo recording.
+`ANTHROPIC_API_KEY`) and a demo recording.
 
 ## Quick start
 
@@ -99,9 +100,16 @@ as survivors.
 Current numbers on this machine (macOS 26, small anchor sets, early days):
 
 ```
-TextEdit: baseline 100%, resized 100%, 0 wrong
-Finder:   baseline 100%, resized 100%, 0 wrong
+TextEdit: baseline 100%,  resized 100%,  0 wrong
+Finder:   baseline 100%,  resized 100%,  0 wrong
+VS Code:  baseline  95%,  resized  77.5%, 0 wrong  (40 anchors, Chromium tree)
 ```
+
+VS Code's non-survivors are all ambiguity refusals, not wrong bindings:
+Chromium trees are full of unlabeled twin groups, and when candidates
+score too close the resolver refuses to guess. The compiled VS Code pack's
+own curated anchors resolve 6/6 after view switches, a window resize, and
+an app update.
 
 Field notes from measuring, kept because they shaped the code: macOS AX
 trees can be cyclic (a wedged TextEdit returned the app element as its own

@@ -114,3 +114,18 @@ def test_settle_opt_out_round_trips(tmp_path):
     path = tmp_path / "p" / "pack.json"
     save(pack, path)
     assert load(path).tool("write_document").steps[0].settle is False
+
+
+def test_shipped_packs_all_load():
+    """Every pack committed under packs/ must validate. A pack that fails
+    here would be silently skipped by the server at startup."""
+    from pathlib import Path
+
+    from vent.packs import load
+
+    packs_dir = Path(__file__).resolve().parent.parent / "packs"
+    pack_files = sorted(packs_dir.glob("*/pack.json"))
+    assert pack_files, "no shipped packs found; did the directory move?"
+    for path in pack_files:
+        pack = load(path)
+        assert pack.tools, f"{path} loaded but has no tools"

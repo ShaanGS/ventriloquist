@@ -1,0 +1,2500 @@
+{
+  "format_version": 2,
+  "bundle_id": "com.microsoft.VSCode",
+  "app_name": "Code",
+  "app_version": "1.129.0",
+  "os_version": "26.3.1",
+  "locale": "C",
+  "tools": [
+    {
+      "name": "show_explorer",
+      "description": "Select the Explorer view in the VS Code activity bar and wait for its content to appear. Pressing the already-selected view collapses the side bar instead; that reports honestly as a failure.",
+      "risk": "read_only",
+      "requires_frontmost": true,
+      "params": {},
+      "preconditions": [
+        {
+          "kind": "app_running"
+        },
+        {
+          "kind": "window_exists"
+        }
+      ],
+      "steps": [
+        {
+          "op": "press",
+          "anchor": {
+            "role": "AXRadioButton",
+            "identifier": "",
+            "labels": [
+              "Explorer (\u21e7\u2318E)"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Code",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXGroup",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWebArea",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXWebApplication"
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXTabGroup",
+                "label": "Active View Switcher",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXRadioButton",
+                "label": "Explorer (\u21e7\u2318E)",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXTabButton"
+              }
+            ]
+          },
+          "expect": {
+            "role": "AXRadioButton"
+          }
+        },
+        {
+          "op": "wait_for",
+          "anchor": {
+            "role": "AXHeading",
+            "identifier": "",
+            "labels": [
+              "EXPLORER"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Code",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXGroup",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWebArea",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXWebApplication"
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXHeading",
+                "label": "EXPLORER",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              }
+            ]
+          },
+          "timeout_s": 8.0
+        }
+      ],
+      "verify": [
+        {
+          "kind": "element_exists",
+          "anchor": {
+            "role": "AXHeading",
+            "identifier": "",
+            "labels": [
+              "EXPLORER"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Code",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXGroup",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWebArea",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXWebApplication"
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXHeading",
+                "label": "EXPLORER",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "show_search",
+      "description": "Select the Search view in the VS Code activity bar and wait for its content to appear. Pressing the already-selected view collapses the side bar instead; that reports honestly as a failure.",
+      "risk": "read_only",
+      "requires_frontmost": true,
+      "params": {},
+      "preconditions": [
+        {
+          "kind": "app_running"
+        },
+        {
+          "kind": "window_exists"
+        }
+      ],
+      "steps": [
+        {
+          "op": "press",
+          "anchor": {
+            "role": "AXRadioButton",
+            "identifier": "",
+            "labels": [
+              "Search (\u21e7\u2318F)"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Code",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXGroup",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWebArea",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXWebApplication"
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXTabGroup",
+                "label": "Active View Switcher",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXRadioButton",
+                "label": "Search (\u21e7\u2318F)",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": "AXTabButton"
+              }
+            ]
+          },
+          "expect": {
+            "role": "AXRadioButton"
+          }
+        },
+        {
+          "op": "wait_for",
+          "anchor": {
+            "role": "AXTextArea",
+            "identifier": "",
+            "labels": [
+              "Search: Type Search Term and press Enter to search"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Code",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXGroup",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWebArea",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXWebApplication"
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 3,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXTextArea",
+                "label": "Search: Type Search Term and press Enter to search",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              }
+            ]
+          },
+          "timeout_s": 8.0
+        }
+      ],
+      "verify": [
+        {
+          "kind": "element_exists",
+          "anchor": {
+            "role": "AXTextArea",
+            "identifier": "",
+            "labels": [
+              "Search: Type Search Term and press Enter to search"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Code",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXGroup",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWebArea",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXWebApplication"
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 3,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXTextArea",
+                "label": "Search: Type Search Term and press Enter to search",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "show_source_control",
+      "description": "Select the Source Control view in the VS Code activity bar and wait for its content to appear. Pressing the already-selected view collapses the side bar instead; that reports honestly as a failure.",
+      "risk": "read_only",
+      "requires_frontmost": true,
+      "params": {},
+      "preconditions": [
+        {
+          "kind": "app_running"
+        },
+        {
+          "kind": "window_exists"
+        }
+      ],
+      "steps": [
+        {
+          "op": "press",
+          "anchor": {
+            "role": "AXRadioButton",
+            "identifier": "",
+            "labels": [
+              "Source Control (\u2303\u21e7G)"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Code",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXGroup",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWebArea",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXWebApplication"
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXTabGroup",
+                "label": "Active View Switcher",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXRadioButton",
+                "label": "Source Control (\u2303\u21e7G)",
+                "identifier": "",
+                "ordinal": 2,
+                "index": 2,
+                "subrole": "AXTabButton"
+              }
+            ]
+          },
+          "expect": {
+            "role": "AXRadioButton"
+          }
+        },
+        {
+          "op": "wait_for",
+          "anchor": {
+            "role": "AXHeading",
+            "identifier": "",
+            "labels": [
+              "SOURCE CONTROL"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Code",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXGroup",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWebArea",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXWebApplication"
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXHeading",
+                "label": "SOURCE CONTROL",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              }
+            ]
+          },
+          "timeout_s": 8.0
+        }
+      ],
+      "verify": [
+        {
+          "kind": "element_exists",
+          "anchor": {
+            "role": "AXHeading",
+            "identifier": "",
+            "labels": [
+              "SOURCE CONTROL"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Code",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXGroup",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWebArea",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXWebApplication"
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXHeading",
+                "label": "SOURCE CONTROL",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "search_workspace",
+      "description": "Type a query into the workspace search box. The Search view must already be open (call show_search first); results populate as VS Code's own search runs.",
+      "risk": "read_only",
+      "requires_frontmost": true,
+      "params": {
+        "query": {
+          "type": "string",
+          "description": "Text to search the workspace for."
+        }
+      },
+      "preconditions": [
+        {
+          "kind": "app_running"
+        },
+        {
+          "kind": "window_exists"
+        }
+      ],
+      "steps": [
+        {
+          "op": "wait_for",
+          "anchor": {
+            "role": "AXTextArea",
+            "identifier": "",
+            "labels": [
+              "Search: Type Search Term and press Enter to search"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Code",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXGroup",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWebArea",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXWebApplication"
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 3,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXTextArea",
+                "label": "Search: Type Search Term and press Enter to search",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              }
+            ]
+          },
+          "timeout_s": 6.0
+        },
+        {
+          "op": "set_value",
+          "anchor": {
+            "role": "AXTextArea",
+            "identifier": "",
+            "labels": [
+              "Search: Type Search Term and press Enter to search"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Code",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXGroup",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWebArea",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXWebApplication"
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 3,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXTextArea",
+                "label": "Search: Type Search Term and press Enter to search",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              }
+            ]
+          },
+          "value": {
+            "param": "query"
+          },
+          "expect": {
+            "role": "AXTextArea"
+          }
+        }
+      ],
+      "verify": [
+        {
+          "kind": "value_contains",
+          "anchor": {
+            "role": "AXTextArea",
+            "identifier": "",
+            "labels": [
+              "Search: Type Search Term and press Enter to search"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Code",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXGroup",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWebArea",
+                "label": "Untitled-1",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXWebApplication"
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 3,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXTextArea",
+                "label": "Search: Type Search Term and press Enter to search",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              }
+            ]
+          },
+          "param": "query"
+        }
+      ]
+    }
+  ],
+  "healed_pending": []
+}
