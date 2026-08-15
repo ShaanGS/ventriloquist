@@ -54,8 +54,10 @@ SECURE_SUBROLE = "AXSecureTextField"
 
 # One depth limit shared by snapshot walks and anchor resolution. If the
 # two disagreed, an anchor minted from a deep inspect could describe an
-# element the resolver structurally cannot reach.
-MAX_TREE_DEPTH = 25
+# element the resolver structurally cannot reach. 25 sufficed for native
+# apps, but Chromium hosts nest far deeper: VS Code's search input sits
+# below depth 25, discovered the day its anchor could never resolve.
+MAX_TREE_DEPTH = 50
 
 VALUE_PREVIEW_LIMIT = 80
 

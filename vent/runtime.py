@@ -156,6 +156,28 @@ def _check_expect(element: Element, expect: Optional[dict], where: str) -> None:
         )
 
 
+def _pump_tree(element: Element) -> None:
+    """Nudge a Chromium host into republishing its accessibility tree.
+
+    Chromium serializes its tree lazily: after an action mutates the page,
+    reads keep returning the pre-action tree until the next action arrives,
+    however long that takes. Observed on VS Code, where a view switch stayed
+    invisible to walks for 13+ seconds of polling and then appeared the
+    instant any action was performed. A scroll-to-visible on the element we
+    just acted on is that action: visually a no-op, but it flushes the
+    stale tree so settle and verify see the world the step created. The
+    nudge only fires on elements that advertise the action, which in
+    practice means web-backed ones; eager native trees skip the extra IPC.
+    A ref the action itself invalidated just fails quietly; verify still
+    re-resolves from scratch.
+    """
+    try:
+        if "AXScrollToVisible" in element.actions():
+            element.perform("AXScrollToVisible")
+    except ax.AXError:
+        pass
+
+
 def _as_element(ref: Any) -> Element:
     """Wrap a raw AX reference, passing through anything already
     element-shaped (real Elements, or the fakes the test suite uses)."""
@@ -238,6 +260,9 @@ def _run_step(
     except ax.AXError as exc:
         # Wrap so the failure names the app, tool, and step, per SECURITY.md.
         raise ToolExecutionError(f"{where}: {exc}") from exc
+
+    if step.op in ("press", "set_value", "pick"):
+        _pump_tree(element)
 
     detail = settle(root, step.timeout_s) if step.settle else "settle skipped"
     return StepReport(op=step.op, ok=True, detail=detail)

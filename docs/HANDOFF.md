@@ -60,6 +60,34 @@ next began, and each review's findings were fixed in a follow-up commit.
    vision agent fumbling with an app versus vent-compiled tools doing it in
    milliseconds.
 
+## What the first live Electron run taught us
+
+The VS Code pack work (August 2026) surfaced three platform truths that
+are now handled in code:
+
+- **Chromium trees are deep.** VS Code's search input sits below the old
+  depth budget of 25, which meant its anchor could never resolve: the
+  resolver structurally could not reach it. `MAX_TREE_DEPTH` is now 50,
+  still one shared limit for snapshot walks and resolution.
+- **Chromium publishes its tree lazily.** After an action mutates the
+  page, every read returns the pre-action tree until the *next* action
+  arrives; a view switch stayed invisible to 13 seconds of polling and
+  then appeared the instant any action was performed. The runtime now
+  pumps a no-op scroll-to-visible after each mutating op (`_pump_tree`
+  in runtime.py) so settle and verify see the world the step created.
+  Related: the cached `AXValue` of Chromium radio buttons is unreliable
+  as a postcondition; verify view switches by waiting for view *content*
+  to exist, not by reading the pressed control's value.
+- **A locked screen makes every app serve an empty tree** while the
+  permission check still passes. `vent doctor` now names this state
+  instead of blaming the app.
+
+VS Code specifics: launch with `--force-renderer-accessibility`, its
+process name is `Code` but its AppleScript name is `Visual Studio Code`
+(activating "Code" silently fails), and an in-place auto-update can wedge
+its AX bridge (AXWindows returns a bogus Application-role element) until
+the app is fully quit and relaunched.
+
 ## Gotchas the next session will hit
 
 - **AX needs the app foregrounded.** Apps relaunched by a background

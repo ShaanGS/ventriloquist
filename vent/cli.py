@@ -15,7 +15,7 @@ from pathlib import Path
 import click
 
 from . import anchors, ax, packs, runtime
-from .snapshot import render, snapshot
+from .snapshot import MAX_TREE_DEPTH, render, snapshot
 
 PACKS_DIR = Path(__file__).resolve().parent.parent / "packs"
 TRACES_DIR = Path(__file__).resolve().parent.parent / "traces"
@@ -65,7 +65,18 @@ def doctor(app_name: str | None) -> None:
 
     click.echo(f"{app.name}: {len(snap.nodes)} elements after web-accessibility request")
     if not snap.nodes:
-        click.secho("✗ No usable tree. This app cannot be packed yet.", fg="red")
+        if ax.session_locked():
+            click.secho(
+                "✗ The screen is locked. Every app serves an empty tree until "
+                "the session is unlocked; this says nothing about the app.",
+                fg="red",
+            )
+        else:
+            click.secho("✗ No usable tree. This app cannot be packed yet.", fg="red")
+            click.echo(
+                "  If the app was launched from a script, foreground it once by "
+                "clicking its window; background-launched apps serve degraded trees."
+            )
         sys.exit(1)
     if web_children:
         click.secho(f"✓ Tree present, including {web_children} web area(s).", fg="green")
@@ -105,7 +116,7 @@ def apps() -> None:
 
 @main.command()
 @click.argument("app_name")
-@click.option("--depth", default=25, show_default=True, help="Maximum tree depth to walk.")
+@click.option("--depth", default=MAX_TREE_DEPTH, show_default=True, help="Maximum tree depth to walk.")
 @click.option("--max-nodes", default=800, show_default=True, help="Cap on surfaced elements.")
 @click.option("--menus", is_flag=True, help="Include the menu bar (skipped by default).")
 def inspect(app_name: str, depth: int, max_nodes: int, menus: bool) -> None:

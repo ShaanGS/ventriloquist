@@ -85,6 +85,23 @@ def is_trusted() -> bool:
     return bool(AXIsProcessTrusted())
 
 
+def session_locked() -> bool:
+    """Whether the login session's screen is locked.
+
+    A locked screen makes every app serve an empty tree while permission
+    checks still pass, a combination that reads as "this app is broken"
+    until you know to look. Quartz is queried lazily and any failure
+    reports unlocked, so this stays a diagnostic aid, never a gate."""
+    _require_pyobjc()
+    try:
+        from Quartz import CGSessionCopyCurrentDictionary
+
+        session = CGSessionCopyCurrentDictionary()
+        return bool(session and session.get("CGSSessionScreenIsLocked"))
+    except Exception:  # pragma: no cover - Quartz querying is best effort
+        return False
+
+
 def require_trusted() -> None:
     if not is_trusted():
         raise NotTrustedError(

@@ -194,3 +194,57 @@ def test_high_risk_tool_refused_without_opt_in():
     assert risk_refusal(spec, allow_high=True) is None
     safe = ToolSpec(name="read", description="", risk="read_only", steps=spec.steps)
     assert risk_refusal(safe, allow_high=False) is None
+
+
+def test_press_pumps_web_backed_elements_only():
+    """After a mutating op, the runtime nudges Chromium hosts to republish
+    their lazily-serialized tree via a no-op scroll-to-visible. Elements
+    that do not advertise the action (eager native trees) are left alone."""
+
+    class RecordingElement(FakeElement):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.performed: list[str] = []
+
+        def perform(self, action: str = "AXPress") -> None:
+            super().perform(action)
+            self.performed.append(action)
+
+    def tree_with_button(actions):
+        button = RecordingElement(
+            "AXButton", "Friends", identifier="nav-friends", actions=actions
+        )
+        tree = FakeElement(
+            "AXApplication",
+            "App",
+            children=[FakeElement("AXWindow", "Main", children=[button])],
+        )
+        return tree, button
+
+    def press_pack(tree):
+        snap = snapshot(tree)
+        node = next(n for n in snap.nodes if n.identifier == "nav-friends")
+        tool = ToolSpec(
+            name="open_friends",
+            description="Press the nav button.",
+            risk="read_only",
+            steps=[
+                Step(
+                    op="press",
+                    anchor=anchors.build(node),
+                    expect={"role": "AXButton"},
+                    timeout_s=0.2,
+                )
+            ],
+        )
+        return Pack(bundle_id="app.test", app_name="App", tools=[tool])
+
+    web_tree, web_button = tree_with_button(["AXPress", "AXScrollToVisible"])
+    result = runtime.execute(press_pack(web_tree), "open_friends", {}, web_tree)
+    assert result.ok
+    assert web_button.performed == ["AXPress", "AXScrollToVisible"]
+
+    native_tree, native_button = tree_with_button(["AXPress"])
+    result = runtime.execute(press_pack(native_tree), "open_friends", {}, native_tree)
+    assert result.ok
+    assert native_button.performed == ["AXPress"]
