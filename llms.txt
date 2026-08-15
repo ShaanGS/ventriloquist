@@ -1,0 +1,272 @@
+# Ventriloquist
+
+> Turn a Mac app into an MCP server using the macOS accessibility API. An agent
+> explores the app once, the useful actions are compiled into a JSON "pack" of
+> typed tools, and after that every call is a deterministic replay that takes
+> milliseconds and never touches a model. No screenshots, no vision, no pixel
+> coordinates anywhere in the codebase.
+
+This file is the whole project explained in one place, written for both people
+and language models. The repo is https://github.com/ShaanGS/ventriloquist. The
+package is `vent`, the CLI is `vent`, the language is Python 3.11+, macOS only.
+
+## The idea in one paragraph
+
+Computer-use agents today are interpreters: a model looks at the screen and
+decides every click, every time, which is slow, expensive, and flaky.
+Ventriloquist is the compiler version. You pay the model cost once, during a
+guarded exploration of the app's accessibility tree. What comes out is a pack
+of typed tools like `write_document(text)` or `search_workspace(query)`, each
+backed by recorded accessibility actions with durable element anchors. Serving
+those tools over MCP requires no model, no network, and no vision. When an app
+update breaks a recorded anchor, a model is brought back for one job only:
+re-ground the anchor. The fix is quarantined and nothing changes on disk until
+a human approves it through `vent verify`.
+
+## Why the accessibility tree
+
+Every Mac app has shipped an accessibility (AX) tree for decades because
+screen readers depend on it. It gives you semantic elements (buttons, text
+areas, rows) with roles, labels, and real actions (press, set value), which is
+a far better contract than pixels. The whole system stands on it: reading the
+tree (never the screen), acting through AX actions (never synthetic mouse
+events), and verifying through live re-reads of element values.
+
+## Architecture, component by component
+
+Everything lives in the `vent/` package. One file per concern:
+
+- `ax.py`. The only file that talks to the macOS accessibility C API
+  (via pyobjc). Elements, attributes, actions, app discovery, activation,
+  trust checks, screen-lock detection. Imports are guarded so the test suite
+  runs on Linux.
+- `snapshot.py`. Walks an app's tree into a semantic snapshot: a flat list of
+  surfaced nodes, each with role, subrole, label, identifier, value preview,
+  available actions, and its full ancestor chain. Skips the menu bar by
+  default. Guards against cyclic trees (real apps have returned an element as
+  its own child). One shared depth limit, `MAX_TREE_DEPTH = 50`, used by both
+  snapshots and anchor resolution so an anchor minted from an inspect can
+  always be reached by the resolver. It was 25 until VS Code proved Chromium
+  trees run deeper.
+- `anchors.py`. The heart of durability. An anchor records how to find an
+  element again later: role, identifier, every label it has been observed
+  under, window title, and the full ancestor chain with ordinals. Resolution
+  walks the live tree, scores every candidate (identifier outranks label,
+  chain similarity and position matter, wrong window is a penalty), and
+  refuses to answer if the best two candidates score too close together.
+  Refusing to guess is a feature: a wrong binding is the worst outcome, a
+  refusal just means re-record or heal.
+- `packs.py`. The pack format. A pack is one JSON file per app bundle id under
+  `packs/`, containing typed tools. Each tool has a name, description, risk
+  level (`read_only`, `mutating`, `high`), parameter schema, preconditions,
+  steps, and verify checks. Steps use a closed op set: `press`, `set_value`,
+  `pick`, `reveal`, `raise_window`, `open_app`, `wait_for`, `read_value`.
+  There is deliberately no exec, no shell, no AppleScript, no arbitrary code.
+  Loading validates everything and rejects unknown ops or risks. Saves are
+  atomic (temp file plus rename).
+- `runtime.py`. Deterministic replay. For each step: resolve the anchor,
+  assert the expected role, perform the action, then wait for the tree to
+  settle (a shape-hash poll that distinguishes "reacted then went quiet" from
+  "nothing happened"). Verify checks re-read live element values, never
+  snapshot previews. Two Chromium-specific pumps live here: after any mutating
+  op the runtime performs a no-op scroll-to-visible on the element, because
+  Chromium hosts publish their accessibility tree lazily and reads would
+  otherwise return the pre-action tree forever; and `wait_for` performs the
+  same nudge between polls. `runtime.py` never imports `llm.py`.
+- `server.py`. The MCP stdio server. Loads every pack, exposes each tool as
+  `<app>_<tool>`, serializes calls with per-app locks (a GUI is one global
+  mutable resource), and refuses `high` risk tools unless the process was
+  started with `VENT_ALLOW_HIGH=1`. Never imports `llm.py` either.
+- `harness.py`. Durability measurement. Records anchors for an app's
+  elements, perturbs the app (real window resize, optionally a full quit and
+  relaunch), and re-resolves everything. Survival only counts when the found
+  element is provably the recorded one; lookalikes count as WRONG, and the
+  design goal is zero wrong. Skips rounds honestly when the screen is locked
+  or the app never comes back.
+- `explorer.py`. The model-driven part of compile time. The model nominates
+  elements worth probing; the policy screens every nomination; only reversible
+  or budgeted actions execute (a probe writes into an empty field and restores
+  the prior value immediately). Everything that ran is recorded into a trace.
+- `policy.py`. The safety screen, applied after the model. Closed action
+  space, destructive-word detection, per-session budgets for cumulative
+  actions like New Note, secure fields stripped before anything sees them.
+- `compiler.py`. Turns a trace into proposed tools. Composes only actions that
+  actually executed. Every proposal is shown to a human two ways: the model's
+  description, and a deterministic summary built from the literal recorded
+  steps. The steps are ground truth; the description is not. Nothing is
+  written without approval. Known limitation: compiling writes the whole pack
+  file, it does not merge into an existing one.
+- `heal.py`. When resolution fails at runtime with healing enabled, the model
+  gets the broken anchor plus a fresh snapshot and proposes a re-grounding.
+  It refuses truncated snapshots, cross-role targets, and destructive
+  targets. The fix goes into the pack's `healed_pending` quarantine, is
+  usable for the current call, and is only promoted into the anchor of record
+  when a human approves it in `vent verify`.
+- `llm.py`. The single home for every model call, and the only file with
+  network egress. Two backends, tried in order: the Anthropic SDK (needs
+  `ANTHROPIC_API_KEY` or an `ant auth login` profile, uses the API's
+  structured output so responses are schema-guaranteed), and the Claude Code
+  CLI (`claude -p`, print mode, tools disabled, works with a subscription
+  login and no API key; the schema travels in the prompt and responses are
+  parsed strictly, with exactly one wrapping markdown fence tolerated as
+  transport framing). App-derived text is wrapped in nonce-delimited
+  untrusted-content markers before it reaches a prompt.
+- `cli.py`. Click-based CLI wiring all of the above together.
+
+## The pack format, concretely
+
+```json
+{
+  "format_version": 2,
+  "bundle_id": "com.apple.TextEdit",
+  "app_name": "TextEdit",
+  "app_version": "1.19",
+  "tools": [
+    {
+      "name": "write_document",
+      "description": "Replace the entire text of the frontmost document.",
+      "risk": "mutating",
+      "params": {"text": {"type": "string", "description": "New content."}},
+      "preconditions": [{"kind": "window_exists"}],
+      "steps": [
+        {
+          "op": "set_value",
+          "anchor": {
+            "role": "AXTextArea",
+            "identifier": "First Text View",
+            "labels": [],
+            "window_title": "vent-demo.txt",
+            "chain": [
+              {"role": "AXApplication", "label": "TextEdit", "ordinal": 0, "index": 0},
+              {"role": "AXWindow", "identifier": "_NS:34", "ordinal": 0, "index": 0},
+              {"role": "AXScrollArea", "identifier": "_NS:8", "ordinal": 0, "index": 0},
+              {"role": "AXTextArea", "identifier": "First Text View", "ordinal": 0, "index": 0}
+            ]
+          },
+          "value": {"param": "text"},
+          "expect": {"role": "AXTextArea"}
+        }
+      ],
+      "verify": [
+        {"kind": "value_contains", "anchor": {"...": "same anchor"}, "param": "text"}
+      ]
+    }
+  ],
+  "healed_pending": []
+}
+```
+
+Verify kinds are `value_equals`, `value_contains` (against a param or a
+literal), and `element_exists`. Preconditions are `app_running` and
+`window_exists`. `wait_for` steps take a `timeout_s` and poll until the
+anchor resolves. Anchors remember every label they have been observed under,
+which is how a pack survived VS Code renaming its sidebar headings from
+"SOURCE CONTROL" to "Source Control" in an update.
+
+## The CLI
+
+```
+vent doctor [APP]      check Accessibility permission, probe an app's tree health
+vent apps              list running apps vent can attach to
+vent inspect APP       print the semantic snapshot (node ids, roles, labels, actions)
+vent anchor APP NODE   print the durable anchor for a node, for hand-authoring packs
+vent explore APP       model probes under the policy, records a trace (--no-values redacts field content)
+vent compile APP       propose tools from the trace, human approves each against literal steps
+vent run APP TOOL      execute one compiled tool directly (--arg key=value, --heal to enable re-grounding)
+vent serve             serve every pack as MCP tools over stdio
+vent verify APP        dry-resolve every anchor, report durability, offer to promote quarantined heals
+vent harness APP       measure anchor durability under resize (--restart adds quit and relaunch)
+```
+
+Wiring into Claude Code: `claude mcp add ventriloquist -- /path/to/.venv/bin/vent serve`.
+Tools appear as `textedit_write_document` and so on.
+
+## Security model, condensed
+
+The full threat model is docs/SECURITY.md (threats T1 through T10). The load
+bearing invariants:
+
+- Closed action space. No op runs code, shell commands, or AppleScript.
+  Adding an op is a breaking change to the threat model.
+- The model composes but never authors. Tools are built only from actions
+  that actually executed under the policy; model output is parsed against a
+  JSON schema and rejected on any mismatch, never repaired.
+- Policy screens after the model, so a prompt-injected model still cannot
+  reach anything the policy refuses.
+- `runtime.py` and `server.py` never import `llm.py`. Serving packs cannot
+  make a model call, structurally.
+- Healed anchors are quarantined, never silently promoted.
+- App-derived text (labels, values, titles) is treated as attacker-influenced
+  and wrapped in nonce-delimited markers before any prompt.
+- Secure fields are dropped before anything can see or target them.
+- Snapshots sent to a model are scrubbed; `--no-values` replaces every field
+  value with a length marker so exploration can run without field content
+  leaving the machine.
+- All network egress lives in one file, `llm.py`.
+- High risk tools are refused by the server unless it was started with
+  `VENT_ALLOW_HIGH=1`, an operator decision, never a caller decision.
+
+Honest limits, also documented: probe reversibility is local (an app that
+syncs on every keystroke may transmit a probe string before the restore), and
+truncation of previews is a privacy measure, not an injection defense.
+
+## Durability numbers (this machine, macOS 26)
+
+```
+TextEdit: baseline 100%,  resized 100%,   0 wrong
+Finder:   baseline 100%,  resized 100%,   0 wrong
+VS Code:  baseline  95%,  resized  87.5%, restart 92.5%, 0 wrong  (40 anchors)
+```
+
+The VS Code restart round is a full quit and relaunch; 37 of 40 anchors still
+bind to provably the same element. Non-survivors are ambiguity refusals, not
+wrong bindings. The VS Code pack's own curated anchors went 6 for 6 across
+view switches, a resize, and a real app update.
+
+## Hard-won platform knowledge (mostly Electron)
+
+- Chromium trees are deep. The old depth budget of 25 could not reach VS
+  Code's search box; the shared limit is now 50.
+- Chromium publishes its accessibility tree lazily. After an action, reads
+  return the pre-action tree until the next action arrives, however long you
+  poll. The runtime pumps a no-op scroll-to-visible after mutating ops and
+  between `wait_for` polls.
+- The cached AXValue of Chromium radio buttons is unreliable. Verify view
+  switches by waiting for the view's content to exist, not by reading the
+  pressed control's value.
+- VS Code must be launched with `--force-renderer-accessibility`. The
+  AXManualAccessibility request alone produces a tree that reads fine but
+  silently ignores every action.
+- VS Code's process name is `Code` but its AppleScript name is
+  `Visual Studio Code`; activating "Code" fails silently.
+- A locked screen makes every app serve an empty tree while the permission
+  check still passes. `vent doctor` names this state.
+- Apps relaunched from a background process serve degraded menubar-only trees
+  until genuinely foregrounded.
+- NSWorkspace's running-application list is KVO-maintained and freezes in a
+  process that never pumps the run loop; `ax.running_apps` pumps briefly on
+  every read.
+- macOS AX trees can be cyclic; every walk carries an ancestor-path cycle
+  guard.
+- An in-place app auto-update can wedge an Electron app's AX bridge until a
+  full quit and relaunch.
+
+## Development story and quality bar
+
+Built phase by phase, each phase getting an adversarial code review and a
+separate security review before the next began, with findings fixed in
+follow-up commits. 91 offline tests run in CI on Linux and macOS; the tests
+use fake element trees and a scripted-model seam
+(`llm.set_completer_for_tests`) so no test needs macOS, credentials, or
+network. Every model-driven path has also been validated live: exploration,
+compilation with the human gate (which caught a genuinely bad tool proposal),
+and the full break, heal, quarantine, promote cycle.
+
+## Files worth reading, in order
+
+1. docs/ARCHITECTURE.md   the design, section by section
+2. docs/SECURITY.md       the threat model, T1 through T10
+3. docs/HANDOFF.md        current state, findings, and gotchas
+4. vent/anchors.py        scoring and refusal, the durability core
+5. vent/runtime.py        replay, settle, verify, the Chromium pumps
+6. packs/                 real packs for TextEdit and VS Code

@@ -18,6 +18,23 @@ The accessibility layer has been in every Mac app for decades because
 screen readers depend on it. It turns out it's also a pretty good API for
 driving apps, if you're careful about how you find elements again later.
 
+## Demo
+
+[Watch the demo](docs/demo.mp4): TextEdit and VS Code side by side, both
+driven entirely by compiled pack tools. The narration gets typed into
+TextEdit by one tool while others switch VS Code's views and run a
+workspace search. Every action in the video is a deterministic replay.
+
+## How it works
+
+![Architecture](docs/architecture.svg)
+
+The top half runs once per app and is where the model earns its keep,
+with a policy screening every probe and a human approving every tool.
+The bottom half is what you actually use day to day, and it has no model
+in it at all. The pack file in the middle is the whole interface between
+the two: plain JSON you can read, diff, and check into a repo.
+
 ## Status
 
 The whole loop works and has been run live: exploration under the safety

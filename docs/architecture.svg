@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 560" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#333"/>
+    </marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#9a6700"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="980" height="560" rx="8" fill="#ffffff" stroke="#d0d7de"/>
+
+  <!-- ============ compile time (top) ============ -->
+  <rect x="24" y="40" width="932" height="210" rx="10" fill="none" stroke="#57606a" stroke-dasharray="5 4"/>
+  <text x="40" y="30" font-size="14" font-weight="bold" fill="#57606a">COMPILE TIME&#160;&#160;(model paid once, everything screened and approved)</text>
+
+  <!-- app -->
+  <rect x="48" y="96" width="150" height="86" rx="10" fill="#f6f8fa" stroke="#333" stroke-width="1.5"/>
+  <text x="123" y="128" font-size="15" font-weight="bold" text-anchor="middle" fill="#111">Running app</text>
+  <text x="123" y="150" font-size="12" text-anchor="middle" fill="#57606a">accessibility tree</text>
+  <text x="123" y="167" font-size="12" text-anchor="middle" fill="#57606a">(no pixels, no OCR)</text>
+
+  <!-- explorer -->
+  <rect x="256" y="96" width="150" height="86" rx="10" fill="#ddf4ff" stroke="#0969da" stroke-width="1.5"/>
+  <text x="331" y="128" font-size="15" font-weight="bold" text-anchor="middle" fill="#0a3069">Explorer</text>
+  <text x="331" y="150" font-size="12" text-anchor="middle" fill="#0a3069">model nominates,</text>
+  <text x="331" y="167" font-size="12" text-anchor="middle" fill="#0a3069">reversible probes</text>
+
+  <!-- policy -->
+  <rect x="464" y="96" width="150" height="86" rx="10" fill="#fff8c5" stroke="#9a6700" stroke-width="1.5"/>
+  <text x="539" y="128" font-size="15" font-weight="bold" text-anchor="middle" fill="#4d2d00">Policy</text>
+  <text x="539" y="150" font-size="12" text-anchor="middle" fill="#4d2d00">screens after the</text>
+  <text x="539" y="167" font-size="12" text-anchor="middle" fill="#4d2d00">model, closed op set</text>
+
+  <!-- compiler -->
+  <rect x="672" y="96" width="150" height="86" rx="10" fill="#ddf4ff" stroke="#0969da" stroke-width="1.5"/>
+  <text x="747" y="128" font-size="15" font-weight="bold" text-anchor="middle" fill="#0a3069">Compiler</text>
+  <text x="747" y="150" font-size="12" text-anchor="middle" fill="#0a3069">composes only</text>
+  <text x="747" y="167" font-size="12" text-anchor="middle" fill="#0a3069">executed actions</text>
+
+  <!-- approval gate -->
+  <rect x="672" y="196" width="150" height="42" rx="10" fill="#ffebe9" stroke="#cf222e" stroke-width="1.5"/>
+  <text x="747" y="222" font-size="13" font-weight="bold" text-anchor="middle" fill="#82071e">you approve each tool</text>
+
+  <line x1="198" y1="139" x2="252" y2="139" stroke="#333" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="406" y1="139" x2="460" y2="139" stroke="#333" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="614" y1="139" x2="668" y2="139" stroke="#333" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="747" y1="182" x2="747" y2="192" stroke="#cf222e" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- pack (bridge between halves) -->
+  <rect x="866" y="118" width="90" height="330" rx="10" fill="#dafbe1" stroke="#1a7f37" stroke-width="2"/>
+  <text x="911" y="150" font-size="15" font-weight="bold" text-anchor="middle" fill="#116329">pack.json</text>
+  <text x="911" y="176" font-size="11" text-anchor="middle" fill="#116329">typed tools</text>
+  <text x="911" y="192" font-size="11" text-anchor="middle" fill="#116329">durable anchors</text>
+  <text x="911" y="208" font-size="11" text-anchor="middle" fill="#116329">risk levels</text>
+  <text x="911" y="224" font-size="11" text-anchor="middle" fill="#116329">verify checks</text>
+  <text x="911" y="248" font-size="11" text-anchor="middle" fill="#57606a">plain JSON,</text>
+  <text x="911" y="263" font-size="11" text-anchor="middle" fill="#57606a">on your disk</text>
+
+  <line x1="822" y1="217" x2="862" y2="217" stroke="#333" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ============ run time (bottom) ============ -->
+  <rect x="24" y="290" width="932" height="246" rx="10" fill="none" stroke="#57606a" stroke-dasharray="5 4"/>
+  <text x="40" y="282" font-size="14" font-weight="bold" fill="#57606a">RUN TIME&#160;&#160;(deterministic, milliseconds, no model)</text>
+
+  <!-- mcp client -->
+  <rect x="48" y="330" width="150" height="86" rx="10" fill="#f6f8fa" stroke="#333" stroke-width="1.5"/>
+  <text x="123" y="362" font-size="15" font-weight="bold" text-anchor="middle" fill="#111">MCP client</text>
+  <text x="123" y="384" font-size="12" text-anchor="middle" fill="#57606a">Claude, or anything</text>
+  <text x="123" y="401" font-size="12" text-anchor="middle" fill="#57606a">that speaks MCP</text>
+
+  <!-- vent serve -->
+  <rect x="256" y="330" width="150" height="86" rx="10" fill="#f6f8fa" stroke="#333" stroke-width="1.5"/>
+  <text x="331" y="362" font-size="15" font-weight="bold" text-anchor="middle" fill="#111">vent serve</text>
+  <text x="331" y="384" font-size="12" text-anchor="middle" fill="#57606a">stdio, per-app locks,</text>
+  <text x="331" y="401" font-size="12" text-anchor="middle" fill="#57606a">risk gate</text>
+
+  <!-- runtime -->
+  <rect x="464" y="330" width="150" height="86" rx="10" fill="#f6f8fa" stroke="#333" stroke-width="1.5"/>
+  <text x="539" y="356" font-size="15" font-weight="bold" text-anchor="middle" fill="#111">Replay runtime</text>
+  <text x="539" y="378" font-size="12" text-anchor="middle" fill="#57606a">resolve anchor, act,</text>
+  <text x="539" y="395" font-size="12" text-anchor="middle" fill="#57606a">settle, verify live</text>
+
+  <!-- app again -->
+  <rect x="672" y="330" width="150" height="86" rx="10" fill="#f6f8fa" stroke="#333" stroke-width="1.5"/>
+  <text x="747" y="362" font-size="15" font-weight="bold" text-anchor="middle" fill="#111">The app</text>
+  <text x="747" y="384" font-size="12" text-anchor="middle" fill="#57606a">real accessibility</text>
+  <text x="747" y="401" font-size="12" text-anchor="middle" fill="#57606a">actions, no clicks faked</text>
+
+  <line x1="198" y1="373" x2="252" y2="373" stroke="#333" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="406" y1="373" x2="460" y2="373" stroke="#333" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="614" y1="373" x2="668" y2="373" stroke="#333" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="911" y1="448" x2="911" y2="470" stroke="#1a7f37" stroke-width="1.5"/>
+  <path d="M 911 470 L 911 484 L 620 484 L 620 420" fill="none" stroke="#1a7f37" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="770" y="478" font-size="11" fill="#116329">tools loaded from packs</text>
+
+  <!-- healer strip -->
+  <rect x="48" y="446" width="470" height="74" rx="10" fill="#fff8c5" stroke="#9a6700" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <text x="64" y="472" font-size="13" font-weight="bold" fill="#4d2d00">When an app update breaks an anchor</text>
+  <text x="64" y="492" font-size="12" fill="#4d2d00">a model re-grounds it, the fix is quarantined, and</text>
+  <text x="64" y="508" font-size="12" fill="#4d2d00">nothing is promoted until you approve it in vent verify</text>
+  <line x1="518" y1="483" x2="539" y2="483" stroke="#9a6700" stroke-width="1.5"/>
+  <line x1="539" y1="483" x2="539" y2="420" stroke="#9a6700" stroke-width="1.5" marker-end="url(#arrg)"/>
+</svg>
