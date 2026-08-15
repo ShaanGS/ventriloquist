@@ -17,12 +17,15 @@ works; Ventriloquist makes it programmable.
 
 ## Status
 
-Early and honest about it: the deterministic half is real today, the agentic
-half is next. Working now: accessibility introspection, scored anchor
-resolution, the pack format, the replay runtime, and an MCP server. One
-hand-written pack ships (TextEdit, two tools). The explorer that writes packs
-for you, the healer, and the durability harness are the current roadmap, in
-that order.
+The full loop exists: introspection, scored anchor resolution, the pack
+format, the deterministic replay runtime, the MCP server, the durability
+harness, the model-driven explorer and compiler with a human approval gate,
+and quarantined healing with `vent verify` promotion. 79 offline tests run
+in CI on every push; live behavior is verified against TextEdit and Notes.
+One hand-written pack ships (TextEdit). What remains before a release:
+live model-in-the-loop runs of `vent explore` and `--heal` (they need an
+`ANTHROPIC_API_KEY`), a compiled pack for a third-party Electron app, and
+a demo recording.
 
 ## Quick start
 
@@ -115,13 +118,25 @@ The threat model lives in [docs/SECURITY.md](docs/SECURITY.md). Both were
 adversarially reviewed before implementation and rewritten from the
 findings, and every phase since gets the same treatment.
 
-## Roadmap
+## The full workflow
 
-1. **Prove the hypothesis.** Scored anchor resolution plus a durability
-   harness measured against structurally diverse apps, including an
-   Electron app. A second hand-written pack (Notes) to pressure the format
-   with a stateful app. In progress; the runtime and server halves are done.
-2. **The explorer.** Survey, probe under the safety policy, and compile
-   traces into ToolSpecs that match the hand-written packs.
-3. **Healing and a third-party app.** Quarantined anchor healing end to end.
-4. **Ship.** Docs, tests, demo video, release.
+```bash
+vent doctor Spotify                 # does this app expose a usable tree?
+vent explore Notes --no-values      # model probes safely, policy screens, trace recorded
+vent compile Notes                  # model proposes tools; you approve against literal steps
+vent serve                          # every approved pack becomes MCP tools
+vent run Notes create_note --arg body="..."   # or call one tool directly
+vent verify Notes                   # dry-resolve anchors; promote quarantined heals
+```
+
+`vent explore` and `vent run --heal` call a model and need Anthropic
+credentials (`ANTHROPIC_API_KEY`). Everything else, including serving
+compiled packs and reusing already-quarantined heals, runs with no model
+and no network.
+
+## Roadmap to release
+
+1. Live model-in-the-loop validation of explore and heal (needs a key).
+2. A compiled pack for a third-party Electron app via the `vent doctor`
+   tree probe.
+3. Demo recording and a tagged release.

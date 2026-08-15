@@ -2,8 +2,25 @@ name: tests
 on:
   push:
   pull_request:
+
 jobs:
-  pytest:
+  # The offline suite is designed to run without macOS, permissions, or model
+  # credentials: fake accessibility trees and a scripted-model seam. Running
+  # it on Linux is the proof of that claim, not just a convenience.
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m venv .venv && .venv/bin/pip install -e . pytest
+      - run: .venv/bin/python -m pytest tests/ -q
+
+  # A second run on macOS exercises the same suite where the real pyobjc
+  # accessibility bindings are importable, catching anything that only breaks
+  # when the AX layer is genuinely present.
+  macos:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4

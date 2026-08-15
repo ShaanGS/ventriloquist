@@ -18,18 +18,39 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Iterator, Optional
 
-from ApplicationServices import (
-    AXIsProcessTrusted,
-    AXUIElementCopyActionNames,
-    AXUIElementCopyAttributeNames,
-    AXUIElementCopyAttributeValue,
-    AXUIElementCreateApplication,
-    AXUIElementPerformAction,
-    AXUIElementSetAttributeValue,
-    AXUIElementSetMessagingTimeout,
-    kAXErrorSuccess,
-)
-from Cocoa import NSBundle, NSRunningApplication, NSWorkspace
+# pyobjc is macOS-only. Importing it lazily keeps the pure-logic modules
+# (snapshot, anchors, packs, runtime, policy, compiler, heal) importable on
+# any platform, so the offline test suite runs in CI on Linux. Every symbol
+# here is used only inside functions that make live accessibility calls; a
+# non-macOS import leaves them None and any real call raises a clear error
+# rather than an ImportError at module load.
+try:
+    from ApplicationServices import (
+        AXIsProcessTrusted,
+        AXUIElementCopyActionNames,
+        AXUIElementCopyAttributeNames,
+        AXUIElementCopyAttributeValue,
+        AXUIElementCreateApplication,
+        AXUIElementPerformAction,
+        AXUIElementSetAttributeValue,
+        AXUIElementSetMessagingTimeout,
+        kAXErrorSuccess,
+    )
+    from Cocoa import NSBundle, NSRunningApplication, NSWorkspace
+
+    _PYOBJC_AVAILABLE = True
+except ImportError:  # pragma: no cover - exercised only off macOS
+    _PYOBJC_AVAILABLE = False
+    kAXErrorSuccess = 0
+
+
+def _require_pyobjc() -> None:
+    if not _PYOBJC_AVAILABLE:
+        raise AXError(
+            "The macOS accessibility API is unavailable on this platform. "
+            "Live app commands need macOS with pyobjc; the offline logic and "
+            "tests do not."
+        )
 
 # AX error codes that matter to us. Values from AXError.h.
 AX_ERROR_API_DISABLED = -25211
@@ -60,6 +81,7 @@ class NotTrustedError(AXError):
 
 def is_trusted() -> bool:
     """Whether this process may use the Accessibility API."""
+    _require_pyobjc()
     return bool(AXIsProcessTrusted())
 
 
@@ -81,6 +103,7 @@ class RunningApp:
 
 def running_apps() -> list[RunningApp]:
     """List regular (Dock-visible) running applications."""
+    _require_pyobjc()
     apps = []
     for app in NSWorkspace.sharedWorkspace().runningApplications():
         # activationPolicy 0 == NSApplicationActivationPolicyRegular
