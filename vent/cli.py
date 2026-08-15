@@ -50,21 +50,24 @@ def doctor(app_name: str | None) -> None:
     try:
         app = ax.find_app(app_name)
         root = ax.app_element(app)
-        before = len(snapshot(root).nodes)
         harness_mod.enable_web_accessibility(root)
         import time as time_mod
 
         time_mod.sleep(1.0)
-        after = len(snapshot(root).nodes)
+        snap = snapshot(root, max_nodes=3000)
+        web_children = sum(
+            1 for n in snap.nodes if n.role == "AXWebArea"
+        )
     except ax.AXError as exc:
         click.secho(str(exc), fg="red")
         sys.exit(1)
 
-    click.echo(f"{app.name}: {before} elements before web-accessibility request, {after} after")
-    if after == 0:
+    click.echo(f"{app.name}: {len(snap.nodes)} elements after web-accessibility request")
+    if not snap.nodes:
         click.secho("✗ No usable tree. This app cannot be packed yet.", fg="red")
-    elif after > before:
-        click.secho("✓ Tree present (web content appeared after the request).", fg="green")
+        sys.exit(1)
+    if web_children:
+        click.secho(f"✓ Tree present, including {web_children} web area(s).", fg="green")
     else:
         click.secho("✓ Tree present.", fg="green")
 

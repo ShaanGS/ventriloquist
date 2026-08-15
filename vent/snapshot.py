@@ -155,7 +155,11 @@ def snapshot(
     """
     nodes: list[Node] = []
     truncated = False
-    seen: set[int] = set()
+    # Ancestor-path cycle guard: real AX trees can contain cycles (a wedged
+    # TextEdit was observed returning the app element as its own child) and
+    # are DAGs besides, so only true ancestor cycles are cut; an element
+    # reachable through two different paths is walked through both.
+    path_keys: set[int] = set()
 
     def visit(element: Element, chain: tuple[ChainLink, ...], depth: int, shown_depth: int) -> None:
         nonlocal truncated
@@ -165,14 +169,11 @@ def snapshot(
         if len(nodes) >= max_nodes:
             truncated = True
             return
-        # Real AX trees can contain cycles: a wedged TextEdit was observed
-        # returning the app element as its own child. Without this guard a
-        # cyclic tree makes the walk explode instead of terminate.
-        key = element.ref_key()
+        key = element.ref_key() if hasattr(element, "ref_key") else None
+        if key is not None and key in path_keys:
+            return
         if key is not None:
-            if key in seen:
-                return
-            seen.add(key)
+            path_keys.add(key)
 
         role = element.role
         subrole = element.subrole
@@ -224,6 +225,9 @@ def snapshot(
             )
             visit(child, chain + (link,), depth + 1, shown_depth + (1 if interesting else 0))
 
+        if key is not None:
+            path_keys.discard(key)
+
     # The app root itself.
     root_link = ChainLink(role=root.role, label=root.label, identifier=_identifier(root), ordinal=0, index=0)
     visit(root, (root_link,), 0, 0)
@@ -249,7 +253,8 @@ def render(snap: Snapshot) -> str:
         label = f" {node.label!r}" if node.label else ""
         ident = f" id={node.identifier}" if node.identifier else ""
         value = f" = {node.value_preview!r}" if node.value_preview else ""
-        actions = f" [{','.join(a.removeprefix('AX') for a in node.actions)}]" if node.actions else ""
+        cleaned = [" ".join(a.removeprefix("AX").split()) for a in node.actions]
+        actions = f" [{','.join(c[:30] for c in cleaned)}]" if cleaned else ""
         lines.append(f"{indent}#{node.id} {node.role.removeprefix('AX')}{label}{ident}{value}{actions}")
     if snap.modal_present:
         lines.append("(a modal sheet is open)")

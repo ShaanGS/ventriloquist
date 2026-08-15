@@ -84,6 +84,30 @@ Tools appear as `textedit_write_document` and friends. Tools marked
 `VENT_ALLOW_HIGH=1` in its environment; see
 [docs/SECURITY.md](docs/SECURITY.md) for why.
 
+## Anchor durability, measured
+
+`vent harness <app>` records anchors for an app's elements, perturbs the
+app (verified window resize, and optionally a full quit and relaunch), and
+re-resolves every anchor. Survival only counts when the element found is
+provably the element recorded; lookalike bindings count as WRONG, and
+anchors with nothing to verify identity against count as unverifiable, not
+as survivors.
+
+Current numbers on this machine (macOS 26, small anchor sets, early days):
+
+```
+TextEdit: baseline 100%, resized 100%, 0 wrong
+Finder:   baseline 100%, resized 100%, 0 wrong
+```
+
+Field notes from measuring, kept because they shaped the code: macOS AX
+trees can be cyclic (a wedged TextEdit returned the app element as its own
+child, which is why every walk carries an ancestor-path cycle guard); apps
+relaunched by a background process can serve degenerate menubar-only trees
+until genuinely foregrounded; a pending accessibility permission dialog
+silently degrades AX for every app launched after it appears; and
+AXZoomWindow advertises itself on buttons that then refuse to perform it.
+
 ## Design
 
 Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before reading the code.

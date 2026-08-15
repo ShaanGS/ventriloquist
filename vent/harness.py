@@ -39,6 +39,7 @@ class AnchorRecord:
     role: str
     identifier: str
     label: str
+    subrole: str
 
 
 @dataclass
@@ -48,11 +49,12 @@ class RoundResult:
     lost: int = 0
     ambiguous: int = 0
     wrong: int = 0
+    unverifiable: int = 0  # resolved, but identity cannot be judged; not survival
     note: str = ""
 
     @property
     def total(self) -> int:
-        return self.resolved + self.lost + self.ambiguous + self.wrong
+        return self.resolved + self.lost + self.ambiguous + self.wrong + self.unverifiable
 
     @property
     def survival(self) -> float:
@@ -70,7 +72,8 @@ class HarnessReport:
         for r in self.rounds:
             line = (
                 f"  {r.name:10} {r.survival:5.1f}% survived "
-                f"({r.resolved} ok, {r.lost} lost, {r.ambiguous} ambiguous, {r.wrong} WRONG)"
+                f"({r.resolved} ok, {r.lost} lost, {r.ambiguous} ambiguous, "
+                f"{r.wrong} WRONG, {r.unverifiable} unverifiable)"
             )
             if r.note:
                 line += f"  [{r.note}]"
@@ -99,26 +102,36 @@ def _record(root: ax.Element, cap: int) -> list[AnchorRecord]:
                 role=node.role,
                 identifier=node.identifier,
                 label=node.label,
+                subrole=node.subrole,
             )
         )
     return records
 
 
-def _same_element(record: AnchorRecord, element: ax.Element) -> bool:
-    """Whether a resolved element is plausibly the recorded one. Refs are
-    not comparable across restarts, so identity is judged on the stable
-    facets the recording captured."""
+def _identity_verdict(record: AnchorRecord, element: ax.Element) -> str:
+    """Judge whether a resolved element is the recorded one.
+
+    Returns "same", "wrong", or "unverifiable". Refs are not comparable
+    across restarts, so identity is judged on stable facets. A record with
+    no identifier, no label, and no subrole gives nothing to judge by;
+    counting those as survivors would overcount, so they are their own
+    bucket and excluded from the survival numerator.
+    """
+    if not (record.identifier or record.label or record.subrole):
+        return "unverifiable"
     if element.role != record.role:
-        return False
+        return "wrong"
     identifier = str(element.attribute("AXIdentifier") or "")
     if record.identifier and identifier and identifier != record.identifier:
-        return False
+        return "wrong"
+    if record.subrole and element.subrole and element.subrole != record.subrole:
+        return "wrong"
     if record.label and element.label and element.label != record.label:
         # Labels legitimately change (toggles, counters); only treat a
         # mismatch as wrong when the identifier gives no tiebreak.
         if not (record.identifier and identifier == record.identifier):
-            return False
-    return True
+            return "wrong"
+    return "same"
 
 
 def _resolve_round(name: str, root: ax.Element, records: list[AnchorRecord]) -> RoundResult:
@@ -135,8 +148,11 @@ def _resolve_round(name: str, root: ax.Element, records: list[AnchorRecord]) -> 
         except ax.AXTransientError:
             result.lost += 1
             continue
-        if _same_element(record, element):
+        verdict = _identity_verdict(record, element)
+        if verdict == "same":
             result.resolved += 1
+        elif verdict == "unverifiable":
+            result.unverifiable += 1
         else:
             result.wrong += 1
     return result
@@ -150,18 +166,38 @@ def _resize_window(root: ax.Element):
     action advertises itself and then refuses to perform on modern macOS,
     a fact this harness discovered, so the size attribute is set directly.
     """
-    from ApplicationServices import AXValueCreate, kAXValueCGSizeType
+    from ApplicationServices import AXValueCreate, AXValueGetValue, kAXValueCGSizeType
+
+    def decode(ref):
+        ok, size = AXValueGetValue(ref, kAXValueCGSizeType, None)
+        return (size.width, size.height) if ok else None
 
     windows = root.attribute("AXWindows") or []
     if not windows:
         return None
     window = ax.Element(windows[0])
     original = window.attribute("AXSize")
-    if original is None:
+    dims = decode(original) if original is not None else None
+    if dims is None:
         return None
+
+    # Shrink relative to the current size; a fixed target can be a no-op
+    # or even a grow, and the window server clamps to the app's minimum.
+    target = (max(400.0, dims[0] * 0.6), max(300.0, dims[1] * 0.6))
     try:
-        window.set_attribute("AXSize", AXValueCreate(kAXValueCGSizeType, (620.0, 480.0)))
+        window.set_attribute("AXSize", AXValueCreate(kAXValueCGSizeType, target))
     except ax.AXError:
+        return None
+
+    time.sleep(0.3)
+    after = decode(window.attribute("AXSize") or original)
+    if after is None or (abs(after[0] - dims[0]) < 20 and abs(after[1] - dims[1]) < 20):
+        # The window server refused the resize. A round measured against
+        # an unchanged UI would publish a lie; skip it instead.
+        try:
+            window.set_attribute("AXSize", original)
+        except ax.AXError:
+            pass
         return None
 
     def restore():
@@ -205,12 +241,23 @@ def run(app_query: str, cap: int = 40, restart: bool = False, reopen: str | None
         time.sleep(0.5)
 
     if restart:
-        subprocess.run(["osascript", "-e", f'tell application "{app.name}" to quit'], timeout=15)
+        if not app.bundle_id:
+            raise ax.AXError(
+                f"{app.name} has no bundle id; refusing to quit an app the "
+                "harness cannot relaunch."
+            )
+        # Terminate through the NSRunningApplication handle. Building
+        # AppleScript source from an app-controlled name is an injection
+        # vector (SECURITY.md T1 applies to us too, not just to packs).
+        ax.terminate(app)
         time.sleep(2.0)
-        launch = ["open", "-b", app.bundle_id or ""]
+        launch = ["open", "-b", app.bundle_id]
         if reopen:
             launch.append(reopen)
-        subprocess.run(launch, check=True, timeout=15)
+        try:
+            subprocess.run(launch, check=True, timeout=15)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+            raise ax.AXError(f"could not relaunch {app.bundle_id}: {exc}") from exc
         time.sleep(3.0)
         fresh_app = ax.find_app_by_bundle(app.bundle_id or "")
         fresh_root = ax.app_element(fresh_app)

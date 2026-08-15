@@ -1,0 +1,315 @@
+{
+  "format_version": 2,
+  "bundle_id": "com.apple.Notes",
+  "app_name": "Notes",
+  "app_version": "4.13",
+  "os_version": "26.3.1",
+  "locale": "C",
+  "tools": [
+    {
+      "name": "create_note",
+      "description": "Create a new note in Apple Notes with the given text.",
+      "risk": "mutating",
+      "requires_frontmost": true,
+      "params": {
+        "body": {
+          "type": "string",
+          "description": "The note's content. The first line becomes its title."
+        }
+      },
+      "preconditions": [
+        {
+          "kind": "app_running"
+        },
+        {
+          "kind": "window_exists"
+        }
+      ],
+      "steps": [
+        {
+          "op": "press",
+          "anchor": {
+            "role": "AXButton",
+            "identifier": "",
+            "labels": [
+              "New Note"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Notes",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "_NS:6",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXToolbar",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXButton",
+                "label": "New Note",
+                "identifier": "",
+                "ordinal": 2,
+                "index": 3,
+                "subrole": ""
+              }
+            ]
+          },
+          "expect": {
+            "role": "AXButton"
+          }
+        },
+        {
+          "op": "wait_for",
+          "anchor": {
+            "role": "AXTextArea",
+            "identifier": "Note Body Text View",
+            "labels": [],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Notes",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "_NS:6",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXSplitGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXScrollArea",
+                "label": "",
+                "identifier": "Note Body Scroll View",
+                "ordinal": 2,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXTextArea",
+                "label": "",
+                "identifier": "Note Body Text View",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              }
+            ]
+          }
+        },
+        {
+          "op": "set_value",
+          "anchor": {
+            "role": "AXTextArea",
+            "identifier": "Note Body Text View",
+            "labels": [],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Notes",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "_NS:6",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXSplitGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXScrollArea",
+                "label": "",
+                "identifier": "Note Body Scroll View",
+                "ordinal": 2,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXTextArea",
+                "label": "",
+                "identifier": "Note Body Text View",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              }
+            ]
+          },
+          "value": {
+            "param": "body"
+          },
+          "expect": {
+            "role": "AXTextArea"
+          }
+        }
+      ],
+      "verify": [
+        {
+          "kind": "value_contains",
+          "anchor": {
+            "role": "AXTextArea",
+            "identifier": "Note Body Text View",
+            "labels": [],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Notes",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "_NS:6",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXSplitGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXScrollArea",
+                "label": "",
+                "identifier": "Note Body Scroll View",
+                "ordinal": 2,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXTextArea",
+                "label": "",
+                "identifier": "Note Body Text View",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              }
+            ]
+          },
+          "param": "body"
+        }
+      ]
+    },
+    {
+      "name": "read_open_note",
+      "description": "Read the full text of the currently open note.",
+      "risk": "read_only",
+      "requires_frontmost": true,
+      "params": {},
+      "preconditions": [
+        {
+          "kind": "app_running"
+        },
+        {
+          "kind": "window_exists"
+        }
+      ],
+      "steps": [
+        {
+          "op": "read_value",
+          "anchor": {
+            "role": "AXTextArea",
+            "identifier": "Note Body Text View",
+            "labels": [],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Notes",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "_NS:6",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXSplitGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXScrollArea",
+                "label": "",
+                "identifier": "Note Body Scroll View",
+                "ordinal": 2,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXTextArea",
+                "label": "",
+                "identifier": "Note Body Text View",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              }
+            ]
+          },
+          "expect": {
+            "role": "AXTextArea"
+          }
+        }
+      ],
+      "verify": []
+    }
+  ],
+  "healed_pending": []
+}

@@ -1,5 +1,5 @@
 {
-  "format_version": 1,
+  "format_version": 2,
   "bundle_id": "com.apple.TextEdit",
   "app_name": "TextEdit",
   "app_version": "",
@@ -40,7 +40,7 @@
               },
               {
                 "role": "AXWindow",
-                "label": "vent-demo.txt",
+                "label": "",
                 "identifier": "_NS:34",
                 "ordinal": 0,
                 "index": 0
@@ -87,7 +87,7 @@
               },
               {
                 "role": "AXWindow",
-                "label": "vent-demo.txt",
+                "label": "",
                 "identifier": "_NS:34",
                 "ordinal": 0,
                 "index": 0
@@ -141,7 +141,7 @@
               },
               {
                 "role": "AXWindow",
-                "label": "vent-demo.txt",
+                "label": "",
                 "identifier": "_NS:34",
                 "ordinal": 0,
                 "index": 0

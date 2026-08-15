@@ -71,3 +71,46 @@ def test_duplicate_tool_names_rejected():
     pack_dict["tools"].append(pack_dict["tools"][0])
     with pytest.raises(PackError, match="duplicate"):
         Pack.from_dict(pack_dict)
+
+
+def test_future_chain_keys_are_dropped_not_fatal(tmp_path):
+    pack = sample_pack()
+    path = tmp_path / "p" / "pack.json"
+    save(pack, path)
+    import json
+    data = json.loads(path.read_text())
+    data["tools"][0]["steps"][0]["anchor"]["chain"][0]["hologram"] = "future-field"
+    path.write_text(json.dumps(data))
+    loaded = load(path)  # must not raise TypeError
+    assert loaded.tool("write_document").steps[0].anchor is not None
+
+
+def test_malformed_structure_is_packerror_not_traceback(tmp_path):
+    pack = sample_pack()
+    path = tmp_path / "p" / "pack.json"
+    save(pack, path)
+    import json
+    data = json.loads(path.read_text())
+    data["tools"][0]["steps"][0]["anchor"]["chain"] = [{"only": "garbage"}]
+    path.write_text(json.dumps(data))
+    with pytest.raises(PackError):
+        load(path)
+
+
+def test_load_all_skips_broken_pack(tmp_path, capsys):
+    good = sample_pack()
+    save(good, tmp_path / "good" / "pack.json")
+    (tmp_path / "bad").mkdir()
+    (tmp_path / "bad" / "pack.json").write_text("{not json")
+    from vent.packs import load_all
+    loaded = load_all(tmp_path)
+    assert len(loaded) == 1
+    assert "skipping" in capsys.readouterr().err
+
+
+def test_settle_opt_out_round_trips(tmp_path):
+    pack = sample_pack()
+    pack.tools[0].steps[0].settle = False
+    path = tmp_path / "p" / "pack.json"
+    save(pack, path)
+    assert load(path).tool("write_document").steps[0].settle is False

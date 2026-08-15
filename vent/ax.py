@@ -156,6 +156,15 @@ def frontmost_app() -> Optional[RunningApp]:
     )
 
 
+def terminate(app: RunningApp) -> bool:
+    """Ask the app to quit (regular Quit, not force kill). Returns False
+    if the process is already gone."""
+    ns_app = NSRunningApplication.runningApplicationWithProcessIdentifier_(app.pid)
+    if ns_app is None:
+        return False
+    return bool(ns_app.terminate())
+
+
 def activate(app: RunningApp) -> bool:
     """Bring the app frontmost. Returns False if the process is gone."""
     ns_app = NSRunningApplication.runningApplicationWithProcessIdentifier_(app.pid)

@@ -57,7 +57,6 @@ W_CHAIN = 3.0
 W_WINDOW = 2.0
 W_ORDINAL = 1.0
 W_INDEX = 0.5
-W_SUBROLE = 2.0
 
 ACCEPT_THRESHOLD = 6.0
 AMBIGUITY_MARGIN = 1.5
@@ -84,23 +83,49 @@ class Anchor:
 
     @classmethod
     def from_dict(cls, data: dict) -> "Anchor":
+        from dataclasses import fields as dc_fields
+
+        known = {f.name for f in dc_fields(ChainLink)}
         return cls(
             role=data["role"],
             identifier=data.get("identifier", ""),
             labels=list(data.get("labels", [])),
             window_title=data.get("window_title", ""),
-            chain=[ChainLink(**link) for link in data.get("chain", [])],
+            # Unknown keys from future format versions are dropped rather
+            # than crashing; packs.py gates on format_version for real
+            # incompatibilities.
+            chain=[
+                ChainLink(**{k: v for k, v in link.items() if k in known})
+                for link in data.get("chain", [])
+            ],
         )
 
 
 def build(node: Node) -> Anchor:
-    """Create an anchor from a surfaced snapshot node."""
+    """Create an anchor from a surfaced snapshot node.
+
+    Window links in the chain get their labels blanked: window identity is
+    scored through the anchor's own window_title field, and window labels
+    embed volatile user data (document names, "Notes - 38 notes") that
+    would otherwise leak into shared packs and booby-trap future scoring.
+    """
+    chain = [
+        ChainLink(
+            role=link.role,
+            label="" if link.role == "AXWindow" else link.label,
+            identifier=link.identifier,
+            ordinal=link.ordinal,
+            index=link.index,
+            subrole=link.subrole,
+        )
+        for link in node.chain
+    ]
     return Anchor(
         role=node.role,
         identifier=node.identifier,
         labels=[node.label] if node.label else [],
         window_title=node.window_title,
-        chain=list(node.chain),
+        chain=chain,
     )
 
 
@@ -117,31 +142,38 @@ def _walk_with_chains(
 ) -> Iterator[tuple[Element, tuple[ChainLink, ...]]]:
     """Yield every element with its ancestor chain, same shape as snapshot."""
 
-    seen: set[int] = set()
+    # Ancestor-path cycle guard, not a global visited set: AX trees are
+    # DAGs and the same element can be legitimately reachable through two
+    # paths. Only a true ancestor cycle (an element inside itself) is cut.
+    path_keys: set[int] = set()
 
     def visit(element: Element, chain: tuple[ChainLink, ...], depth: int):
         key = element.ref_key()
-        if key is not None:
-            if key in seen:
-                return
-            seen.add(key)
-        yield element, chain
-        if depth >= max_depth:
+        if key is not None and key in path_keys:
             return
-        role_counts: dict[str, int] = {}
-        for index, child in enumerate(element.children()):
-            role = child.role
-            ordinal = role_counts.get(role, 0)
-            role_counts[role] = ordinal + 1
-            link = ChainLink(
-                role=role,
-                label=child.label,
-                identifier=str(child.attribute("AXIdentifier") or ""),
-                ordinal=ordinal,
-                index=index,
-                subrole=child.subrole,
-            )
-            yield from visit(child, chain + (link,), depth + 1)
+        if key is not None:
+            path_keys.add(key)
+        try:
+            yield element, chain
+            if depth >= max_depth:
+                return
+            role_counts: dict[str, int] = {}
+            for index, child in enumerate(element.children()):
+                role = child.role
+                ordinal = role_counts.get(role, 0)
+                role_counts[role] = ordinal + 1
+                link = ChainLink(
+                    role=role,
+                    label=child.label,
+                    identifier=str(child.attribute("AXIdentifier") or ""),
+                    ordinal=ordinal,
+                    index=index,
+                    subrole=child.subrole,
+                )
+                yield from visit(child, chain + (link,), depth + 1)
+        finally:
+            if key is not None:
+                path_keys.discard(key)
 
     root_link = ChainLink(
         role=root.role,
@@ -248,10 +280,6 @@ def _score(anchor: Anchor, chain: tuple[ChainLink, ...]) -> tuple[float, dict]:
         position = max(0.0, W_ORDINAL - 0.5 * ordinal_gap) + max(0.0, W_INDEX - 0.1 * index_gap)
         score += position
         breakdown["position"] = round(position, 2)
-
-        if recorded_leaf.subrole and recorded_leaf.subrole == leaf.subrole:
-            score += W_SUBROLE
-            breakdown["subrole"] = W_SUBROLE
 
     return score, breakdown
 

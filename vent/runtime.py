@@ -60,19 +60,20 @@ class ToolResult:
 def _shape_hash(element: Element, depth: int = SETTLE_DEPTH) -> int:
     """A cheap fingerprint of the tree's current shape and values."""
     parts: list[str] = []
-    seen: set[int] = set()
+    path_keys: set[int] = set()
 
     def visit(el: Element, d: int) -> None:
         key = el.ref_key() if hasattr(el, "ref_key") else None
-        if key is not None:
-            if key in seen:
-                return
-            seen.add(key)
-        parts.append(f"{el.role}|{el.label}|{el.value}")
-        if d >= depth:
+        if key is not None and key in path_keys:
             return
-        for child in el.children():
-            visit(child, d + 1)
+        if key is not None:
+            path_keys.add(key)
+        parts.append(f"{el.role}|{el.label}|{el.value}")
+        if d < depth:
+            for child in el.children():
+                visit(child, d + 1)
+        if key is not None:
+            path_keys.discard(key)
 
     visit(element, 0)
     return hash("\n".join(parts))
@@ -238,7 +239,7 @@ def _run_step(
         # Wrap so the failure names the app, tool, and step, per SECURITY.md.
         raise ToolExecutionError(f"{where}: {exc}") from exc
 
-    detail = settle(root, step.timeout_s)
+    detail = settle(root, step.timeout_s) if step.settle else "settle skipped"
     return StepReport(op=step.op, ok=True, detail=detail)
 
 

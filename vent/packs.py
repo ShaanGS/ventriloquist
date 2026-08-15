@@ -27,7 +27,8 @@ OPS = {"press", "set_value", "pick", "reveal", "raise_window", "open_app", "wait
 RISK_LEVELS = {"read_only", "mutating", "high"}
 VERIFY_KINDS = {"value_contains", "value_equals", "element_exists"}
 PRECONDITION_KINDS = {"app_running", "window_exists"}
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
+READABLE_VERSIONS = {1, 2}  # version 2 added ChainLink.subrole
 
 
 class PackError(ValueError):
@@ -42,6 +43,7 @@ class Step:
     expect: Optional[dict] = None  # {"role": "AXTextArea"}
     action: str = "AXPress"  # AX action name, for press steps
     timeout_s: float = 5.0
+    settle: bool = True  # opt out for steps whose effect verify covers
 
     def to_dict(self) -> dict:
         data: dict[str, Any] = {"op": self.op}
@@ -55,6 +57,8 @@ class Step:
             data["action"] = self.action
         if self.timeout_s != 5.0:
             data["timeout_s"] = self.timeout_s
+        if not self.settle:
+            data["settle"] = False
         return data
 
     @classmethod
@@ -72,6 +76,7 @@ class Step:
             expect=data.get("expect"),
             action=data.get("action", "AXPress"),
             timeout_s=float(data.get("timeout_s", 5.0)),
+            settle=bool(data.get("settle", True)),
         )
 
 
@@ -199,8 +204,10 @@ class Pack:
     @classmethod
     def from_dict(cls, data: dict) -> "Pack":
         version = data.get("format_version")
-        if version != FORMAT_VERSION:
-            raise PackError(f"unsupported pack format_version {version!r}, expected {FORMAT_VERSION}")
+        if version not in READABLE_VERSIONS:
+            raise PackError(
+                f"unsupported pack format_version {version!r}, readable: {sorted(READABLE_VERSIONS)}"
+            )
         if not data.get("bundle_id"):
             raise PackError("pack is missing bundle_id")
         if not data.get("app_name"):
@@ -229,6 +236,10 @@ def load(path: Path) -> Pack:
         return Pack.from_dict(data)
     except PackError as exc:
         raise PackError(f"{path}: {exc}") from exc
+    except (TypeError, KeyError, ValueError) as exc:
+        # Malformed structure from a future version or hand edit. Same
+        # outcome as any invalid pack: rejected with the file named.
+        raise PackError(f"{path}: malformed pack ({exc!r})") from exc
 
 
 def save(pack: Pack, path: Path) -> None:
@@ -238,9 +249,16 @@ def save(pack: Pack, path: Path) -> None:
 
 
 def load_all(packs_dir: Path) -> list[Pack]:
+    """Load every pack, skipping invalid ones with a warning on stderr.
+    One broken pack should not take down the server for the rest."""
+    import sys
+
     packs = []
     for pack_file in sorted(Path(packs_dir).glob("*/pack.json")):
-        packs.append(load(pack_file))
+        try:
+            packs.append(load(pack_file))
+        except PackError as exc:
+            print(f"warning: skipping {exc}", file=sys.stderr)
     return packs
 
 

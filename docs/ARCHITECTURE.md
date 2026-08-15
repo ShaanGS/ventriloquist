@@ -14,7 +14,9 @@ flaky. Ventriloquist is a compiler. An agent explores a Mac app's
 accessibility tree once, discovers what the app can do, and writes that
 knowledge down as a "pack": a set of typed tools, each backed by a recorded
 sequence of accessibility actions. After compilation, calling a tool replays
-the recording in milliseconds with zero model calls. The model only comes back
+the recording with zero model calls: anchor resolution takes milliseconds,
+and each mutating step then waits a settle window (0.15 to 0.6 seconds) for
+the app to react before the next step trusts the tree. The model only comes back
 when a recording breaks, fixes it, and the fix is quarantined until approved.
 Interpreter when needed, compiler by default.
 
