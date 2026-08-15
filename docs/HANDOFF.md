@@ -140,10 +140,23 @@ the code and docs, plus a queue of open work in priority order:
    action-deaf without it), serves only an open modal's subtree while a
    promo overlay is up, and its composer and search are the two text
    inputs. Figma desktop probed as the expected worst case: usable shell
-   chrome, opaque pixel canvas. Next Slack step is a pack: channel
-   navigation plus a parameter-bound select is what send_message_to
-   needs, and the DM list is virtualized, so select must compose with
-   scrolling.
+   chrome, opaque pixel canvas. A thin Slack pack now ships
+   (`packs/com.tinyspeck.slackmacgap`): Home navigation plus a
+   parameterized sidebar filter, 6/8 tool-level calls under resize
+   cycles, both failures ambiguity refusals when the nav rail reflows.
+   The workspace name was scrubbed from the committed anchors the way
+   window titles already are; do that for any pack recorded against a
+   signed-in app. What send_message_to still needs is a parameter-bound
+   select over the DM list, which is virtualized, so select must compose
+   with scrolling.
+
+   The portability probe should target VS Code, not TextEdit. AppKit
+   anchors ride nib identifiers and are expected to travel; the test
+   with information in it is an Electron pack under a fresh user account
+   (default theme, no extensions, different geometry). Login-gated apps
+   like Slack cannot be probed this way at all, which is itself a
+   finding: their packs may be per-user artifacts, and if so the honest
+   claim is "pay the model once per user", not "once".
 1. Portability is the untested load-bearing claim. Packs carry window
    titles and chain ordinals that may be coupled to one machine's state.
    AppKit identifiers ship in compiled nibs and should travel; Electron

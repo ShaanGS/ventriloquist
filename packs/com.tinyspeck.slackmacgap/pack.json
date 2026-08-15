@@ -1,0 +1,1072 @@
+{
+  "format_version": 2,
+  "bundle_id": "com.tinyspeck.slackmacgap",
+  "app_name": "Slack",
+  "app_version": "4.51.185",
+  "os_version": "26.3.1",
+  "locale": "C",
+  "tools": [
+    {
+      "name": "show_home",
+      "description": "Select the Home tab in Slack's navigation rail and wait for the sidebar to appear. Slack must be running with --force-renderer-accessibility or presses are silently ignored.",
+      "risk": "read_only",
+      "requires_frontmost": true,
+      "params": {},
+      "preconditions": [
+        {
+          "kind": "app_running"
+        },
+        {
+          "kind": "window_exists"
+        }
+      ],
+      "steps": [
+        {
+          "op": "press",
+          "anchor": {
+            "role": "AXRadioButton",
+            "identifier": "",
+            "labels": [
+              "Home"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Slack",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXGroup",
+                "label": "new-channel (Channel) - Kairo - Slack",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWebArea",
+                "label": "new-channel (Channel) - Kairo - Slack",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 2,
+                "index": 3,
+                "subrole": "AXTabPanel"
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXTabGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 2,
+                "subrole": ""
+              },
+              {
+                "role": "AXRadioButton",
+                "label": "Home",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXTabButton"
+              }
+            ]
+          },
+          "expect": {
+            "role": "AXRadioButton"
+          }
+        },
+        {
+          "op": "wait_for",
+          "anchor": {
+            "role": "AXTextField",
+            "identifier": "",
+            "labels": [
+              "Channel or user name"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Slack",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXGroup",
+                "label": "new-channel (Channel) - Kairo - Slack",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWebArea",
+                "label": "new-channel (Channel) - Kairo - Slack",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 2,
+                "index": 3,
+                "subrole": "AXTabPanel"
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "Home",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXTabPanel"
+              },
+              {
+                "role": "AXGroup",
+                "label": "Home",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXApplicationGroup"
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 2,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXTextField",
+                "label": "Channel or user name",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXSearchField"
+              }
+            ]
+          },
+          "timeout_s": 8.0
+        }
+      ],
+      "verify": [
+        {
+          "kind": "element_exists",
+          "anchor": {
+            "role": "AXTextField",
+            "identifier": "",
+            "labels": [
+              "Channel or user name"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Slack",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXGroup",
+                "label": "new-channel (Channel) - Kairo - Slack",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWebArea",
+                "label": "new-channel (Channel) - Kairo - Slack",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 2,
+                "index": 3,
+                "subrole": "AXTabPanel"
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "Home",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXTabPanel"
+              },
+              {
+                "role": "AXGroup",
+                "label": "Home",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXApplicationGroup"
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 2,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXTextField",
+                "label": "Channel or user name",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXSearchField"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "filter_channels",
+      "description": "Type into the sidebar's channel and user filter, narrowing the visible list. Pass an empty string to clear the filter. The Home tab must be showing (call show_home first).",
+      "risk": "read_only",
+      "requires_frontmost": true,
+      "params": {
+        "query": {
+          "type": "string",
+          "description": "Channel or user name fragment, or empty to clear."
+        }
+      },
+      "preconditions": [
+        {
+          "kind": "app_running"
+        },
+        {
+          "kind": "window_exists"
+        }
+      ],
+      "steps": [
+        {
+          "op": "wait_for",
+          "anchor": {
+            "role": "AXTextField",
+            "identifier": "",
+            "labels": [
+              "Channel or user name"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Slack",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXGroup",
+                "label": "new-channel (Channel) - Kairo - Slack",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWebArea",
+                "label": "new-channel (Channel) - Kairo - Slack",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 2,
+                "index": 3,
+                "subrole": "AXTabPanel"
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "Home",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXTabPanel"
+              },
+              {
+                "role": "AXGroup",
+                "label": "Home",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXApplicationGroup"
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 2,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXTextField",
+                "label": "Channel or user name",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXSearchField"
+              }
+            ]
+          },
+          "timeout_s": 6.0
+        },
+        {
+          "op": "set_value",
+          "anchor": {
+            "role": "AXTextField",
+            "identifier": "",
+            "labels": [
+              "Channel or user name"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Slack",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXGroup",
+                "label": "new-channel (Channel) - Kairo - Slack",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWebArea",
+                "label": "new-channel (Channel) - Kairo - Slack",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 2,
+                "index": 3,
+                "subrole": "AXTabPanel"
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "Home",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXTabPanel"
+              },
+              {
+                "role": "AXGroup",
+                "label": "Home",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXApplicationGroup"
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 2,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXTextField",
+                "label": "Channel or user name",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXSearchField"
+              }
+            ]
+          },
+          "value": {
+            "param": "query"
+          },
+          "expect": {
+            "role": "AXTextField"
+          }
+        }
+      ],
+      "verify": [
+        {
+          "kind": "value_contains",
+          "anchor": {
+            "role": "AXTextField",
+            "identifier": "",
+            "labels": [
+              "Channel or user name"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Slack",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXGroup",
+                "label": "new-channel (Channel) - Kairo - Slack",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWebArea",
+                "label": "new-channel (Channel) - Kairo - Slack",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 2,
+                "index": 3,
+                "subrole": "AXTabPanel"
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 1,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "Home",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXTabPanel"
+              },
+              {
+                "role": "AXGroup",
+                "label": "Home",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXApplicationGroup"
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 2,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXTextField",
+                "label": "Channel or user name",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXSearchField"
+              }
+            ]
+          },
+          "param": "query"
+        }
+      ]
+    }
+  ],
+  "healed_pending": []
+}

@@ -150,7 +150,15 @@ repeatedly, resizing the window every other cycle:
 ```
 TextEdit: 8/8 calls passed   (4 cycles)
 VS Code:  12/16 calls passed (4 cycles, every failure the same tool)
+Slack:    6/8 calls passed   (4 cycles, both failures ambiguity refusals)
 ```
+
+The Slack pack is thin on purpose (navigation and a parameterized
+sidebar filter) but it is compiled capability, not just anchor survival.
+Its two failures happen when the resized window reflows the nav rail and
+the Home tab gains a lookalike; the resolver refuses to pick between
+them, which is a safe failure and still a failure. Nothing wrong was
+pressed in any cycle on any app.
 
 The VS Code failures are all `search_workspace` called cold. Its
 description says to open the Search view first, but that dependency is
