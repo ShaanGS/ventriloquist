@@ -18,6 +18,7 @@ from . import anchors, ax, packs, runtime
 from .snapshot import render, snapshot
 
 PACKS_DIR = Path(__file__).resolve().parent.parent / "packs"
+TRACES_DIR = Path(__file__).resolve().parent.parent / "traces"
 
 
 @click.group()
@@ -209,6 +210,101 @@ def run(app_name: str, tool_name: str, arg_pairs: tuple[str, ...]) -> None:
     click.secho(f"✓ {pack.app_name}.{tool_name}: {result.detail}", fg="green")
     for value in result.values:
         click.echo(value)
+
+
+@main.command()
+@click.argument("app_name")
+@click.option("--rounds", default=3, show_default=True, help="Probe rounds to run.")
+def explore(app_name: str, rounds: int) -> None:
+    """Probe a running app under the safety policy and record a trace.
+
+    The model nominates elements; the policy screens every nomination;
+    only reversible or budgeted actions execute. The trace is saved for
+    `vent compile`.
+    """
+    from . import explorer, llm, policy as policy_mod
+
+    try:
+        app = ax.find_app(app_name)
+        root = ax.app_element(app)
+        ax.activate(app)
+        pol = policy_mod.Policy()
+        trace = explorer.explore(app, root, pol, rounds=rounds, notify=click.echo)
+    except (ax.AXError, llm.ModelError, explorer.ExplorationBlocked) as exc:
+        click.secho(f"✗ {exc}", fg="red")
+        sys.exit(1)
+
+    path = explorer.save_trace(trace, TRACES_DIR)
+    executed = sum(1 for a in trace.actions if a.executed)
+    refused = len(trace.actions) - executed
+    click.secho(
+        f"✓ Explored {app.name}: {executed} action(s) executed, "
+        f"{refused} refused by policy. Trace: {path}",
+        fg="green",
+    )
+
+
+@main.command("compile")
+@click.argument("app_name")
+def compile_cmd(app_name: str) -> None:
+    """Compile a recorded trace into pack tools, with human approval.
+
+    Each proposed tool is shown two ways: the model's description, and a
+    deterministic summary built from the literal recorded steps. The steps
+    are the ground truth; nothing is written without approval.
+    """
+    import locale as locale_mod
+    import platform as platform_mod
+
+    from . import compiler, explorer, llm
+
+    try:
+        app = ax.find_app(app_name)
+        if not app.bundle_id:
+            raise ax.AXError(f"{app.name} has no bundle id; cannot compile a pack for it.")
+        trace = explorer.load_trace(TRACES_DIR, app.bundle_id)
+    except FileNotFoundError:
+        click.secho(f"No trace for {app_name!r}. Run `vent explore {app_name}` first.", fg="red")
+        sys.exit(1)
+    except ax.AXError as exc:
+        click.secho(str(exc), fg="red")
+        sys.exit(1)
+
+    try:
+        proposals = compiler.propose(trace)
+    except llm.ModelError as exc:
+        click.secho(f"✗ {exc}", fg="red")
+        sys.exit(1)
+
+    if not proposals:
+        click.echo("The model proposed no tools from this trace.")
+        return
+
+    approved = []
+    for proposal in proposals:
+        spec = compiler.build_spec(proposal)
+        if not spec.steps:
+            continue
+        click.echo()
+        click.secho(f"Proposed: {spec.name}", bold=True)
+        click.echo(f"  Model description: {spec.description}")
+        click.echo(compiler.deterministic_summary(spec, trace.app_name))
+        if click.confirm("Approve this tool?", default=False):
+            approved.append(spec)
+
+    if not approved:
+        click.echo("Nothing approved; no pack written.")
+        return
+
+    pack = compiler.assemble_pack(
+        trace,
+        approved,
+        os_version=platform_mod.mac_ver()[0],
+        locale=(locale_mod.getlocale()[0] or ""),
+    )
+    pack_path = PACKS_DIR / pack.bundle_id / "pack.json"
+    packs.save(pack, pack_path)
+    click.secho(f"✓ Wrote {len(approved)} tool(s) to {pack_path}", fg="green")
 
 
 @main.command()
