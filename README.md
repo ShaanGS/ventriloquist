@@ -23,14 +23,14 @@ click. No screenshots and no pixel coordinates anywhere in the codebase.
 Needs macOS and [uv](https://docs.astral.sh/uv/) (`brew install uv`).
 
 ```bash
-uv tool install git+https://github.com/ShaanGS/ventriloquist
+uv tool install ventriloquist-mcp
 vent doctor
 ```
 
 `vent doctor` checks the one permission vent needs. If it says
 Accessibility is missing, open System Settings > Privacy & Security >
 Accessibility, switch on your terminal app, restart the terminal, and run
-it again. (`pipx install git+https://github.com/ShaanGS/ventriloquist`
+it again. (`pipx install ventriloquist-mcp`
 works too.)
 
 Now drive TextEdit with the pack that ships with vent:
@@ -172,7 +172,7 @@ does `vent serve` if you start it with `VENT_HEAL=1` to let it heal broken
 anchors. Nothing else does. The model comes from the Claude Code CLI if
 it's installed and signed in, with no API key needed, or from the
 Anthropic API: install with
-`uv tool install --with anthropic git+https://github.com/ShaanGS/ventriloquist`
+`uv tool install --with anthropic ventriloquist-mcp`
 and set `ANTHROPIC_API_KEY`.
 
 Packs you make live in `~/.ventriloquist/packs/` (set `VENT_HOME` to move

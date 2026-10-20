@@ -182,7 +182,7 @@ vent verify APP        dry-resolve every anchor, report durability, offer to pro
 vent harness APP       measure anchor durability under resize (--restart adds quit and relaunch)
 ```
 
-Install: `uv tool install git+https://github.com/ShaanGS/ventriloquist`
+Install: `uv tool install ventriloquist-mcp`
 (the PyPI distribution name will be `ventriloquist-mcp`). `vent mcp-config`
 prints a client entry with vent's absolute path. Wiring into Claude Code:
 `claude mcp add --scope user ventriloquist -- ~/.local/bin/vent serve`.
