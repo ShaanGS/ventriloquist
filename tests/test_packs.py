@@ -126,3 +126,21 @@ def test_shipped_packs_all_load():
     for path in pack_files:
         pack = load(path)
         assert pack.tools, f"{path} loaded but has no tools"
+
+
+def test_shipped_packs_pin_no_window_titles():
+    """A recorded window title names one person's document (the TextEdit
+    pack once shipped with "vent-demo.txt"). In a shipped pack it steers
+    every install toward a window with that name and away from the
+    document actually in front, so shipped anchors leave it empty."""
+    from vent.paths import BUNDLED_PACKS_DIR
+
+    for path in sorted(BUNDLED_PACKS_DIR.glob("*/pack.json")):
+        for tool in load(path).tools:
+            items = [*tool.steps, *tool.verify, *getattr(tool, "preconditions", [])]
+            pinned = [
+                item.anchor.window_title
+                for item in items
+                if getattr(item, "anchor", None) is not None and item.anchor.window_title
+            ]
+            assert not pinned, f"{path.parent.name} {tool.name} pins window titles {pinned}"

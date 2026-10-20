@@ -23,6 +23,11 @@ the contract; the short version:
   nib-derived and identical across documents, so the window title is the
   only thing separating "vent-demo.txt" from "taxes-2025.txt". A recorded
   window title that mismatches costs heavily.
+- An anchor with no recorded window title is window-agnostic on purpose
+  (a shared pack's "frontmost document" tool). When its close candidates
+  sit in different windows, the one in the app's focused window wins,
+  because that is the document the user is looking at. Ties inside one
+  window, and ties for title-pinned anchors, still refuse.
 
 Scoring reads only the chain links captured during the walk, never the
 live element again; every attribute read is a cross-process call and the
@@ -33,7 +38,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
-from typing import Iterator
+from typing import Iterator, Optional
 
 from .ax import Element
 from .snapshot import MAX_TREE_DEPTH, ChainLink, Node
@@ -329,9 +334,54 @@ def resolve(root: Element, anchor: Anchor, low_confidence: bool = False) -> Elem
         )
 
     if len(candidates) > 1 and best.score - candidates[1].score < AMBIGUITY_MARGIN:
-        raise AnchorAmbiguous(
-            f"Two candidates for {anchor.role} scored {best.score:.1f} and "
-            f"{candidates[1].score:.1f}, within the ambiguity margin. Refusing to guess."
-        )
+        settled = None if anchor.window_title else _settle_by_focused_window(root, candidates, threshold)
+        if settled is None:
+            raise AnchorAmbiguous(
+                f"Two candidates for {anchor.role} scored {best.score:.1f} and "
+                f"{candidates[1].score:.1f}, within the ambiguity margin. Refusing to guess."
+            )
+        return settled.element
 
     return best.element
+
+
+def _settle_by_focused_window(
+    root: Element, candidates: list[_Candidate], threshold: float
+) -> Optional[_Candidate]:
+    """The one close candidate inside the app's focused window, or None.
+
+    Only called for window-agnostic anchors. Returns None, so the caller
+    refuses, when the app reports no focused window, when no close
+    candidate is in it, or when more than one is.
+    """
+    focused_index = _focused_window_index(root)
+    if focused_index is None:
+        return None
+    best = candidates[0]
+    in_focus = [
+        c
+        for c in candidates
+        if best.score - c.score < AMBIGUITY_MARGIN
+        and _top_level_window_index(c.chain) == focused_index
+    ]
+    if len(in_focus) != 1 or in_focus[0].score < threshold:
+        return None
+    return in_focus[0]
+
+
+def _focused_window_index(root: Element) -> Optional[int]:
+    """Position of the app's focused window among the root's children."""
+    focused = root.attribute("AXFocusedWindow")
+    if focused is None:
+        return None
+    for index, child in enumerate(root.children()):
+        if child.wraps(focused):
+            return index
+    return None
+
+
+def _top_level_window_index(chain: tuple[ChainLink, ...]) -> Optional[int]:
+    """The candidate's window position, matching _focused_window_index."""
+    if len(chain) > 1 and chain[1].role == "AXWindow":
+        return chain[1].index
+    return None

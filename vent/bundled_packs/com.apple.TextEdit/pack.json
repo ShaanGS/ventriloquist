@@ -29,7 +29,7 @@
             "role": "AXTextArea",
             "identifier": "First Text View",
             "labels": [],
-            "window_title": "vent-demo.txt",
+            "window_title": "",
             "chain": [
               {
                 "role": "AXApplication",
@@ -80,7 +80,7 @@
             "role": "AXTextArea",
             "identifier": "First Text View",
             "labels": [],
-            "window_title": "vent-demo.txt",
+            "window_title": "",
             "chain": [
               {
                 "role": "AXApplication",
@@ -138,7 +138,7 @@
             "role": "AXTextArea",
             "identifier": "First Text View",
             "labels": [],
-            "window_title": "vent-demo.txt",
+            "window_title": "",
             "chain": [
               {
                 "role": "AXApplication",

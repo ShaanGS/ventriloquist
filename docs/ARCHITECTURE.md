@@ -124,6 +124,11 @@ scoring function, not a cascade:
   AND beats the runner-up by a margin. Two close candidates raise
   `AnchorAmbiguous`; zero viable candidates raise `AnchorLost`. Both go to
   the healer. Picking a coin-flip winner is banned.
+- One tie is settled rather than refused. An anchor that records no window
+  title is window-agnostic by design (a "frontmost document" tool). When its
+  close candidates sit in different windows, the one in the app's focused
+  window wins. Ties inside one window, and ties for anchors that pin a window
+  title, still raise `AnchorAmbiguous`.
 - Anchors record every label an element was observed under (toggle buttons
   legitimately have several).
 - The compiler must refuse to emit a ToolSpec whose anchor was not unique in

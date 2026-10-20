@@ -33,10 +33,14 @@ class FakeElement:
         self._identifier = identifier
         self._actions = actions or []
         self._children = children or []
+        # Set on an app root to mark one of its windows focused.
+        self.focused_window: Optional["FakeElement"] = None
 
     def attribute(self, name: str) -> Any:
         if name == "AXIdentifier":
             return self._identifier or None
+        if name == "AXFocusedWindow":
+            return self.focused_window
         return None
 
     def actions(self) -> list[str]:
@@ -54,6 +58,9 @@ class FakeElement:
 
     def ref_key(self):
         return id(self)
+
+    def wraps(self, ref: Any) -> bool:
+        return self is ref
 
 
     def walk(self, max_depth: int = 25, _depth: int = 0):

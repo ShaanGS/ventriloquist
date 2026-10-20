@@ -172,3 +172,74 @@ def test_same_window_title_still_resolves():
     tree = textedit_like()
     anchor = anchor_for(tree, identifier="doc-body")
     assert anchors.resolve(tree, anchor).value == "hello"
+
+
+def two_document_app(focused):
+    """TextEdit with two documents open, built like the real app: both text
+    areas carry the same nib-derived identifier, so only the window tells
+    them apart."""
+
+    def document(title, body):
+        return FakeElement(
+            "AXWindow",
+            title,
+            children=[
+                FakeElement(
+                    "AXScrollArea",
+                    children=[FakeElement("AXTextArea", value=body, identifier="First Text View")],
+                )
+            ],
+        )
+
+    app = FakeElement("AXApplication", "TextEdit", children=[document("a.txt", "a"), document("b.txt", "b")])
+    if focused is not None:
+        app.focused_window = app.children()[focused]
+    return app
+
+
+def window_agnostic_anchor(app):
+    anchor = anchor_for(app, role="AXTextArea", value_preview="a")
+    anchor.window_title = ""  # how a shared "frontmost document" tool records it
+    return anchor
+
+
+def test_window_agnostic_anchor_follows_the_focused_window():
+    """A "frontmost document" tool matches the same text area in every
+    open document. The focused window settles that tie, so with two
+    documents open the call reaches the one in front instead of refusing."""
+    app = two_document_app(focused=1)
+    anchor = window_agnostic_anchor(app)
+    assert anchors.resolve(app, anchor).value == "b"
+    app.focused_window = app.children()[0]
+    assert anchors.resolve(app, anchor).value == "a"
+
+
+def test_window_agnostic_tie_without_a_focused_window_refuses():
+    app = two_document_app(focused=None)
+    with pytest.raises(anchors.AnchorAmbiguous):
+        anchors.resolve(app, window_agnostic_anchor(app))
+
+
+def test_title_pinned_anchor_is_never_retargeted_by_focus():
+    """An anchor recorded in notes.txt must not write into another document
+    just because that document is in front."""
+    app = two_document_app(focused=0)
+    anchor = window_agnostic_anchor(app)
+    anchor.window_title = "notes.txt"
+    with pytest.raises((anchors.AnchorAmbiguous, anchors.AnchorLost)):
+        anchors.resolve(app, anchor)
+
+
+def test_twins_inside_the_focused_window_still_refuse():
+    tree = notes_like()
+    window = tree.children()[0]
+    window._children.append(FakeElement("AXGroup", children=[FakeElement("AXTextArea", value="a")]))
+    window._children.append(FakeElement("AXGroup", children=[FakeElement("AXTextArea", value="b")]))
+    tree.focused_window = window
+
+    node = next(n for n in snapshot(tree).nodes if n.role == "AXTextArea" and n.value_preview == "a")
+    anchor = anchors.build(node)
+    anchor.identifier = ""
+    anchor.window_title = ""
+    with pytest.raises((anchors.AnchorAmbiguous, anchors.AnchorLost)):
+        anchors.resolve(tree, anchor)

@@ -336,6 +336,15 @@ class Element:
         except TypeError:
             return None
 
+    def wraps(self, ref: Any) -> bool:
+        """Whether this element is the raw AX reference `ref`, such as an
+        app's AXFocusedWindow value. CF refs compare by CFEqual through
+        pyobjc."""
+        try:
+            return bool(self._ref == ref)
+        except TypeError:
+            return False
+
     def __repr__(self) -> str:
         label = self.label
         return f"<Element {self.role}{f' {label!r}' if label else ''}>"
