@@ -117,14 +117,11 @@ def test_settle_opt_out_round_trips(tmp_path):
 
 
 def test_shipped_packs_all_load():
-    """Every pack committed under packs/ must validate. A pack that fails
-    here would be silently skipped by the server at startup."""
-    from pathlib import Path
+    """Every pack committed under vent/bundled_packs/ must validate. A pack
+    that fails here would be silently skipped by the server at startup."""
+    from vent.paths import BUNDLED_PACKS_DIR
 
-    from vent.packs import load
-
-    packs_dir = Path(__file__).resolve().parent.parent / "packs"
-    pack_files = sorted(packs_dir.glob("*/pack.json"))
+    pack_files = sorted(BUNDLED_PACKS_DIR.glob("*/pack.json"))
     assert pack_files, "no shipped packs found; did the directory move?"
     for path in pack_files:
         pack = load(path)

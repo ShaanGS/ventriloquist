@@ -22,6 +22,7 @@ Written against MCP SDK 2.x, which takes handlers as constructor arguments.
 from __future__ import annotations
 
 import os
+import sys
 import threading
 from pathlib import Path
 
@@ -30,7 +31,7 @@ import mcp.types as types
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 
-from . import ax, heal, packs, runtime
+from . import __version__, ax, heal, packs, runtime
 
 LOCK_TIMEOUT_S = 180.0
 
@@ -71,13 +72,18 @@ def _error(text: str) -> types.CallToolResult:
     )
 
 
-def build_server(packs_dir: Path) -> Server:
+def build_server(search_path: list[Path]) -> Server:
+    """Serve every pack found on the search path. The first directory is the
+    writable one: healing saves its quarantine entries there, so a healed
+    bundled pack becomes the user's own copy (see paths.py)."""
     try:
-        loaded = packs.load_all(packs_dir)
+        loaded = packs.load_search_path(search_path)
     except packs.PackError as exc:
         raise SystemExit(f"Pack failed to load: {exc}") from exc
     if not loaded:
-        raise SystemExit(f"No packs found under {packs_dir}. Author or compile one first.")
+        searched = ", ".join(str(d) for d in search_path)
+        raise SystemExit(f"No packs found under {searched}. Author or compile one first.")
+    writable_dir = search_path[0]
 
     # (mcp tool name) -> (pack, spec). Names use the app name for
     # readability; collisions are an error, never a silent overwrite.
@@ -139,7 +145,7 @@ def build_server(packs_dir: Path) -> Server:
                 low_confidence = packs.is_stale(pack, ax.app_version(app))
                 heal_cb = None
                 if allow_heal or pack.healed_pending:
-                    pack_path = packs_dir / pack.bundle_id / "pack.json"
+                    pack_path = writable_dir / pack.bundle_id / "pack.json"
                     heal_cb = heal.make_heal_callback(
                         pack, pack_path, ask_model=allow_heal, low_confidence=low_confidence,
                     )
@@ -166,7 +172,7 @@ def build_server(packs_dir: Path) -> Server:
 
     return Server(
         "ventriloquist",
-        version="0.1.0",
+        version=__version__,
         instructions=(
             "Tools compiled from Mac apps by Ventriloquist. Each call replays "
             "a recorded accessibility workflow deterministically."
@@ -176,8 +182,19 @@ def build_server(packs_dir: Path) -> Server:
     )
 
 
-def serve_stdio(packs_dir: Path) -> None:
-    server = build_server(packs_dir)
+def serve_stdio(search_path: list[Path]) -> None:
+    server = build_server(search_path)
+    try:
+        trusted = ax.is_trusted()
+    except ax.AXError:
+        trusted = False
+    if not trusted:
+        # stderr is the MCP client's server log; this line is usually the
+        # whole answer to "why does every call fail".
+        print(
+            f"warning: vent serve is not trusted for Accessibility, so tool calls will fail. {ax.TRUST_HINT}",
+            file=sys.stderr,
+        )
 
     async def main() -> None:
         async with stdio_server() as (read, write):

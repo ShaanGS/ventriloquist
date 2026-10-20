@@ -1,8 +1,30 @@
 [project]
-name = "ventriloquist"
-version = "0.1.0"
-description = "Compile any Mac app into an MCP server: explore once, get typed tools backed by deterministic accessibility replay."
+# "ventriloquist" on PyPI belongs to an unrelated project, hence the suffix.
+# The import package and the CLI are both still `vent`.
+name = "ventriloquist-mcp"
+dynamic = ["version"]
+description = "Turn Mac apps into MCP servers using the accessibility API. Explore an app once, then every tool call is deterministic replay: no screenshots, no model per step."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Shaan Gurushankar" }]
 requires-python = ">=3.11"
+keywords = ["mcp", "model-context-protocol", "macos", "accessibility", "automation", "agents", "computer-use"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Environment :: MacOS X",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Utilities",
+]
 dependencies = [
     "pyobjc-framework-Cocoa>=10.0; sys_platform == 'darwin'",
     "pyobjc-framework-ApplicationServices>=10.0; sys_platform == 'darwin'",
@@ -11,15 +33,24 @@ dependencies = [
     "anyio>=4.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/ShaanGS/ventriloquist"
+Documentation = "https://github.com/ShaanGS/ventriloquist/blob/main/docs/ARCHITECTURE.md"
+Issues = "https://github.com/ShaanGS/ventriloquist/issues"
+
 [project.scripts]
 vent = "vent.cli:main"
+ventriloquist-mcp = "vent.cli:serve_entry"
 
 [dependency-groups]
 dev = ["pytest>=8.0"]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "vent/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["vent"]

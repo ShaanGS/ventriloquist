@@ -9,11 +9,14 @@ jobs:
   # it on Linux is the proof of that claim, not just a convenience.
   offline:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.14"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
       - run: python -m venv .venv && .venv/bin/pip install -e . pytest
       - run: .venv/bin/python -m pytest tests/ -q
 
@@ -21,11 +24,34 @@ jobs:
   # accessibility bindings are importable, catching anything that only breaks
   # when the AX layer is genuinely present.
   macos:
-    runs-on: macos-14
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.14"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
       - run: python -m venv .venv && .venv/bin/pip install -e . pytest
       - run: .venv/bin/python -m pytest tests/ -q
+
+  # Builds the wheel, installs it into a clean environment the way users get
+  # vent, and lists the served tools over MCP stdio. An editable install reads
+  # files straight from the checkout, so only this job can catch a wheel that
+  # leaves the bundled packs or an entry point behind.
+  install:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: python -m pip wheel --no-deps --wheel-dir dist .
+      - run: python -m venv "$RUNNER_TEMP/env" && "$RUNNER_TEMP/env/bin/pip" install dist/*.whl
+      - name: Serve the bundled packs from the installed wheel
+        working-directory: ${{ runner.temp }}
+        run: '"$RUNNER_TEMP/env/bin/python" "$GITHUB_WORKSPACE/tests/install_smoke.py" "$RUNNER_TEMP/env/bin"'

@@ -190,7 +190,12 @@ Notes on the shape:
 
 ### Pack
 
-A versioned JSON file per app: `packs/<bundle-id>/pack.json`. Besides the
+A versioned JSON file per app, `<bundle-id>/pack.json`, in one of two
+places. Packs bundled with vent live in `vent/bundled_packs/` and are never
+written to. The user's own live in `~/.ventriloquist/packs/` (`VENT_HOME`
+moves it), and one there shadows a bundled pack with the same bundle id.
+Every write (compile, heal, promote) goes to the user's directory, so
+healing a bundled pack saves the user's own copy. Besides the
 ToolSpecs it records the compile-time environment: app version
 (`CFBundleShortVersionString`), macOS version, and locale. On load, a
 mismatch marks every anchor low-confidence (which raises the resolver's
@@ -216,6 +221,8 @@ vent/
   explorer.py      survey / probe / synthesize, producing traces
   compiler.py      traces to ToolSpecs, uniqueness and risk checks
   cli.py           doctor/apps/inspect/act/explore/compile/verify/serve
+  paths.py         where packs and traces are read and written
+  bundled_packs/   the packs that ship with vent, read-only
 tests/
   fakes.py         in-memory fake element trees, no macOS needed
   test_anchors.py  scoring under rename/reorder/removal/ambiguity

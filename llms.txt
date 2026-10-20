@@ -57,8 +57,10 @@ Everything lives in the `vent/` package. One file per concern:
   refuses to answer if the best two candidates score too close together.
   Refusing to guess is a feature: a wrong binding is the worst outcome, a
   refusal just means re-record or heal.
-- `packs.py`. The pack format. A pack is one JSON file per app bundle id under
-  `packs/`, containing typed tools. Each tool has a name, description, risk
+- `packs.py`. The pack format. A pack is one JSON file per app bundle id,
+  either bundled with vent under `vent/bundled_packs/` (read-only) or the
+  user's own under `~/.ventriloquist/packs/`, which shadows a bundled pack
+  for the same app and is the only place vent writes. It contains typed tools. Each tool has a name, description, risk
   level (`read_only`, `mutating`, `high`), parameter schema, preconditions,
   steps, and verify checks. Steps use a closed op set: `press`, `set_value`,
   `pick`, `reveal`, `raise_window`, `open_app`, `wait_for`, `read_value`.
@@ -270,4 +272,4 @@ and the full break, heal, quarantine, promote cycle.
 3. docs/HANDOFF.md        current state, findings, and gotchas
 4. vent/anchors.py        scoring and refusal, the durability core
 5. vent/runtime.py        replay, settle, verify, the Chromium pumps
-6. packs/                 real packs for TextEdit and VS Code
+6. vent/bundled_packs/    real packs for TextEdit, Notes, VS Code, and Slack

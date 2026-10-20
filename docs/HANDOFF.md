@@ -70,7 +70,7 @@ began, and each review's findings were fixed in a follow-up commit.
    when told not to; exactly one wrapping fence is stripped as transport
    framing, everything else still rejects.
 2. **A third-party Electron app pack: DONE (VS Code).**
-   `packs/com.microsoft.VSCode/pack.json` ships four tools (Explorer,
+   `vent/bundled_packs/com.microsoft.VSCode/pack.json` ships four tools (Explorer,
    Search, and Source Control view switches plus a parameterized
    `search_workspace`), all passing live through `vent run`, with
    `vent verify` at 6/6 anchors. Harness numbers are in the README
@@ -141,7 +141,7 @@ the code and docs, plus a queue of open work in priority order:
    promo overlay is up, and its composer and search are the two text
    inputs. Figma desktop probed as the expected worst case: usable shell
    chrome, opaque pixel canvas. A thin Slack pack now ships
-   (`packs/com.tinyspeck.slackmacgap`): Home navigation plus a
+   (`vent/bundled_packs/com.tinyspeck.slackmacgap`): Home navigation plus a
    parameterized sidebar filter, 6/8 tool-level calls under resize
    cycles, both failures ambiguity refusals when the nav rail reflows.
    The workspace name was scrubbed from the committed anchors the way

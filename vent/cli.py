@@ -9,19 +9,26 @@ and serve exposes every pack to MCP clients.
 from __future__ import annotations
 
 import json
+import os
+import shlex
+import shutil
 import sys
 from pathlib import Path
 
 import click
 
-from . import anchors, ax, packs, runtime
+from . import __version__, anchors, ax, packs, paths, runtime
 from .snapshot import MAX_TREE_DEPTH, render, snapshot
 
-PACKS_DIR = Path(__file__).resolve().parent.parent / "packs"
-TRACES_DIR = Path(__file__).resolve().parent.parent / "traces"
+
+def _user_pack_path(bundle_id: str) -> Path:
+    """Where a pack is saved. Always the user's directory, even when the pack
+    was loaded from the bundled set (see paths.py)."""
+    return paths.user_packs_dir() / bundle_id / "pack.json"
 
 
 @click.group()
+@click.version_option(__version__, prog_name="vent")
 def main() -> None:
     """Give every Mac app an API."""
 
@@ -37,10 +44,7 @@ def doctor(app_name: str | None) -> None:
     """
     if not ax.is_trusted():
         click.secho("✗ Accessibility permission missing.", fg="red")
-        click.echo(
-            "  Open System Settings, Privacy & Security, Accessibility, and "
-            "enable your terminal (or the app running vent), then rerun."
-        )
+        click.echo(f"  {ax.TRUST_HINT}")
         sys.exit(1)
     click.secho("✓ Accessibility permission granted. Ready to go.", fg="green")
 
@@ -195,7 +199,7 @@ def anchor(app_name: str, node_id: int, menus: bool) -> None:
 
 def _find_pack(name: str) -> packs.Pack:
     try:
-        loaded = packs.load_all(PACKS_DIR)
+        loaded = packs.load_search_path(paths.pack_search_path())
     except packs.PackError as exc:
         raise click.ClickException(str(exc))
     for pack in loaded:
@@ -228,7 +232,7 @@ def run(app_name: str, tool_name: str, arg_pairs: tuple[str, ...], do_heal: bool
         low_confidence = packs.is_stale(pack, ax.app_version(app))
         heal_cb = None
         if do_heal or pack.healed_pending:
-            pack_path = PACKS_DIR / pack.bundle_id / "pack.json"
+            pack_path = _user_pack_path(pack.bundle_id)
             heal_cb = heal_mod.make_heal_callback(
                 pack, pack_path, notify=click.echo, ask_model=do_heal, low_confidence=low_confidence,
             )
@@ -414,8 +418,9 @@ def verify(app_name: str, report_path: str | None) -> None:
             click.secho("  ⚠ nothing to rewrite; the tool changed since this fix. Kept in quarantine.", fg="yellow")
 
     if promoted_any:
-        packs.save(pack, PACKS_DIR / pack.bundle_id / "pack.json")
-        click.secho("Pack updated.", fg="green")
+        pack_path = _user_pack_path(pack.bundle_id)
+        packs.save(pack, pack_path)
+        click.secho(f"Pack updated: {pack_path}", fg="green")
 
 
 @main.command()
@@ -441,7 +446,7 @@ def explore(app_name: str, rounds: int, no_values: bool) -> None:
         click.secho(f"✗ {exc}", fg="red")
         sys.exit(1)
 
-    path = explorer.save_trace(trace, TRACES_DIR)
+    path = explorer.save_trace(trace, paths.traces_dir())
     executed = sum(1 for a in trace.actions if a.executed)
     refused = len(trace.actions) - executed
     click.secho(
@@ -469,7 +474,7 @@ def compile_cmd(app_name: str) -> None:
         app = ax.find_app(app_name)
         if not app.bundle_id:
             raise ax.AXError(f"{app.name} has no bundle id; cannot compile a pack for it.")
-        trace = explorer.load_trace(TRACES_DIR, app.bundle_id)
+        trace = explorer.load_trace(paths.traces_dir(), app.bundle_id)
     except FileNotFoundError:
         click.secho(f"No trace for {app_name!r}. Run `vent explore {app_name}` first.", fg="red")
         sys.exit(1)
@@ -515,7 +520,7 @@ def compile_cmd(app_name: str) -> None:
         os_version=platform_mod.mac_ver()[0],
         locale=(locale_mod.getlocale()[0] or ""),
     )
-    pack_path = PACKS_DIR / pack.bundle_id / "pack.json"
+    pack_path = _user_pack_path(pack.bundle_id)
     packs.save(pack, pack_path)
     click.secho(f"✓ Wrote {len(approved)} tool(s) to {pack_path}", fg="green")
 
@@ -529,7 +534,43 @@ def serve() -> None:
     """
     from .server import serve_stdio
 
-    serve_stdio(PACKS_DIR)
+    serve_stdio(paths.pack_search_path())
+
+
+def serve_entry() -> None:
+    """The `ventriloquist-mcp` command: the MCP server on its own, for
+    launchers that run a package by its name (`uvx ventriloquist-mcp`)."""
+    serve()
+
+
+def _vent_executable() -> str:
+    """Absolute path of the vent command that is running. Symlinks are not
+    resolved: a uv or pipx shim stays valid across upgrades, while the
+    environment it points into may be replaced."""
+    invoked = Path(sys.argv[0])
+    if invoked.name == "vent":
+        return os.path.abspath(invoked)
+    return shutil.which("vent") or "vent"
+
+
+@main.command("mcp-config")
+def mcp_config() -> None:
+    """Print a ready-to-paste MCP client entry for this install of vent.
+
+    Claude Desktop and Cursor start MCP servers without your shell's PATH,
+    so the entry names vent by its absolute path.
+    """
+    command = _vent_executable()
+    entry = {"mcpServers": {"ventriloquist": {"command": command, "args": ["serve"]}}}
+    click.echo(json.dumps(entry, indent=2))
+    click.echo(
+        "\nPaste this into Claude Desktop's claude_desktop_config.json or "
+        "Cursor's ~/.cursor/mcp.json, merging it into an existing mcpServers "
+        "block if there is one. For Claude Code, run:\n"
+        f"  claude mcp add --scope user ventriloquist -- {shlex.quote(command)} serve\n"
+        "Then give that app Accessibility permission (see vent doctor).",
+        err=True,
+    )
 
 
 if __name__ == "__main__":

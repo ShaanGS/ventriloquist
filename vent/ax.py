@@ -104,13 +104,18 @@ def session_locked() -> bool:
         return False
 
 
+# macOS grants Accessibility to the app that started a process, not to the
+# process itself, so the app to name depends on who launched vent.
+TRUST_HINT = (
+    "Grant access in System Settings, Privacy & Security, Accessibility to "
+    "the app that started vent: your terminal, or the MCP client (Claude, "
+    "Cursor) that launched vent serve. Then quit and reopen that app."
+)
+
+
 def require_trusted() -> None:
     if not is_trusted():
-        raise NotTrustedError(
-            "This process is not trusted for Accessibility. Grant access in "
-            "System Settings, Privacy & Security, Accessibility (add your "
-            "terminal app), then rerun."
-        )
+        raise NotTrustedError(f"This process is not trusted for Accessibility. {TRUST_HINT}")
 
 
 @dataclass(frozen=True)

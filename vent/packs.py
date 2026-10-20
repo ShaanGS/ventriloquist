@@ -279,6 +279,22 @@ def load_all(packs_dir: Path) -> list[Pack]:
     return packs
 
 
+def load_search_path(dirs: list[Path]) -> list[Pack]:
+    """Load packs from several directories, earlier directories winning.
+    A pack shadows any pack with the same bundle id in a later directory,
+    so a user's healed or re-recorded copy replaces the bundled one instead
+    of colliding with it. Two packs for one app in the same directory are
+    both kept, so the server's collision check still reports them. A
+    directory that does not exist contributes nothing."""
+    loaded: list[Pack] = []
+    claimed: set[str] = set()
+    for packs_dir in dirs:
+        found = [pack for pack in load_all(packs_dir) if pack.bundle_id not in claimed]
+        loaded.extend(found)
+        claimed.update(pack.bundle_id for pack in found)
+    return loaded
+
+
 def is_stale(pack: Pack, app_version: str) -> bool:
     """True when the environment no longer matches what the pack recorded.
 
