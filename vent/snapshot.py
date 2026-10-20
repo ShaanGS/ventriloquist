@@ -236,7 +236,13 @@ def snapshot(
 
     windows = _windows(root)
     focused = root.attribute("AXFocusedWindow")
-    focused_title = str(Element(focused).title) if focused is not None else ""
+    focused_title = ""
+    if focused is not None:
+        # Look the focused window up among the windows already listed, the
+        # same identity check anchors.py uses; wrapping it afresh would make
+        # a fake tree call the live AX API.
+        match = next((w for w in windows if w.wraps(focused)), None)
+        focused_title = str((match or Element(focused)).title)
     modal = any(_has_sheet(w) for w in windows)
 
     return Snapshot(
