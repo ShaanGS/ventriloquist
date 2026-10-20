@@ -32,7 +32,9 @@ from .untrusted import wrap_untrusted
 EXPLORER_MODEL = "claude-sonnet-5"
 HEALER_MODEL = "claude-haiku-4-5"
 
-MAX_OUTPUT_TOKENS = 8192
+# Thinking is on by default for the explorer model and counts against this
+# limit, so it needs headroom beyond the JSON itself.
+MAX_OUTPUT_TOKENS = 16000
 
 
 class ModelError(RuntimeError):
@@ -156,9 +158,11 @@ def complete_json(
         if _claude_cli():
             return _complete_via_cli(system, user_text, schema, model)
         raise ModelUnavailable(
-            "The anthropic package is not installed and no claude CLI was "
-            "found. Install one of them (pip install anthropic, or install "
-            "Claude Code and run `claude login`)."
+            "The anthropic package is not installed in vent's environment and "
+            "no claude CLI was found. Reinstall vent with it "
+            "(`uv tool install --with anthropic ventriloquist-mcp`, or "
+            "`pipx inject ventriloquist-mcp anthropic`), or install Claude "
+            "Code and run `claude login`."
         ) from exc
 
     try:
@@ -191,6 +195,11 @@ def complete_json(
 
     if response.stop_reason == "refusal":
         raise ModelError("The model declined this request.")
+    if response.stop_reason == "max_tokens":
+        raise ModelError(
+            f"The model's answer hit the {MAX_OUTPUT_TOKENS}-token output limit "
+            "before the JSON was complete."
+        )
 
     text = next((b.text for b in response.content if b.type == "text"), "")
     try:
