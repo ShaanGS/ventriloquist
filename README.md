@@ -11,6 +11,7 @@ has one model in it, but it's deciding which tools to call, not where to
 click. No screenshots and no pixel coordinates anywhere in the codebase.
 
 <!-- Demo GIF goes here once recorded. Plan and commands: docs/DEMO.md -->
+<!-- mcp-name: io.github.ShaanGS/ventriloquist -->
 
 ## Try it in a minute
 

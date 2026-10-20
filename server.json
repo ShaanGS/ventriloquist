@@ -1,0 +1,42 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.ShaanGS/ventriloquist",
+  "title": "Ventriloquist",
+  "description": "Turn Mac apps into MCP tools via the accessibility API: no screenshots, no model per step.",
+  "repository": {
+    "url": "https://github.com/ShaanGS/ventriloquist",
+    "source": "github"
+  },
+  "version": "0.2.0",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "ventriloquist-mcp",
+      "version": "0.2.0",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "VENT_ALLOW_HIGH",
+          "description": "Set to 1 to allow tools a pack marks as high risk. They are refused otherwise.",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "VENT_HEAL",
+          "description": "Set to 1 to let the server call a model to re-ground broken anchors. Off keeps serving model-free.",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "VENT_HOME",
+          "description": "Directory for your own packs and traces. Defaults to ~/.ventriloquist.",
+          "isRequired": false,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}
