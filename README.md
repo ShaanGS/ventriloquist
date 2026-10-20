@@ -1,9 +1,14 @@
+<div align="center">
+
 # Ventriloquist
 
-[![tests](https://github.com/ShaanGS/ventriloquist/actions/workflows/test.yml/badge.svg)](https://github.com/ShaanGS/ventriloquist/actions/workflows/test.yml)
+Turn a Mac app into an MCP server using the accessibility API.
 
-Turn a Mac app into an MCP server using the accessibility API. An agent
-explores the app once, the interesting actions get compiled into a JSON
+[Try it in a minute](#try-it-in-a-minute) · [Use from Claude, Cursor or Codex](#use-it-from-claude-cursor-or-codex) · [How it works](#how-it-works)
+
+</div>
+
+An agent explores the app once, the interesting actions get compiled into a JSON
 "pack" of typed tools, and after that each tool call is deterministic
 replay. No model runs per UI step and none runs on the serving path. The
 client composing tool calls is still a model, so a multi-step workflow
