@@ -37,7 +37,17 @@ began, and each review's findings were fixed in a follow-up commit.
   snapshots and cross-role or destructive targets, quarantines fixes,
   promotes only through `vent verify` under a human.
 
-91 offline tests, green on Linux and macOS in CI.
+- **Packaging** (unreleased 0.2.0, `paths.py`): installs with
+  `uv tool install` or `pipx` from git, and is ready for PyPI as
+  `ventriloquist-mcp` (the plain name is taken). Bundled packs live in
+  `vent/bundled_packs/` and are never written to; everything vent writes
+  goes under `~/.ventriloquist` (`VENT_HOME`), where a user pack shadows
+  the bundled one for the same app. `vent mcp-config` prints a client
+  entry with vent's absolute path. Read tool output is wrapped as
+  untrusted app content at the MCP boundary (SECURITY.md T12).
+
+112 offline tests, green on Linux and macOS in CI, plus an install job
+that serves the bundled packs from a freshly installed wheel.
 
 ## The release checklist (complete, v0.1.0)
 

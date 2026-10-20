@@ -22,6 +22,17 @@ Live behavior (the `ax` layer, `vent inspect`, `vent run` against a real
 app) needs macOS and Accessibility permission for your terminal, granted in
 System Settings, Privacy & Security, Accessibility.
 
+An editable install reads files straight from the checkout, so it cannot
+show a packaging mistake. CI also builds the wheel, installs it into a
+clean environment, and runs `tests/install_smoke.py` against it. To do
+the same locally:
+
+```bash
+python3 -m venv --clear /tmp/vent-env
+/tmp/vent-env/bin/pip install .    # a regular install, built as a wheel
+cd /tmp && /tmp/vent-env/bin/python "$OLDPWD/tests/install_smoke.py" /tmp/vent-env/bin
+```
+
 ## Read these first
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains every module and why
@@ -51,6 +62,20 @@ even if the tests pass, so the tests exist to make breaking them loud.
    `vent verify`, under a human, rewrites a tool's anchor of record.
 6. **No screenshots, no pixel coordinates, no vision.** If a feature seems
    to need them, redesign the feature.
+
+## Shipping a pack
+
+Packs you record land in `~/.ventriloquist/packs/<bundle id>/pack.json`
+(or under `VENT_HOME`). To ship one with vent:
+
+1. Run `vent verify <app>` and the tool-level harness
+   (`vent harness <app> --tools`) and put the numbers in the PR.
+2. Scrub anything personal from the anchors: window titles, workspace
+   and account names, document names. Labels in ancestor chains leak
+   these too.
+3. Copy the file to `vent/bundled_packs/<bundle id>/pack.json`.
+   `test_shipped_packs_all_load` checks that it validates.
+4. Add a row to the "What ships" table in the README.
 
 ## Style
 

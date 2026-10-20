@@ -1,0 +1,48 @@
+name: Pack report
+description: Tell us how a pack behaved on your Mac, working or not.
+title: "Pack report: <app> on macOS <version>"
+labels: ["pack report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Packs have only been measured on the author's Mac, so reports from
+        other machines are the most useful thing you can send, including
+        "it just worked".
+  - type: input
+    id: app
+    attributes:
+      label: App and version
+      placeholder: Visual Studio Code 1.133.0
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "26.3"
+    validations:
+      required: true
+  - type: input
+    id: vent
+    attributes:
+      label: vent version
+      description: Output of `vent --version`.
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: vent verify report
+      description: |
+        Run `vent verify <app> --report out.json` and paste out.json here.
+        It holds no pack contents and no model output; the only app content
+        is each resolved element's live label. Read it before pasting.
+      render: json
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Which tools you ran, through which client, and what you saw.
+    validations:
+      required: true

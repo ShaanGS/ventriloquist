@@ -177,11 +177,15 @@ vent explore APP       model probes under the policy, records a trace (--no-valu
 vent compile APP       propose tools from the trace, human approves each against literal steps
 vent run APP TOOL      execute one compiled tool directly (--arg key=value, --heal to enable re-grounding)
 vent serve             serve every pack as MCP tools over stdio
+vent mcp-config        print a ready-to-paste MCP client entry with vent's absolute path
 vent verify APP        dry-resolve every anchor, report durability, offer to promote quarantined heals
 vent harness APP       measure anchor durability under resize (--restart adds quit and relaunch)
 ```
 
-Wiring into Claude Code: `claude mcp add ventriloquist -- /path/to/.venv/bin/vent serve`.
+Install: `uv tool install git+https://github.com/ShaanGS/ventriloquist`
+(the PyPI distribution name will be `ventriloquist-mcp`). `vent mcp-config`
+prints a client entry with vent's absolute path. Wiring into Claude Code:
+`claude mcp add --scope user ventriloquist -- ~/.local/bin/vent serve`.
 Tools appear as `textedit_write_document` and so on.
 
 ## Security model, condensed
@@ -259,7 +263,7 @@ view switches, a resize, and a real app update.
 
 Built phase by phase, each phase getting an adversarial code review and a
 separate security review before the next began, with findings fixed in
-follow-up commits. 91 offline tests run in CI on Linux and macOS; the tests
+follow-up commits. 112 offline tests run in CI on Linux and macOS; the tests
 use fake element trees and a scripted-model seam
 (`llm.set_completer_for_tests`) so no test needs macOS, credentials, or
 network. Every model-driven path has also been validated live: exploration,
