@@ -200,7 +200,8 @@ bearing invariants:
   make a model call, structurally.
 - Healed anchors are quarantined, never silently promoted.
 - App-derived text (labels, values, titles) is treated as attacker-influenced
-  and wrapped in nonce-delimited markers before any prompt.
+  and wrapped in nonce-delimited markers before any prompt, and read tool
+  output is wrapped the same way before it reaches the MCP client.
 - Secure fields are dropped before anything can see or target them.
 - Snapshots sent to a model are scrubbed; `--no-values` replaces every field
   value with a length marker so exploration can run without field content

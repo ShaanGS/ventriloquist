@@ -217,6 +217,7 @@ vent/
   heal.py          re-ground lost anchors, quarantine the fixes
   server.py        MCP stdio server, per-app serialization, risk gating
   llm.py           single home for every model call
+  untrusted.py     marks app text as data for any model that reads it
   policy.py        action and tool safety policy (see SECURITY.md)
   explorer.py      survey / probe / synthesize, producing traces
   compiler.py      traces to ToolSpecs, uniqueness and risk checks

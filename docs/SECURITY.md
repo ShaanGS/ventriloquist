@@ -244,22 +244,26 @@ and the high-risk server gate exist.
 
 ### T12. Read tools feeding the client model
 
-Not yet shipped, recorded before it is. Today the server exposes tools
-that act; the moment it exposes tools that read (list rows, read a
-document, dump search results), the trust picture changes shape. App
-content is attacker-influenced text, and a read tool hands it directly to
-the client model, which also holds this server's mutating tool handles.
-The structural invariant that `server.py` never imports `llm.py` still
-holds, but the protection it provided is gone: the injection no longer
-needs our model because the caller brought their own.
+Written before read tools shipped, and they have now
+(`textedit_read_document`, `notes_read_open_note`). A tool that reads
+(list rows, read a document, dump search results) changes the shape of
+the trust picture. App content is attacker-influenced text, and a read
+tool hands it directly to the client model, which also holds this
+server's mutating tool handles. The structural invariant that
+`server.py` never imports `llm.py` still holds, but the protection it
+provided is gone: the injection no longer needs our model because the
+caller brought their own.
 
-The client's defenses are not ours to assume. Minimum bar for shipping
-read tools: mark read-tool output as untrusted app content at the MCP
-boundary with the same nonce-delimited wrapping `llm.py` uses internally,
-so a well-behaved client can quarantine it, and say plainly in the tool
-description that the output is app-controlled data, not instructions.
-This does not make injection impossible; it makes the boundary visible
-to the party who can act on it.
+The client's defenses are not ours to assume. The server marks every
+value a read step returns as untrusted app content at the MCP boundary,
+with the same nonce-delimited wrapping `llm.py` uses for its own prompts
+(the wrapper lives in `untrusted.py`, so the server uses it without
+importing `llm.py`), and every tool with a read step says in its
+description that its output is app-controlled data, not instructions.
+A well-behaved client can quarantine it. This does not make injection
+impossible; it makes the boundary visible to the party who can act on
+it. Tests pin both, including that app text cannot close the wrapper
+early.
 
 ## Standing rules for contributors
 
