@@ -4,6 +4,7 @@ connects in-process, so no app, permission, or subprocess is involved."""
 
 import ast
 import re
+import threading
 from dataclasses import replace
 from pathlib import Path
 
@@ -12,6 +13,7 @@ import pytest
 from mcp import Client
 
 import vent
+from vent import ax
 from vent.packs import Step, ToolSpec, save
 from vent.runtime import ToolResult
 from vent.server import READ_NOTE, build_server, result_text
@@ -78,6 +80,29 @@ def test_high_risk_tool_is_refused_over_mcp_without_the_opt_in(tmp_path, monkeyp
     result = call(build_server([tmp_path]), "textedit_write_document", {"text": "x"})
     assert result.is_error
     assert "VENT_ALLOW_HIGH=1" in result.content[0].text
+
+
+def test_app_state_is_refreshed_on_the_event_loop_before_the_app_lookup(tmp_path, monkeypatch):
+    """AppKit applies app launches, quits and activations only on the main
+    run loop, and the tool runs on a worker thread. So the refresh has to
+    come first, on the thread running the event loop."""
+    events = []
+    monkeypatch.setattr(ax, "refresh_app_state", lambda: events.append(("refresh", threading.get_ident())))
+
+    def lookup(bundle_id):
+        events.append(("lookup", threading.get_ident()))
+        raise ax.AXError(f"No running application with bundle id {bundle_id!r}. Is the app open?")
+
+    monkeypatch.setattr(ax, "find_app_by_bundle", lookup)
+    pack = sample_pack()
+    save(pack, tmp_path / pack.bundle_id / "pack.json")
+    result = call(build_server([tmp_path]), "textedit_write_document", {"text": "x"})
+
+    assert result.is_error
+    assert "Is the app open" in result.content[0].text
+    assert [name for name, _ in events] == ["refresh", "lookup"]
+    assert events[0][1] == threading.get_ident()  # connect() runs the event loop on this thread
+    assert events[1][1] != events[0][1]
 
 
 def pack_with_a_read_tool():

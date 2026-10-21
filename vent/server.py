@@ -177,6 +177,11 @@ def build_server(search_path: list[Path]) -> Server:
             finally:
                 lock.release()
 
+        # This handler runs on the main thread, the only place AppKit
+        # applies app launches, quits and activations. The tool itself runs
+        # on a worker thread, which would otherwise see the state from the
+        # server's first call.
+        ax.refresh_app_state()
         try:
             result = await anyio.to_thread.run_sync(run_locked)
         except (runtime.ToolExecutionError, ax.AXError, packs.PackError) as exc:

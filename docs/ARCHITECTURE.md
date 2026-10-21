@@ -268,6 +268,16 @@ the app, runs the tool, and restores the previously frontmost app after. The
 server exposes a "do not steal focus" mode that queues frontmost-requiring
 tools until the machine is idle or the user allows it.
 
+**Running-app state.** AppKit updates NSWorkspace's app list and front app,
+and every NSRunningApplication, only while the main run loop runs. The CLI
+pumps that loop before it reads. `vent serve` runs each tool call on a
+worker thread while its main thread runs the asyncio loop, so before every
+call the server pumps the main loop from the handler (`refresh_app_state`),
+and packs find their app by asking LaunchServices for the bundle id,
+skipping processes that have already exited. Without both, the server kept
+the state from its first call: apps opened later never appeared, and a
+relaunched app kept its dead pid.
+
 **Concurrency.** MCP clients fire tool calls in parallel; a GUI is one global
 mutable resource. The server holds a per-bundle-id mutex for the entire
 duration of a tool call and queues the rest. Queue waits have a timeout and

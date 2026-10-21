@@ -15,6 +15,7 @@ tree that is not really empty.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Any, Iterator, Optional
 
@@ -129,11 +130,14 @@ def running_apps() -> list[RunningApp]:
     """List regular (Dock-visible) running applications."""
     _require_pyobjc()
     # NSWorkspace's running-application list is maintained by KVO on the
-    # run loop. A headless process that never pumps the loop sees the list
-    # frozen at first access: quit apps stay listed, relaunched ones never
-    # appear. Found when the harness polled for a restarted VS Code for a
-    # full minute while ps showed it had already come back. One brief pump
-    # keeps every read current.
+    # main run loop. A headless process that never pumps the loop sees the
+    # list frozen at first access: quit apps stay listed, relaunched ones
+    # never appear. Found when the harness polled for a restarted VS Code
+    # for a full minute while ps showed it had already come back. One brief
+    # pump keeps every read current, but only on the main thread, where the
+    # CLI calls this. On a worker thread it runs that thread's own loop and
+    # changes nothing, so vent serve uses find_app_by_bundle and
+    # refresh_app_state instead.
     from Cocoa import NSDate, NSRunLoop
 
     NSRunLoop.currentRunLoop().runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(0.05))
@@ -179,12 +183,60 @@ def find_app(name_or_bundle: str) -> RunningApp:
 def find_app_by_bundle(bundle_id: str) -> RunningApp:
     """Find a running app by exact bundle id. Packs resolve apps this way:
     a pack for com.apple.Notes must never attach to 'Notes Plus' just
-    because the names look alike."""
-    needle = bundle_id.strip().lower()
+    because the names look alike.
+
+    Asks LaunchServices on every call instead of reading NSWorkspace's
+    list. vent serve looks apps up on a worker thread, where that list
+    never refreshes, so an app opened after the server's first lookup
+    stayed invisible and a relaunched one kept its dead pid."""
+    _require_pyobjc()
+    needle = bundle_id.strip()
+    for ns_app in NSRunningApplication.runningApplicationsWithBundleIdentifier_(needle) or []:
+        # activationPolicy 0 == NSApplicationActivationPolicyRegular
+        if ns_app.activationPolicy() != 0 or ns_app.isTerminated():
+            continue
+        pid = int(ns_app.processIdentifier())
+        if _pid_alive(pid):
+            return RunningApp(
+                name=str(ns_app.localizedName() or ""),
+                bundle_id=str(ns_app.bundleIdentifier()) if ns_app.bundleIdentifier() else None,
+                pid=pid,
+            )
+    # LaunchServices matches bundle ids case-sensitively. The list scan
+    # keeps the old case-insensitive match for hand-written packs.
+    lowered = needle.lower()
     for app in running_apps():
-        if app.bundle_id and app.bundle_id.lower() == needle:
+        if app.bundle_id and app.bundle_id.lower() == lowered and _pid_alive(app.pid):
             return app
     raise AXError(f"No running application with bundle id {bundle_id!r}. Is the app open?")
+
+
+def _pid_alive(pid: int) -> bool:
+    """Whether a process exists. LaunchServices can go on listing an app
+    whose process was killed, and AX calls to it then fail as if it hung."""
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def refresh_app_state() -> None:
+    """Let AppKit apply the app launches, quits and activations it has
+    queued. NSWorkspace and NSRunningApplication update only while the
+    main run loop runs, and vent serve's main thread runs the asyncio loop
+    instead. The server calls this there before each tool call, so
+    frontmost_app() on the worker thread reports the app in front now,
+    not the one in front at the server's first call. A no-op off the main
+    thread."""
+    if not _PYOBJC_AVAILABLE:
+        return
+    from Cocoa import NSDate, NSRunLoop, NSThread
+
+    if NSThread.isMainThread():
+        NSRunLoop.currentRunLoop().runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(0.05))
 
 
 def app_version(app: RunningApp) -> str:
