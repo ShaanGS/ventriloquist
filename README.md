@@ -1,27 +1,23 @@
-<div align="center">
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ShaanGS/ventriloquist/main/docs/icon.svg" width="128" height="128" alt="Ventriloquist icon">
+</p>
 
-<img src="https://raw.githubusercontent.com/ShaanGS/ventriloquist/main/docs/icon.png" width="120" height="120" alt="Ventriloquist icon">
+<h1 align="center">Ventriloquist</h1>
 
-# Ventriloquist
+<p align="center">
+  Turn any Mac app into MCP tools your AI agent can call.
+  <br>
+  <a href="#try-it-in-a-minute">Install</a> · <a href="#how-it-works">How it works</a> · <a href="#what-ships">Packs</a> · <a href="https://github.com/ShaanGS/ventriloquist/blob/main/docs/SECURITY.md">Security</a>
+</p>
 
-Turn a Mac app into an MCP server using the accessibility API.
+## About
 
-[![PyPI](https://img.shields.io/pypi/v/ventriloquist-mcp?label=PyPI)](https://pypi.org/project/ventriloquist-mcp/)
-[![tests](https://github.com/ShaanGS/ventriloquist/actions/workflows/test.yml/badge.svg)](https://github.com/ShaanGS/ventriloquist/actions/workflows/test.yml)
-[![Python versions](https://img.shields.io/pypi/pyversions/ventriloquist-mcp)](https://pypi.org/project/ventriloquist-mcp/)
-![macOS only](https://img.shields.io/badge/platform-macOS-lightgrey)
-[![Glama score](https://glama.ai/mcp/servers/ShaanGS/ventriloquist/badges/score.svg)](https://glama.ai/mcp/servers/ShaanGS/ventriloquist)
-
-[Try it in a minute](#try-it-in-a-minute) · [Use from Claude, Cursor or Codex](#use-it-from-claude-cursor-or-codex) · [How it works](#how-it-works)
-
-</div>
-
-An agent explores the app once, the interesting actions get compiled into a JSON
-"pack" of typed tools, and after that each tool call is deterministic
-replay. No model runs per UI step and none runs on the serving path. The
-client composing tool calls is still a model, so a multi-step workflow
-has one model in it, but it's deciding which tools to call, not where to
-click. No screenshots and no pixel coordinates anywhere in the codebase.
+Ventriloquist learns a Mac app once through the macOS accessibility API
+and keeps the actions worth having as typed tools, like
+`textedit_write_document` or `slack_filter_channels`. Your agent calls
+them over MCP, and every call replays the recorded steps: no screenshots,
+no vision model, about 85 ms for a read. The agent still decides which
+tool to call. It never decides where to click.
 
 <!-- Demo GIF goes here once recorded. Plan and commands: docs/DEMO.md -->
 <!-- mcp-name: io.github.ShaanGS/ventriloquist -->
@@ -367,3 +363,5 @@ has the rules that are load-bearing.
 ## License
 
 MIT
+
+[![PyPI](https://img.shields.io/pypi/v/ventriloquist-mcp?label=PyPI)](https://pypi.org/project/ventriloquist-mcp/) [![tests](https://github.com/ShaanGS/ventriloquist/actions/workflows/test.yml/badge.svg)](https://github.com/ShaanGS/ventriloquist/actions/workflows/test.yml) [![Python versions](https://img.shields.io/pypi/pyversions/ventriloquist-mcp)](https://pypi.org/project/ventriloquist-mcp/) [![Glama score](https://glama.ai/mcp/servers/ShaanGS/ventriloquist/badges/score.svg)](https://glama.ai/mcp/servers/ShaanGS/ventriloquist)
