@@ -1,8 +1,16 @@
 <div align="center">
 
+<img src="https://raw.githubusercontent.com/ShaanGS/ventriloquist/main/docs/logo.svg" width="96" height="96" alt="Ventriloquist logo">
+
 # Ventriloquist
 
 Turn a Mac app into an MCP server using the accessibility API.
+
+[![PyPI](https://img.shields.io/pypi/v/ventriloquist-mcp?label=PyPI)](https://pypi.org/project/ventriloquist-mcp/)
+[![tests](https://github.com/ShaanGS/ventriloquist/actions/workflows/test.yml/badge.svg)](https://github.com/ShaanGS/ventriloquist/actions/workflows/test.yml)
+[![Python versions](https://img.shields.io/pypi/pyversions/ventriloquist-mcp)](https://pypi.org/project/ventriloquist-mcp/)
+![macOS only](https://img.shields.io/badge/platform-macOS-lightgrey)
+[![Glama score](https://glama.ai/mcp/servers/ShaanGS/ventriloquist/badges/score.svg)](https://glama.ai/mcp/servers/ShaanGS/ventriloquist)
 
 [Try it in a minute](#try-it-in-a-minute) · [Use from Claude, Cursor or Codex](#use-it-from-claude-cursor-or-codex) · [How it works](#how-it-works)
 
