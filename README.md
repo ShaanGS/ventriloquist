@@ -5,7 +5,7 @@
 <h1 align="center">Ventriloquist</h1>
 
 <p align="center">
-  Turn any Mac app into MCP tools your AI agent can call.
+  Turn Mac apps into MCP tools your AI agent can call.
   <br>
   <a href="#try-it-in-a-minute">Install</a> · <a href="#how-it-works">How it works</a> · <a href="#what-ships">Packs</a> · <a href="https://github.com/ShaanGS/ventriloquist/blob/main/docs/SECURITY.md">Security</a>
 </p>
@@ -153,7 +153,7 @@ has no model in it at all. The pack file in the middle is the whole
 interface between the two: plain JSON you can read, diff, and check into
 a repo.
 
-The accessibility layer has been in every Mac app for decades because
+Native Mac apps have carried an accessibility layer for decades because
 screen readers depend on it. It turns out it's also a pretty good API for
 driving apps, if you're careful about how you find elements again later.
 

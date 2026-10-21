@@ -30,7 +30,7 @@ def _user_pack_path(bundle_id: str) -> Path:
 @click.group()
 @click.version_option(__version__, prog_name="vent")
 def main() -> None:
-    """Give every Mac app an API."""
+    """Give Mac apps an API."""
 
 
 @main.command()

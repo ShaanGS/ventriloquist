@@ -26,7 +26,7 @@ a human approves it through `vent verify`.
 
 ## Why the accessibility tree
 
-Every Mac app has shipped an accessibility (AX) tree for decades because
+Native Mac apps have shipped an accessibility (AX) tree for decades because
 screen readers depend on it. It gives you semantic elements (buttons, text
 areas, rows) with roles, labels, and real actions (press, set value), which is
 a far better contract than pixels. The whole system stands on it: reading the
