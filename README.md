@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/ShaanGS/ventriloquist/main/docs/logo.svg" width="96" height="96" alt="Ventriloquist logo">
+<img src="https://raw.githubusercontent.com/ShaanGS/ventriloquist/main/docs/icon.png" width="120" height="120" alt="Ventriloquist icon">
 
 # Ventriloquist
 
