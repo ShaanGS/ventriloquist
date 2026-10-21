@@ -219,6 +219,17 @@ used for Ventriloquist, review packs before serving them, and treat
 `vent serve` as giving the connected MCP client exactly the capabilities the
 approved packs describe, unattended.
 
+Claude Desktop moves the grant somewhere else. It starts each MCP server
+through a helper that makes the server responsible for itself, so macOS
+checks the program the helper ran: vent's Python interpreter for the entry
+`vent mcp-config` prints, or uv when the config runs vent through `uvx`.
+The grant then belongs to that binary, and other tools can share it: any
+program that runs on the same interpreter as its own process, such as
+another MCP server Claude Desktop starts on that Python, gets the same
+reach. vent's "not trusted" message names the exact binary so the user
+grants that file rather than something broader, and the README steers
+Claude Desktop users to the interpreter over uv, since less runs on it.
+
 ### T11. Semantic drift under a stable anchor
 
 Anchor durability and semantic safety pull in opposite directions, and

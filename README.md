@@ -64,8 +64,10 @@ your shell's PATH, so the config needs vent's absolute path, and
 }
 ```
 
-- **Claude Desktop**: merge it into
+- **Claude Desktop**: quit Claude, then merge it into
   `~/Library/Application Support/Claude/claude_desktop_config.json`.
+  Claude rewrites that file while it runs, so an edit made with it open
+  gets lost.
 - **Cursor**: merge it into `~/.cursor/mcp.json`.
 - **Claude Code**: `claude mcp add --scope user ventriloquist -- ~/.local/bin/vent serve`
 - **Codex CLI**: add to `~/.codex/config.toml`:
@@ -77,10 +79,21 @@ your shell's PATH, so the config needs vent's absolute path, and
   ```
 
 The Accessibility permission belongs to whichever app starts
-`vent serve`: Claude Desktop or Cursor themselves, or your terminal for
-Claude Code and Codex. Switch it on for that app (use the + button if it
-isn't in the list yet) and restart it. If every call fails with "not
-trusted for Accessibility", that's the fix.
+`vent serve`: Cursor itself, or your terminal for Claude Code and Codex.
+Switch it on for that app (use the + button if it isn't in the list yet)
+and restart it.
+
+Claude Desktop is the exception. It runs each MCP server as its own
+process for permissions, so macOS checks vent's Python rather than
+Claude, and switching Claude on does nothing for vent. `vent mcp-config`
+and `vent doctor` print that file's path. Drag it from Finder into
+System Settings > Privacy & Security > Accessibility (the + picker greys
+it out), then restart Claude. Use the `vent mcp-config` entry rather
+than `uvx` here: under `uvx`, macOS checks uv instead, and a grant for
+uv covers everything uv runs.
+
+If every call fails with "not trusted for Accessibility", the message
+names the app or file to switch on.
 
 Tools show up as `textedit_write_document`, `code_show_search`,
 `slack_filter_channels`, and so on. Then ask for things in plain words,
@@ -187,8 +200,9 @@ does with caveats:
 
 - **macOS only.** The whole approach rests on the macOS accessibility API.
 - **The Accessibility grant is broad.** macOS gives it to the app that
-  starts vent (your terminal, Claude Desktop, Cursor), and anything that
-  app runs can then drive every app on your Mac. vent's own scoping
+  starts vent (your terminal, Cursor) or, under Claude Desktop, to vent's
+  Python. Anything else that app starts, or that runs on that Python as
+  its own process, can then drive every app on your Mac. vent's own scoping
   (named apps, a policy, risk levels) is self-discipline inside that
   grant, not an OS boundary. SECURITY.md T10 has the details.
 - **Packs are recorded on one machine.** Anchors held up under resizes,

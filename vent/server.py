@@ -216,7 +216,7 @@ def serve_stdio(search_path: list[Path]) -> None:
         # stderr is the MCP client's server log; this line is usually the
         # whole answer to "why does every call fail".
         print(
-            f"warning: vent serve is not trusted for Accessibility, so tool calls will fail. {ax.TRUST_HINT}",
+            f"warning: vent serve is not trusted for Accessibility, so tool calls will fail. {ax.trust_hint()}",
             file=sys.stderr,
         )
 

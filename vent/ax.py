@@ -16,6 +16,7 @@ tree that is not really empty.
 from __future__ import annotations
 
 import os
+import subprocess
 from dataclasses import dataclass
 from typing import Any, Iterator, Optional
 
@@ -109,14 +110,94 @@ def session_locked() -> bool:
 # process itself, so the app to name depends on who launched vent.
 TRUST_HINT = (
     "Grant access in System Settings, Privacy & Security, Accessibility to "
-    "the app that started vent: your terminal, or the MCP client (Claude, "
+    "the app that started vent: your terminal, or the MCP client (such as "
     "Cursor) that launched vent serve. Then quit and reopen that app."
 )
+
+# Claude Desktop starts its MCP servers, and its Claude Code sessions,
+# through this helper, which makes each one responsible for itself. macOS
+# then checks the program the helper ran instead of Claude, so Claude's own
+# grant never reaches vent.
+_CLAUDE_DISCLAIMER = "/Claude.app/Contents/Helpers/disclaimer"
+
+
+def executable_path(pid: int) -> str:
+    """The file a process is running, symlinks resolved, or "" when it
+    can't be read. This is the file macOS checks for a permission. ps
+    sometimes reports a bare name instead, and a framework Python's
+    sys.executable is a stub that hands off to a binary inside Python.app."""
+    import ctypes
+
+    try:
+        libproc = ctypes.CDLL("/usr/lib/libproc.dylib")
+    except OSError:
+        return ""
+    buffer = ctypes.create_string_buffer(4096)  # PROC_PIDPATHINFO_MAXSIZE
+    if libproc.proc_pidpath(pid, buffer, ctypes.sizeof(buffer)) <= 0:
+        return ""
+    return buffer.value.decode(errors="replace")
+
+
+def _process_chain(limit: int = 8) -> list[str]:
+    """Executable paths of this process and its ancestors, nearest first."""
+    try:
+        listing = subprocess.run(
+            ["/bin/ps", "-A", "-o", "pid=,ppid="],
+            capture_output=True, text=True, timeout=5,
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        return []
+    parents = {}
+    for line in listing.splitlines():
+        fields = line.split()
+        if len(fields) == 2 and fields[0].isdigit() and fields[1].isdigit():
+            parents[int(fields[0])] = int(fields[1])
+    chain, pid = [], os.getpid()
+    while pid > 1 and len(chain) < limit:
+        chain.append(executable_path(pid))
+        pid = parents.get(pid, 0)
+    return chain
+
+
+def claude_desktop_permission_owner(chain: Optional[list[str]] = None) -> Optional[str]:
+    """The program macOS checks for Accessibility when vent runs under
+    Claude Desktop's disclaimer helper, or None when it doesn't. It is
+    whatever the helper ran: vent's Python for the entry `vent mcp-config`
+    prints, uv when the config runs vent through uvx, or Claude Code when
+    vent runs inside one of its sessions."""
+    if chain is None:
+        chain = _process_chain()
+    for index, path in enumerate(chain):
+        if path.endswith(_CLAUDE_DISCLAIMER):
+            return (chain[index - 1] or None) if index > 0 else None
+    return None
+
+
+def trust_hint() -> str:
+    """How to grant Accessibility, given the way this process was started."""
+    owner = claude_desktop_permission_owner()
+    if owner is None:
+        return TRUST_HINT
+    hint = (
+        f"Under Claude Desktop, macOS checks {owner} for Accessibility, not "
+        "Claude, because Claude starts that program as its own process for "
+        "permissions. Add that file in System Settings, Privacy & Security, "
+        "Accessibility (drag it in from Finder if the + picker greys it out), "
+        "then quit and reopen Claude."
+    )
+    if os.path.basename(owner) in ("uv", "uvx"):
+        hint += (
+            " That file is uv itself, because the config runs vent through uvx. "
+            "For a grant that doesn't cover everything uv runs, install vent "
+            "with `uv tool install ventriloquist-mcp` and use the entry "
+            "`vent mcp-config` prints."
+        )
+    return hint
 
 
 def require_trusted() -> None:
     if not is_trusted():
-        raise NotTrustedError(f"This process is not trusted for Accessibility. {TRUST_HINT}")
+        raise NotTrustedError(f"This process is not trusted for Accessibility. {trust_hint()}")
 
 
 @dataclass(frozen=True)

@@ -182,11 +182,12 @@ vent verify APP        dry-resolve every anchor, report durability, offer to pro
 vent harness APP       measure anchor durability under resize (--restart adds quit and relaunch)
 ```
 
-Install: `uv tool install ventriloquist-mcp`
-(the PyPI distribution name will be `ventriloquist-mcp`). `vent mcp-config`
+Install: `uv tool install ventriloquist-mcp`. `vent mcp-config`
 prints a client entry with vent's absolute path. Wiring into Claude Code:
 `claude mcp add --scope user ventriloquist -- ~/.local/bin/vent serve`.
-Tools appear as `textedit_write_document` and so on.
+Claude Desktop runs MCP servers as their own process for permissions, so
+Accessibility goes to vent's Python (the path `vent mcp-config` prints),
+not to Claude. Tools appear as `textedit_write_document` and so on.
 
 ## Security model, condensed
 

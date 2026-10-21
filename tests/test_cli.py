@@ -34,6 +34,27 @@ def test_doctor_without_permission_names_the_app_to_trust(monkeypatch):
     """macOS trusts the app that launched vent, so for an MCP client that
     is the client itself, not the terminal."""
     monkeypatch.setattr(cli.ax, "is_trusted", lambda: False)
+    monkeypatch.setattr(cli.ax, "_process_chain", lambda: [])
     result = CliRunner().invoke(cli.main, ["doctor"])
     assert result.exit_code == 1
     assert "MCP client" in result.output
+
+
+def test_doctor_points_claude_desktop_users_at_vents_python(monkeypatch):
+    """A terminal can pass doctor while Claude Desktop still fails: it
+    checks vent's Python, not the terminal."""
+    monkeypatch.setattr(cli.ax, "is_trusted", lambda: True)
+    monkeypatch.setattr(cli, "_vent_python", lambda: "/opt/tools/python/bin/python3.14")
+    result = CliRunner().invoke(cli.main, ["doctor"])
+    assert result.exit_code == 0
+    assert "Claude Desktop" in result.output
+    assert "/opt/tools/python/bin/python3.14" in result.output
+
+
+def test_mcp_config_tells_claude_desktop_users_what_differs(monkeypatch):
+    monkeypatch.setattr(cli.sys, "argv", ["/opt/tools/bin/vent", "mcp-config"])
+    monkeypatch.setattr(cli, "_vent_python", lambda: "/opt/tools/python/bin/python3.14")
+    result = CliRunner().invoke(cli.main, ["mcp-config"])
+    assert "Claude Desktop works differently" in result.stderr
+    assert "while it is closed" in result.stderr
+    assert "/opt/tools/python/bin/python3.14" in result.stderr

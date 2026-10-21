@@ -44,9 +44,13 @@ def doctor(app_name: str | None) -> None:
     """
     if not ax.is_trusted():
         click.secho("✗ Accessibility permission missing.", fg="red")
-        click.echo(f"  {ax.TRUST_HINT}")
+        click.echo(f"  {ax.trust_hint()}")
         sys.exit(1)
     click.secho("✓ Accessibility permission granted. Ready to go.", fg="green")
+    click.echo(
+        "  Using Claude Desktop? It checks vent's Python rather than itself, "
+        f"so give this file Accessibility too:\n    {_vent_python()}"
+    )
 
     if not app_name:
         return
@@ -553,6 +557,13 @@ def _vent_executable() -> str:
     return shutil.which("vent") or "vent"
 
 
+def _vent_python() -> str:
+    """The interpreter binary running vent. Claude Desktop checks this file
+    for Accessibility when it starts the entry mcp-config prints, since the
+    vent script runs on it."""
+    return ax.executable_path(os.getpid()) or os.path.realpath(sys.executable)
+
+
 @main.command("mcp-config")
 def mcp_config() -> None:
     """Print a ready-to-paste MCP client entry for this install of vent.
@@ -568,7 +579,14 @@ def mcp_config() -> None:
         "Cursor's ~/.cursor/mcp.json, merging it into an existing mcpServers "
         "block if there is one. For Claude Code, run:\n"
         f"  claude mcp add --scope user ventriloquist -- {shlex.quote(command)} serve\n"
-        "Then give that app Accessibility permission (see vent doctor).",
+        "Then give the app that starts vent Accessibility permission: Cursor, "
+        "or your terminal for Claude Code (see vent doctor).\n\n"
+        "Claude Desktop works differently. Edit its config while it is closed, "
+        "because it rewrites the file while it runs. It also checks vent's "
+        "Python rather than itself, so give this file Accessibility, dragging "
+        "it from Finder into System Settings, Privacy & Security, "
+        "Accessibility (the + picker greys it out):\n"
+        f"  {_vent_python()}",
         err=True,
     )
 
