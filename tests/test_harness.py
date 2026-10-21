@@ -130,6 +130,7 @@ def test_run_tools_measures_end_to_end_success(monkeypatch):
 
     monkeypatch.setattr(hm.ax, "find_app", lambda q: type("A", (), {"name": "TextEdit", "pid": 1, "bundle_id": "com.apple.TextEdit"})())
     monkeypatch.setattr(hm.ax, "app_element", lambda app: tree)
+    monkeypatch.setattr(hm.ax, "session_locked", lambda: False)
     monkeypatch.setattr(hm, "enable_web_accessibility", lambda root: None)
     monkeypatch.setattr(hm, "_wait_for_tree", lambda root, **kw: True)
 
