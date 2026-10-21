@@ -19,7 +19,11 @@ them over MCP, and every call replays the recorded steps: no screenshots,
 no vision model, about 85 ms for a read. The agent still decides which
 tool to call. It never decides where to click.
 
-<!-- Demo GIF goes here once recorded. Plan and commands: docs/DEMO.md -->
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ShaanGS/ventriloquist/main/docs/demo.gif" width="900" alt="An agent calls vent's tools: VS Code opens its Search view and searches the repo for refuse, then a note appears in TextEdit. Nobody touches the mouse.">
+  <br>
+  <sub>A real run. Each tool call plays at real speed; the agent's pauses between calls are cut.</sub>
+</p>
 <!-- mcp-name: io.github.ShaanGS/ventriloquist -->
 
 ## Try it in a minute
