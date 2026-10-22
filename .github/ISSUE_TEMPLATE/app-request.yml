@@ -1,0 +1,41 @@
+name: App request
+description: Ask for a pack for a Mac app you'd like your agent to drive.
+title: "App request: <app>"
+labels: ["app request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        vent is most useful for a task you repeat in an app with no other way
+        in, so describe the task, not just the app.
+  - type: input
+    id: app
+    attributes:
+      label: App and version
+      placeholder: Preview 11.0
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of app is it?
+      description: Native apps work best. Electron apps need a launch flag. Content drawn on a canvas, like a game or a design surface, is out of reach.
+      options:
+        - Native Mac app
+        - Electron or other Chromium-based app
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: task
+    attributes:
+      label: The task you repeat
+      description: What you do by hand today, step by step, and how often.
+      placeholder: Every Monday I open the export dialog, pick last week's dates and save a CSV.
+    validations:
+      required: true
+  - type: textarea
+    id: other-ways
+    attributes:
+      label: Other ways in
+      description: Does the app have an API, an MCP server, AppleScript or Shortcuts actions? If it does, what's missing?
