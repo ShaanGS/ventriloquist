@@ -86,7 +86,12 @@ def _shape_hash(element: Element, depth: int = SETTLE_DEPTH, include_menus: bool
     return hash("\n".join(parts))
 
 
-def settle(root: Element, deadline_s: float, include_menus: bool = True) -> str:
+def settle(
+    root: Element,
+    deadline_s: float,
+    include_menus: bool = True,
+    baseline: Optional[int] = None,
+) -> str:
     """Wait for the tree to react to an op and then go quiet.
 
     Returns "settled" when a change was observed and the tree then held
@@ -100,9 +105,14 @@ def settle(root: Element, deadline_s: float, include_menus: bool = True) -> str:
     The runtime turns include_menus off unless the step acted inside a menu
     bar. Fingerprinting TextEdit's menu bar on every poll took 0.15 to 0.7
     seconds and was most of a write's time.
+
+    baseline is a fingerprint taken before the op, for ops whose own effect
+    is the change to wait on. Without one, the first fingerprint is taken
+    now, after the op.
     """
     deadline = time.monotonic() + deadline_s
-    baseline = _shape_hash(root, include_menus=include_menus)
+    if baseline is None:
+        baseline = _shape_hash(root, include_menus=include_menus)
     changed = False
     last = baseline
     quiet_since = time.monotonic()
@@ -300,6 +310,19 @@ def _run_step(
         value = "" if element.value is None else str(element.value)
         return StepReport(op=step.op, ok=True, detail=value)
 
+    include_menus = anchors.in_menu_bar(step.anchor)
+    # A write has landed by the time set_value returns, so a fingerprint
+    # taken afterwards already holds it, and settle used to wait out its
+    # whole no-reaction window (0.6 s on every TextEdit write) for nothing.
+    # Fingerprinting first lets the new value count as the change. Presses
+    # keep the fingerprint taken afterwards: what they wait for is the
+    # app's reaction, not the button's own state.
+    before = (
+        _shape_hash(root, include_menus=include_menus)
+        if step.op == "set_value" and step.settle
+        else None
+    )
+
     try:
         if step.op == "press":
             element.perform(step.action)
@@ -319,7 +342,7 @@ def _run_step(
         _pump_tree(element)
 
     detail = (
-        settle(root, step.timeout_s, include_menus=anchors.in_menu_bar(step.anchor))
+        settle(root, step.timeout_s, include_menus=include_menus, baseline=before)
         if step.settle
         else "settle skipped"
     )

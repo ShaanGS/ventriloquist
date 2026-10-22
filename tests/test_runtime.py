@@ -295,7 +295,7 @@ def test_settle_ignores_menu_bar_churn_unless_asked():
 def test_only_menu_bar_steps_settle_on_the_menu_bar(monkeypatch):
     seen = []
 
-    def recording_settle(root, deadline_s, include_menus=True):
+    def recording_settle(root, deadline_s, include_menus=True, baseline=None):
         seen.append(include_menus)
         return "settled"
 
@@ -314,3 +314,41 @@ def test_only_menu_bar_steps_settle_on_the_menu_bar(monkeypatch):
     runtime.execute(menu_pack, "new_document", {}, tree)
 
     assert seen == [False, True]
+
+
+def test_write_settles_once_the_new_value_holds():
+    """A write lands before set_value returns. With the fingerprint taken
+    afterwards, settle saw no change and waited out its whole no-reaction
+    window, 0.6 s on every TextEdit write. Taken before, the new value
+    counts as the change, and settle returns once the tree holds still."""
+    tree = textedit_like()
+    pack = build_write_tool(tree)
+    pack.tools[0].steps[0].timeout_s = 2.0
+    result = runtime.execute(pack, "write_document", {"text": "settled text"}, tree)
+    assert result.steps[0].detail == "settled"
+
+
+def test_press_waits_for_a_reaction_beyond_its_own_state():
+    """A press waits on the app, not on the control it pressed, so the
+    control's own state change must not count as the reaction."""
+
+    class ToggleElement(FakeElement):
+        def perform(self, action: str = "AXPress") -> None:
+            super().perform(action)
+            self.value = 0 if self.value else 1
+
+    toggle = ToggleElement("AXCheckBox", "Bold", identifier="bold", value=0, actions=["AXPress"])
+    tree = FakeElement(
+        "AXApplication", "App", children=[FakeElement("AXWindow", "Main", children=[toggle])]
+    )
+    node = next(n for n in snapshot(tree).nodes if n.identifier == "bold")
+    tool = ToolSpec(
+        name="toggle_bold",
+        description="Toggle bold.",
+        risk="mutating",
+        steps=[Step(op="press", anchor=anchors.build(node), timeout_s=2.0)],
+    )
+    pack = Pack(bundle_id="app.test", app_name="App", tools=[tool])
+    result = runtime.execute(pack, "toggle_bold", {}, tree)
+    assert toggle.value == 1
+    assert result.steps[0].detail == "no_reaction"
