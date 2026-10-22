@@ -141,11 +141,11 @@ and decides every single click, every time, which is slow and expensive
 and breaks in weird ways. This is the compiler version of that. You pay
 the model cost once during exploration and get back tools like
 `write_document(text)`. Calling them later costs no model tokens. On the
-author's Mac, a TextEdit read takes about half a second end to end through
-Claude Code, about 150 ms of it inside vent. A write takes about 1.5 s,
-much of it spent waiting for the app to settle. When an app update breaks
-a recorded action, a model is brought back in to fix it, but the fix sits
-in quarantine until you approve it.
+author's Mac, through Claude Code, a TextEdit read takes about half a
+second end to end and a write about 1.1 s. Measured with a plain MCP
+client, vent's own share is about 0.1 s for a read and 0.5 s for a write.
+When an app update breaks a recorded action, a model is brought back in to
+fix it, but the fix sits in quarantine until you approve it.
 
 The top half of the diagram runs once per app and is where the model
 earns its keep, with a policy screening every probe and a human approving
@@ -222,10 +222,12 @@ does with caveats:
   Chromium apps need `--force-renderer-accessibility`. Anything drawn on
   a canvas (Figma's design surface, games) exposes its chrome and
   nothing inside.
-- **The app has to be running, with the window the tool expects.** The
-  Notes, VS Code, and Slack tools bring their app to the front while they
-  run and hand focus back afterwards. A locked screen makes every app
-  look empty.
+- **The app has to be running, with the window the tool expects, on the
+  Space you're using.** macOS only lists windows on the current Space to
+  accessibility clients, so while you're in a full-screen app or on
+  another desktop, vent sees the app as having no window. The Notes, VS
+  Code, and Slack tools bring their app to the front while they run and
+  hand focus back afterwards. A locked screen makes every app look empty.
 - **Calls to one app run one at a time.** A GUI is one shared thing, so
   parallel calls against the same app queue.
 - **Preconditions are prose.** VS Code's `search_workspace` says to open
