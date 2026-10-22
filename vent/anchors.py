@@ -332,9 +332,9 @@ def resolve(root: Element, anchor: Anchor, low_confidence: bool = False) -> Elem
     """
     threshold = ACCEPT_THRESHOLD + (2.0 if low_confidence else 0.0)
 
-    # The menu bar is most of a native app's tree (369 of TextEdit's 370
-    # elements), and walking it was most of every tool call, so it is
-    # walked only for anchors that can live there.
+    # The menu bar is most of a native app's tree (about 365 of TextEdit's
+    # roughly 410 elements), and walking it was most of every tool call, so
+    # it is walked only for anchors that can live there.
     candidates: list[_Candidate] = []
     for element, chain in _walk_with_chains(root, MAX_TREE_DEPTH, in_menu_bar(anchor)):
         score, breakdown = _score(anchor, chain)

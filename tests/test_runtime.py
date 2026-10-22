@@ -272,7 +272,8 @@ def test_acting_on_a_drifted_element_is_refused():
 
 def test_write_never_walks_the_menu_bar():
     """Resolve, settle and verify each crawled the menu bar on every call,
-    which in TextEdit was 369 of 370 elements and most of a write's time."""
+    which in TextEdit is about 365 of roughly 410 elements and was most of
+    a write's time."""
     tree = textedit_like()
     tree._children.append(GuardedElement("AXMenuBar"))
     pack = build_write_tool(tree)

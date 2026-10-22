@@ -246,9 +246,9 @@ def test_twins_inside_the_focused_window_still_refuse():
 
 
 def test_window_anchor_never_walks_the_menu_bar():
-    """The menu bar was 369 of TextEdit's 370 elements, and walking it was
-    most of every tool call. An anchor recorded in a window can't live
-    there, so resolution must not descend into it."""
+    """The menu bar is about 365 of TextEdit's roughly 410 elements, and
+    walking it was most of every tool call. An anchor recorded in a window
+    can't live there, so resolution must not descend into it."""
     tree = textedit_like()
     tree._children.append(GuardedElement("AXMenuBar"))
     anchor = anchor_for(tree, identifier="doc-body")
