@@ -143,9 +143,14 @@ class _Candidate:
 
 
 def _walk_with_chains(
-    root: Element, max_depth: int
+    root: Element, max_depth: int, include_menus: bool = True
 ) -> Iterator[tuple[Element, tuple[ChainLink, ...]]]:
-    """Yield every element with its ancestor chain, same shape as snapshot."""
+    """Yield every element with its ancestor chain, same shape as snapshot.
+
+    With include_menus off, menu bar subtrees are skipped wherever they
+    appear, the rule snapshot applies by default. Indices still count the
+    skipped menu bars, so chains line up with a snapshot's link for link.
+    """
 
     # Ancestor-path cycle guard, not a global visited set: AX trees are
     # DAGs and the same element can be legitimately reachable through two
@@ -167,6 +172,8 @@ def _walk_with_chains(
                 role = child.role
                 ordinal = role_counts.get(role, 0)
                 role_counts[role] = ordinal + 1
+                if not include_menus and role == "AXMenuBar":
+                    continue
                 link = ChainLink(
                     role=role,
                     label=child.label,
@@ -305,6 +312,16 @@ def semantic_drift(anchor: Anchor, element: Element) -> bool:
     return bool(live) and live not in anchor.labels
 
 
+def in_menu_bar(anchor: Anchor) -> bool:
+    """Whether an anchor may point into a menu bar.
+
+    Snapshots leave menu bars out unless exploration asks for them, so an
+    anchor whose recorded chain never passes through an AXMenuBar cannot
+    live in one. An anchor with no chain can't rule it out.
+    """
+    return not anchor.chain or any(link.role == "AXMenuBar" for link in anchor.chain)
+
+
 def resolve(root: Element, anchor: Anchor, low_confidence: bool = False) -> Element:
     """Find the element an anchor describes, or refuse.
 
@@ -315,8 +332,11 @@ def resolve(root: Element, anchor: Anchor, low_confidence: bool = False) -> Elem
     """
     threshold = ACCEPT_THRESHOLD + (2.0 if low_confidence else 0.0)
 
+    # The menu bar is most of a native app's tree (369 of TextEdit's 370
+    # elements), and walking it was most of every tool call, so it is
+    # walked only for anchors that can live there.
     candidates: list[_Candidate] = []
-    for element, chain in _walk_with_chains(root, MAX_TREE_DEPTH):
+    for element, chain in _walk_with_chains(root, MAX_TREE_DEPTH, in_menu_bar(anchor)):
         score, breakdown = _score(anchor, chain)
         if score >= 0:
             candidates.append(_Candidate(element=element, chain=chain, score=score, breakdown=breakdown))

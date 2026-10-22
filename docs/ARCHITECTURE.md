@@ -251,8 +251,10 @@ Three things the first draft ignored and review demanded. They shape
 
 **Settle.** `AXUIElementPerformAction` returns when the action is dispatched,
 not when the UI has finished reacting. After every mutating op the runtime
-runs a settle loop: poll the affected subtree until its shape is stable for a
-quiet period or a per-step deadline passes. `wait_for` is a predicate over a
+runs a settle loop: poll the app's windows until their shape is stable for a
+quiet period or a per-step deadline passes. The menu bar is left out unless
+the step acted inside it; it is most of a native app's tree, and anchor
+resolution skips it on the same terms. `wait_for` is a predicate over a
 fresh snapshot (element exists, value matches, window appeared, modal gone)
 with an explicit timeout. Every element gets `AXUIElementSetMessagingTimeout`
 set low so a hung app fails in about a second instead of the six-second

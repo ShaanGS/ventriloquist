@@ -57,8 +57,12 @@ class ToolResult:
     values: list[str] = field(default_factory=list)  # read_value output, in step order
 
 
-def _shape_hash(element: Element, depth: int = SETTLE_DEPTH) -> int:
-    """A cheap fingerprint of the tree's current shape and values."""
+def _shape_hash(element: Element, depth: int = SETTLE_DEPTH, include_menus: bool = True) -> int:
+    """A cheap fingerprint of the tree's current shape and values.
+
+    With include_menus off, menu bar subtrees are left out, the same rule
+    anchor resolution follows for anchors that cannot live in one.
+    """
     parts: list[str] = []
     path_keys: set[int] = set()
 
@@ -66,9 +70,12 @@ def _shape_hash(element: Element, depth: int = SETTLE_DEPTH) -> int:
         key = el.ref_key() if hasattr(el, "ref_key") else None
         if key is not None and key in path_keys:
             return
+        role = el.role
+        if not include_menus and role == "AXMenuBar":
+            return
         if key is not None:
             path_keys.add(key)
-        parts.append(f"{el.role}|{el.label}|{el.value}")
+        parts.append(f"{role}|{el.label}|{el.value}")
         if d < depth:
             for child in el.children():
                 visit(child, d + 1)
@@ -79,7 +86,7 @@ def _shape_hash(element: Element, depth: int = SETTLE_DEPTH) -> int:
     return hash("\n".join(parts))
 
 
-def settle(root: Element, deadline_s: float) -> str:
+def settle(root: Element, deadline_s: float, include_menus: bool = True) -> str:
     """Wait for the tree to react to an op and then go quiet.
 
     Returns "settled" when a change was observed and the tree then held
@@ -89,9 +96,13 @@ def settle(root: Element, deadline_s: float) -> str:
     real checks. The distinction is reported so a probe that concludes
     "this button does nothing" can be told apart from one that acted too
     early, a confusion the design review flagged.
+
+    The runtime turns include_menus off unless the step acted inside a menu
+    bar. Fingerprinting TextEdit's menu bar on every poll took 0.15 to 0.7
+    seconds and was most of a write's time.
     """
     deadline = time.monotonic() + deadline_s
-    baseline = _shape_hash(root)
+    baseline = _shape_hash(root, include_menus=include_menus)
     changed = False
     last = baseline
     quiet_since = time.monotonic()
@@ -99,7 +110,7 @@ def settle(root: Element, deadline_s: float) -> str:
 
     while time.monotonic() < deadline:
         time.sleep(SETTLE_POLL_S)
-        current = _shape_hash(root)
+        current = _shape_hash(root, include_menus=include_menus)
         if current != last:
             changed = True
             last = current
@@ -250,7 +261,7 @@ def _run_step(
             subprocess.run(["open", "-b", pack.bundle_id], check=True, timeout=15)
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
             raise ToolExecutionError(f"{where}: could not open {pack.bundle_id}: {exc}") from exc
-        detail = settle(root, step.timeout_s)
+        detail = settle(root, step.timeout_s, include_menus=False)
         return StepReport(op=step.op, ok=True, detail=detail)
 
     if step.op == "raise_window":
@@ -262,7 +273,7 @@ def _run_step(
         if target is None:
             raise ToolExecutionError(f"{where}: app has no windows to raise")
         target.perform("AXRaise")
-        settle(root, step.timeout_s)
+        settle(root, step.timeout_s, include_menus=False)
         return StepReport(op=step.op, ok=True)
 
     if step.anchor is None:
@@ -307,7 +318,11 @@ def _run_step(
     if step.op in ("press", "set_value", "pick"):
         _pump_tree(element)
 
-    detail = settle(root, step.timeout_s) if step.settle else "settle skipped"
+    detail = (
+        settle(root, step.timeout_s, include_menus=anchors.in_menu_bar(step.anchor))
+        if step.settle
+        else "settle skipped"
+    )
     return StepReport(op=step.op, ok=True, detail=detail)
 
 

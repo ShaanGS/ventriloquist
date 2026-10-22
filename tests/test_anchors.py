@@ -11,7 +11,7 @@ import pytest
 from vent import anchors
 from vent.snapshot import snapshot
 
-from .fakes import FakeElement, notes_like, textedit_like
+from .fakes import FakeElement, GuardedElement, notes_like, textedit_like, textedit_with_menus
 
 
 def anchor_for(tree: FakeElement, **match) -> anchors.Anchor:
@@ -243,3 +243,30 @@ def test_twins_inside_the_focused_window_still_refuse():
     anchor.window_title = ""
     with pytest.raises((anchors.AnchorAmbiguous, anchors.AnchorLost)):
         anchors.resolve(tree, anchor)
+
+
+def test_window_anchor_never_walks_the_menu_bar():
+    """The menu bar was 369 of TextEdit's 370 elements, and walking it was
+    most of every tool call. An anchor recorded in a window can't live
+    there, so resolution must not descend into it."""
+    tree = textedit_like()
+    tree._children.append(GuardedElement("AXMenuBar"))
+    anchor = anchor_for(tree, identifier="doc-body")
+    assert not anchors.in_menu_bar(anchor)
+    assert anchors.resolve(tree, anchor).value == "hello"
+
+
+def test_menu_bar_anchor_still_resolves():
+    tree = textedit_with_menus()
+    node = next(n for n in snapshot(tree, include_menus=True).nodes if n.label == "New")
+    anchor = anchors.build(node)
+    assert anchors.in_menu_bar(anchor)
+    assert anchors.resolve(tree, anchor).label == "New"
+
+
+def test_anchor_without_a_chain_still_searches_menus():
+    """A hand-built anchor records no chain, so nothing rules the menu bar out."""
+    tree = textedit_with_menus()
+    anchor = anchors.Anchor("AXMenuItem", "menu-new", ["New"], "", [])
+    assert anchors.in_menu_bar(anchor)
+    assert anchors.resolve(tree, anchor).label == "New"

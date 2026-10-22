@@ -10,7 +10,7 @@ from vent.packs import Pack, PackError, Step, ToolSpec, Verify
 from vent.server import risk_refusal
 from vent.snapshot import VALUE_PREVIEW_LIMIT, snapshot
 
-from .fakes import FakeElement, TickingElement, textedit_like
+from .fakes import FakeElement, GuardedElement, TickingElement, textedit_like, textedit_with_menus
 
 
 def build_write_tool(tree) -> Pack:
@@ -268,3 +268,49 @@ def test_acting_on_a_drifted_element_is_refused():
     # Reading a drifted element stays permitted; the caller can judge data.
     result = runtime.execute(pack, "read_document", {}, tree)
     assert result.ok
+
+
+def test_write_never_walks_the_menu_bar():
+    """Resolve, settle and verify each crawled the menu bar on every call,
+    which in TextEdit was 369 of 370 elements and most of a write's time."""
+    tree = textedit_like()
+    tree._children.append(GuardedElement("AXMenuBar"))
+    pack = build_write_tool(tree)
+    result = runtime.execute(pack, "write_document", {"text": "fast now"}, tree)
+    assert result.ok
+    assert doc_body(tree).value == "fast now"
+
+
+def test_settle_ignores_menu_bar_churn_unless_asked():
+    tree = textedit_like()
+    tree._children.append(
+        FakeElement("AXMenuBar", children=[TickingElement("AXMenuItem", value="x", ticks=10_000)])
+    )
+    # A menu item that never stops changing must not hold a window step...
+    assert runtime.settle(tree, deadline_s=1.0, include_menus=False) == "no_reaction"
+    # ...but a step that acted inside the menu bar still watches it.
+    assert runtime.settle(tree, deadline_s=0.5, include_menus=True) == "timeout"
+
+
+def test_only_menu_bar_steps_settle_on_the_menu_bar(monkeypatch):
+    seen = []
+
+    def recording_settle(root, deadline_s, include_menus=True):
+        seen.append(include_menus)
+        return "settled"
+
+    monkeypatch.setattr(runtime, "settle", recording_settle)
+    tree = textedit_with_menus()
+    runtime.execute(build_write_tool(tree), "write_document", {"text": "hi"}, tree)
+
+    menu_node = next(n for n in snapshot(tree, include_menus=True).nodes if n.label == "New")
+    new_document = ToolSpec(
+        name="new_document",
+        description="Open a new document.",
+        risk="mutating",
+        steps=[Step(op="press", anchor=anchors.build(menu_node))],
+    )
+    menu_pack = Pack(bundle_id="com.apple.TextEdit", app_name="TextEdit", tools=[new_document])
+    runtime.execute(menu_pack, "new_document", {}, tree)
+
+    assert seen == [False, True]

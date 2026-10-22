@@ -77,6 +77,14 @@ class FakeElement:
         return f"<FakeElement {self.role} {self.label!r}>"
 
 
+class GuardedElement(FakeElement):
+    """A fake that fails the test if anything lists its children. Stands in
+    for a menu bar that a walk is supposed to skip."""
+
+    def children(self) -> list[FakeElement]:
+        raise AssertionError(f"{self!r} was walked")
+
+
 class TickingElement(FakeElement):
     """A fake whose value reads differently for the first `ticks` reads,
     then holds still. Lets settle() tests exercise the change-then-quiet
@@ -120,6 +128,34 @@ def textedit_like() -> FakeElement:
             ),
         ],
     )
+
+
+def textedit_with_menus() -> FakeElement:
+    """textedit_like plus a menu bar holding File > New, listed next to the
+    window the way real apps list theirs."""
+    tree = textedit_like()
+    tree._children.append(
+        FakeElement(
+            "AXMenuBar",
+            children=[
+                FakeElement(
+                    "AXMenuBarItem",
+                    "File",
+                    children=[
+                        FakeElement(
+                            "AXMenu",
+                            children=[
+                                FakeElement(
+                                    "AXMenuItem", "New", identifier="menu-new", actions=["AXPress"]
+                                ),
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        )
+    )
+    return tree
 
 
 def notes_like() -> FakeElement:

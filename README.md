@@ -15,9 +15,9 @@
 Ventriloquist learns a Mac app once through the macOS accessibility API
 and keeps the actions worth having as typed tools, like
 `textedit_write_document` or `slack_filter_channels`. Your agent calls
-them over MCP, and every call replays the recorded steps: no screenshots,
-no vision model, about 85 ms for a read. The agent still decides which
-tool to call. It never decides where to click.
+them over MCP, and every call replays the recorded steps: no screenshots
+and no vision model. The agent still decides which tool to call. It never
+decides where to click.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/ShaanGS/ventriloquist/main/docs/demo.gif" width="900" alt="An agent calls vent's tools: VS Code opens its Search view and searches the repo for refuse, then a note appears in TextEdit. Nobody touches the mouse.">
@@ -140,11 +140,12 @@ Most computer-use agents are interpreters. A model looks at your screen
 and decides every single click, every time, which is slow and expensive
 and breaks in weird ways. This is the compiler version of that. You pay
 the model cost once during exploration and get back tools like
-`write_document(text)`. Calling them later costs no model tokens and takes
-well under a second: on the author's Mac a read takes about 85 ms and a
-write about 0.9 s, most of it spent waiting for the app to settle. When an
-app update breaks a recorded action, a model is brought back in to fix it,
-but the fix sits in quarantine until you approve it.
+`write_document(text)`. Calling them later costs no model tokens. On the
+author's Mac, a TextEdit read takes about half a second end to end through
+Claude Code, about 150 ms of it inside vent. A write takes about 1.5 s,
+much of it spent waiting for the app to settle. When an app update breaks
+a recorded action, a model is brought back in to fix it, but the fix sits
+in quarantine until you approve it.
 
 The top half of the diagram runs once per app and is where the model
 earns its keep, with a policy screening every probe and a human approving
