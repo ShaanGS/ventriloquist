@@ -2,10 +2,10 @@
 
 > Turn a Mac app into an MCP server using the macOS accessibility API. An agent
 > explores the app once, the useful actions are compiled into a JSON "pack" of
-> typed tools, and after that each tool call is a deterministic replay that
-> takes milliseconds. No model runs per UI step and none runs on the serving
-> path; the client model composing tool calls is the only model in a workflow.
-> No screenshots, no vision, no pixel coordinates anywhere in the codebase.
+> typed tools, and after that each tool call is a deterministic replay. No
+> model runs per UI step and none runs on the serving path; the client model
+> composing tool calls is the only model in a workflow. No screenshots, no
+> vision, no pixel coordinates anywhere in the codebase.
 
 This file is the whole project explained in one place, written for both people
 and language models. The repo is https://github.com/ShaanGS/ventriloquist. The
@@ -13,16 +13,16 @@ package is `vent`, the CLI is `vent`, the language is Python 3.11+, macOS only.
 
 ## The idea in one paragraph
 
-Computer-use agents today are interpreters: a model looks at the screen and
-decides every click, every time, which is slow, expensive, and flaky.
-Ventriloquist is the compiler version. You pay the model cost once, during a
-guarded exploration of the app's accessibility tree. What comes out is a pack
-of typed tools like `write_document(text)` or `search_workspace(query)`, each
-backed by recorded accessibility actions with durable element anchors. Serving
-those tools over MCP requires no model, no network, and no vision. When an app
-update breaks a recorded anchor, a model is brought back for one job only:
-re-ground the anchor. The fix is quarantined and nothing changes on disk until
-a human approves it through `vent verify`.
+Computer-use agents today are interpreters: a model looks at the app and
+decides every action, every time, so every run pays again for screenshots and
+model decisions. Ventriloquist is the compiler version. You pay the model cost
+once, during a guarded exploration of the app's accessibility tree. What comes
+out is a pack of typed tools like `write_document(text)` or
+`search_workspace(query)`, each backed by recorded accessibility actions with
+durable element anchors. Serving those tools over MCP requires no model, no
+network, and no vision. When an app update breaks a recorded anchor, a model
+is brought back for one job only: re-ground the anchor. The fix is quarantined
+and nothing changes on disk until a human approves it through `vent verify`.
 
 ## Why the accessibility tree
 

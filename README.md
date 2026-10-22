@@ -136,13 +136,19 @@ of [docs/ARCHITECTURE.md](https://github.com/ShaanGS/ventriloquist/blob/main/doc
 
 ![Architecture](https://raw.githubusercontent.com/ShaanGS/ventriloquist/main/docs/architecture.svg)
 
-Most computer-use agents are interpreters. A model looks at your screen
-and decides every single click, every time, which is slow and expensive
-and breaks in weird ways. This is the compiler version of that. You pay
-the model cost once during exploration and get back tools like
-`write_document(text)`. Calling them later costs no model tokens. On the
-author's Mac, through Claude Code, a TextEdit read takes about half a
-second end to end and a write about 1.1 s. Measured with a plain MCP
+Most computer-use agents are interpreters. A model looks at your app and
+decides every action, every time. That works on any app with no setup,
+and on a simple task it's no slower than vent: in a TextEdit test,
+Claude's computer use needed the same two tool calls and about the same
+total time. But every run pays again for screenshots and model decisions.
+This is the compiler version. You pay the model cost once during
+exploration and get back tools like `write_document(text)`, which run no
+model on vent's side. In that TextEdit test, vent added about 6x fewer
+tokens to the agent's context per task, because it returns text instead
+of screenshots.
+
+On the author's Mac, through Claude Code, a TextEdit read takes about half
+a second end to end and a write about 1.1 s. Measured with a plain MCP
 client, vent's own share is about 0.1 s for a read and 0.5 s for a write.
 When an app update breaks a recorded action, a model is brought back in to
 fix it, but the fix sits in quarantine until you approve it.
@@ -160,10 +166,11 @@ driving apps, if you're careful about how you find elements again later.
 
 ## How it compares
 
-- **Screenshot computer use** (the computer-use features in Claude and
-  Codex, and most open-source agents): a model looks at the screen and
-  picks every action. It works on any app, and every step costs a model
-  call.
+- **Built-in computer use** (the computer-use features in Claude and
+  Codex, and most open-source agents): a model looks at the app, through
+  screenshots and, in Claude's case, the accessibility tree too, and picks
+  the actions on every run. It works on any app with no setup, and each
+  run pays for those screenshots and model decisions.
 - **Accessibility MCP servers** such as
   [Peekaboo](https://github.com/openclaw/Peekaboo) and
   [MacOS-MCP](https://github.com/CursorTouch/MacOS-MCP): they hand the
@@ -175,7 +182,7 @@ driving apps, if you're careful about how you find elements again later.
 - **Ventriloquist**: the model works once, while you record. What gets
   served is a fixed set of tools you approved, replayed with no model.
   It covers fewer apps than any of the above, by design, and in exchange
-  calls are cheap, fast, and the same every time. The closest idea
+  calls are cheap in tokens and the same every time. The closest idea
   elsewhere is [terminator](https://github.com/mediar-ai/terminator),
   which records workflows as deterministic code on Windows.
 
