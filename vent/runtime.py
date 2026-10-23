@@ -23,6 +23,7 @@ from typing import Any, Callable, Optional
 from . import anchors, ax
 from .ax import Element
 from .packs import Pack, Step, ToolSpec, Verify
+from .snapshot import MAX_TREE_DEPTH, SECURE_SUBROLE
 
 # Settle tuning. After a mutating op the loop waits for the tree to change
 # and then go quiet. An op whose effect never appears is reported, not
@@ -222,6 +223,54 @@ def _pump_tree(element: Element) -> None:
         pass
 
 
+# Cap on text a read gathers from inside a container, so one long page
+# can't flood the caller's context.
+READ_TEXT_LIMIT = 20_000
+
+
+def _text_inside(element: Element) -> str:
+    """The text an element holds in its descendants, one line per text run.
+
+    Web views report an empty AXValue for the whole page and keep the words
+    in static text below it: Outlook's reading pane is an AXWebArea whose
+    value is "" while the email body sits in AXStaticText nodes. A read of
+    such a container returns those runs in tree order. A static text's own
+    children repeat its words, so the walk stops at it; secure fields are
+    never entered (SECURITY.md T4), and the ancestor-cycle guard matches the
+    other walks.
+    """
+    lines: list[str] = []
+    total = 0
+    path_keys: set[int] = set()
+
+    def visit(el: Element, depth: int) -> bool:
+        nonlocal total
+        if el.subrole == SECURE_SUBROLE:
+            return True
+        if el.role == "AXStaticText":
+            text = el.value
+            if isinstance(text, str) and text.strip():
+                lines.append(text.strip())
+                total += len(text)
+                return total < READ_TEXT_LIMIT
+        key = el.ref_key() if hasattr(el, "ref_key") else None
+        if (key is not None and key in path_keys) or depth >= MAX_TREE_DEPTH:
+            return True
+        if key is not None:
+            path_keys.add(key)
+        try:
+            for child in el.children():
+                if not visit(child, depth + 1):
+                    return False
+        finally:
+            if key is not None:
+                path_keys.discard(key)
+        return True
+
+    visit(element, 0)
+    return "\n".join(lines)[:READ_TEXT_LIMIT]
+
+
 def _as_element(ref: Any) -> Element:
     """Wrap a raw AX reference, passing through anything already
     element-shaped (real Elements, or the fakes the test suite uses)."""
@@ -308,6 +357,8 @@ def _run_step(
 
     if step.op == "read_value":
         value = "" if element.value is None else str(element.value)
+        if not value:
+            value = _text_inside(element)
         return StepReport(op=step.op, ok=True, detail=value)
 
     include_menus = anchors.in_menu_bar(step.anchor)

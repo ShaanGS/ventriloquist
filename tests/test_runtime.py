@@ -64,6 +64,74 @@ def test_read_value_returns_live_content():
     assert result.values == ["hello"]
 
 
+def reading_pane_like(*pane_children) -> FakeElement:
+    """An app whose reading pane is a web view, shaped like Outlook's: the
+    web area's own value is empty and the words sit in static text below."""
+    default = [
+        FakeElement("AXGroup", children=[FakeElement("AXStaticText", value="Your order has shipped.")]),
+        FakeElement(
+            "AXGroup",
+            children=[
+                FakeElement("AXStaticText", value="Get"),
+                FakeElement(
+                    "AXLink",
+                    label="Outlook for Mac",
+                    actions=["AXPress"],
+                    children=[FakeElement("AXStaticText", value="Outlook for Mac")],
+                ),
+            ],
+        ),
+    ]
+    pane = FakeElement("AXWebArea", label="Reading Pane", value="", children=list(pane_children) or default)
+    return FakeElement("AXApplication", label="Outlook", children=[FakeElement("AXWindow", children=[pane])])
+
+
+def read_pane(tree) -> list[str]:
+    pane = next(n for n in snapshot(tree).nodes if n.role == "AXWebArea")
+    tool = ToolSpec(
+        name="read_pane",
+        description="Read the reading pane.",
+        risk="read_only",
+        steps=[Step(op="read_value", anchor=anchors.build(pane), expect={"role": "AXWebArea"})],
+    )
+    pack = Pack(bundle_id="com.microsoft.Outlook", app_name="Outlook", tools=[tool])
+    return runtime.execute(pack, "read_pane", {}, tree).values
+
+
+def test_read_value_collects_the_text_inside_a_web_view():
+    assert read_pane(reading_pane_like()) == ["Your order has shipped.\nGet\nOutlook for Mac"]
+
+
+def test_read_value_does_not_repeat_nested_text():
+    # Outlook's header line "Recipients: To: ..." is a static text whose own
+    # children repeat its words; the read returns them once.
+    header = FakeElement(
+        "AXStaticText",
+        value="To: someone@example.com",
+        children=[FakeElement("AXStaticText", value="To:")],
+    )
+    assert read_pane(reading_pane_like(header)) == ["To: someone@example.com"]
+
+
+def test_read_value_skips_secure_fields_and_cuts_cycles():
+    secret = FakeElement(
+        "AXTextField",
+        subrole="AXSecureTextField",
+        children=[FakeElement("AXStaticText", value="hunter2")],
+    )
+    loop = FakeElement("AXGroup")
+    loop._children = [loop, FakeElement("AXStaticText", value="after the loop")]
+    assert read_pane(reading_pane_like(secret, loop)) == ["after the loop"]
+
+
+def test_read_value_caps_text_gathered_from_a_container():
+    long_run = FakeElement("AXStaticText", value="x" * (runtime.READ_TEXT_LIMIT + 500))
+    tail = FakeElement("AXStaticText", value="never reached")
+    [text] = read_pane(reading_pane_like(long_run, tail))
+    assert len(text) == runtime.READ_TEXT_LIMIT
+    assert "never reached" not in text
+
+
 def test_long_values_verify_against_live_reads_not_previews():
     tree = textedit_like()
     pack = build_write_tool(tree)
