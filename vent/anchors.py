@@ -41,7 +41,7 @@ from difflib import SequenceMatcher
 from typing import Iterator, Optional
 
 from .ax import Element
-from .snapshot import MAX_TREE_DEPTH, ChainLink, Node
+from .snapshot import MAX_TREE_DEPTH, ChainLink, Node, app_children
 
 
 class AnchorLost(RuntimeError):
@@ -150,6 +150,8 @@ def _walk_with_chains(
     With include_menus off, menu bar subtrees are skipped wherever they
     appear, the rule snapshot applies by default. Indices still count the
     skipped menu bars, so chains line up with a snapshot's link for link.
+    The root's children come from app_children, as in a snapshot, so a
+    window on another Space is still searched.
     """
 
     # Ancestor-path cycle guard, not a global visited set: AX trees are
@@ -168,7 +170,8 @@ def _walk_with_chains(
             if depth >= max_depth:
                 return
             role_counts: dict[str, int] = {}
-            for index, child in enumerate(element.children()):
+            children = app_children(element) if depth == 0 else element.children()
+            for index, child in enumerate(children):
                 role = child.role
                 ordinal = role_counts.get(role, 0)
                 role_counts[role] = ordinal + 1
@@ -390,11 +393,12 @@ def _settle_by_focused_window(
 
 
 def _focused_window_index(root: Element) -> Optional[int]:
-    """Position of the app's focused window among the root's children."""
+    """Position of the app's focused window among the root's children,
+    counted the way the walk counts them."""
     focused = root.attribute("AXFocusedWindow")
     if focused is None:
         return None
-    for index, child in enumerate(root.children()):
+    for index, child in enumerate(app_children(root)):
         if child.wraps(focused):
             return index
     return None

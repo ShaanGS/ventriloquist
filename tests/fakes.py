@@ -33,14 +33,17 @@ class FakeElement:
         self._identifier = identifier
         self._actions = actions or []
         self._children = children or []
-        # Set on an app root to mark one of its windows focused.
+        # Set on an app root to mark one of its windows focused or main.
         self.focused_window: Optional["FakeElement"] = None
+        self.main_window: Optional["FakeElement"] = None
 
     def attribute(self, name: str) -> Any:
         if name == "AXIdentifier":
             return self._identifier or None
         if name == "AXFocusedWindow":
             return self.focused_window
+        if name == "AXMainWindow":
+            return self.main_window
         return None
 
     def actions(self) -> list[str]:
@@ -155,6 +158,18 @@ def textedit_with_menus() -> FakeElement:
             ],
         )
     )
+    return tree
+
+
+def on_another_space(tree: FakeElement) -> FakeElement:
+    """The same app with its window on another Space, as macOS shows it to
+    accessibility clients: the app lists only its menu bar and no windows,
+    but AXMainWindow and AXFocusedWindow still return the window. Seen on
+    Outlook and TextEdit."""
+    window = next(child for child in tree._children if child.role == "AXWindow")
+    tree._children = [child for child in tree._children if child.role != "AXWindow"]
+    tree.main_window = window
+    tree.focused_window = window
     return tree
 
 

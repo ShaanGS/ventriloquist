@@ -21,7 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from .ax import Element
+from .ax import Element, session_locked
 
 # Roles that are pure structure. Recursed through, never surfaced.
 CONTAINER_ROLES = {
@@ -110,6 +110,7 @@ class Snapshot:
     truncated: bool
     modal_present: bool
     focused_window_title: str
+    off_space: bool = False  # the app listed no window, so its main one was walked; see _unlisted_windows
 
 
 def _preview(value: Any) -> str:
@@ -125,18 +126,73 @@ def _identifier(element: Element) -> str:
     return str(element.attribute("AXIdentifier") or "")
 
 
-def _windows(root: Element) -> list[Element]:
+def _as_element(ref: Any) -> Element:
+    """Wrap a raw AX reference, passing through anything already
+    element-shaped (real Elements, or the fakes the test suite uses)."""
+    return ref if hasattr(ref, "attribute") else Element(ref)
+
+
+def _unlisted_windows(root: Element) -> list[Element]:
+    """The app's main and focused windows, for an app that lists none.
+
+    macOS shows accessibility clients only the windows on the current
+    Space. With an app's window on another desktop, or the user in a
+    full-screen app, AXWindows is empty and AXChildren holds only the menu
+    bar, but AXMainWindow and AXFocusedWindow still return the window.
+    Reads and writes through it work without switching Spaces. A press
+    there acts as in any app that isn't in front, sometimes flipping only
+    the button, which is what requires_frontmost is for. Found with
+    Outlook, confirmed on TextEdit. A hidden app and a minimized window
+    stay listed, so neither lands here. The app's other windows on other
+    Spaces stay out of reach.
+
+    A locked screen hides windows too. It is left looking empty, as
+    before, so nothing is read or done behind it.
+    """
+    if session_locked():
+        return []
+    found: list[Element] = []
+    for name in ("AXMainWindow", "AXFocusedWindow"):
+        ref = root.attribute(name)
+        if ref is None or any(window.wraps(ref) for window in found):
+            continue
+        window = _as_element(ref)
+        if window.role == "AXWindow":
+            found.append(window)
+    return found
+
+
+def _lists_windows(root: Element, children: list[Element]) -> bool:
+    return any(child.role == "AXWindow" for child in children) or bool(root.attribute("AXWindows"))
+
+
+def app_children(root: Element) -> list[Element]:
+    """The app root's children as every walk sees them.
+
+    When the app lists no window at all, its main and focused windows go
+    first, where a listed window sits, so a walk made while the window is
+    on another Space records the same chains as one made on its Space.
+    """
+    children = root.children()
+    if _lists_windows(root, children):
+        return children
+    return _unlisted_windows(root) + children
+
+
+def app_windows(root: Element) -> list[Element]:
     """Enumerate windows through AXWindows, the authoritative list.
 
     Falls back to AXChildren for app roots that do not report AXWindows.
     This exists because AXChildren alone misses windows in some states,
     which we learned the day TextEdit's file picker made the app root
-    look empty.
+    look empty. When neither lists a window, the main and focused windows
+    stand in (see _unlisted_windows).
     """
     raw = root.attribute("AXWindows")
     if raw:
-        return [Element(ref) for ref in raw]
-    return [child for child in root.children() if child.role == "AXWindow"]
+        return [_as_element(ref) for ref in raw]
+    listed = [child for child in root.children() if child.role == "AXWindow"]
+    return listed or _unlisted_windows(root)
 
 
 def _has_sheet(window: Element) -> bool:
@@ -207,7 +263,7 @@ def snapshot(
             )
 
         role_counts: dict[str, int] = {}
-        for index, child in enumerate(element.children()):
+        for index, child in enumerate(top_level if depth == 0 else element.children()):
             child_role = child.role
             ordinal = role_counts.get(child_role, 0)
             role_counts[child_role] = ordinal + 1
@@ -230,19 +286,25 @@ def snapshot(
         if key is not None:
             path_keys.discard(key)
 
-    # The app root itself.
+    # The app root itself. Its children follow app_children, spelled out
+    # here so the snapshot can say when the window came from outside the
+    # app's own list.
+    children = root.children()
+    unlisted = [] if _lists_windows(root, children) else _unlisted_windows(root)
+    top_level = unlisted + children
     root_link = ChainLink(role=root.role, label=root.label, identifier=_identifier(root), ordinal=0, index=0)
     visit(root, (root_link,), 0, 0)
 
-    windows = _windows(root)
+    windows = unlisted or app_windows(root)
     focused = root.attribute("AXFocusedWindow")
     focused_title = ""
     if focused is not None:
         # Look the focused window up among the windows already listed, the
-        # same identity check anchors.py uses; wrapping it afresh would make
-        # a fake tree call the live AX API.
+        # same identity check anchors.py uses. One that isn't listed (a
+        # locked screen hides them all) goes through _as_element, since
+        # wrapping a fake afresh would make it call the live AX API.
         match = next((w for w in windows if w.wraps(focused)), None)
-        focused_title = str((match or Element(focused)).title)
+        focused_title = str((match or _as_element(focused)).title)
     modal = any(_has_sheet(w) for w in windows)
 
     return Snapshot(
@@ -250,6 +312,7 @@ def snapshot(
         truncated=truncated,
         modal_present=modal,
         focused_window_title=focused_title,
+        off_space=bool(unlisted),
     )
 
 
@@ -275,6 +338,8 @@ def render(snap: Snapshot, redact_values: bool = False) -> str:
         cleaned = [" ".join(a.removeprefix("AX").split()) for a in node.actions]
         actions = f" [{','.join(c[:30] for c in cleaned)}]" if cleaned else ""
         lines.append(f"{indent}#{node.id} {node.role.removeprefix('AX')}{label}{ident}{value}{actions}")
+    if snap.off_space:
+        lines.append("(the window is on another Space, reached through the app's main window)")
     if snap.modal_present:
         lines.append("(a modal sheet is open)")
     if snap.truncated:

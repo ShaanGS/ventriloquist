@@ -92,7 +92,13 @@ A pruned, ordered list of the interesting elements in an app's accessibility
 tree at one moment. The snapshot contract, revised after review:
 
 - Windows are enumerated through `AXWindows` (with `AXChildren` fallback),
-  and the focused window is marked. Sheets and drawers (`AXSheets`,
+  and the focused window is marked. macOS lists only the windows on the
+  current Space, so an app whose window is on another Space lists none;
+  its `AXMainWindow` and `AXFocusedWindow` then stand in, placed where a
+  listed window would sit, and the snapshot says the window is on another
+  Space. Anchor resolution, settle and the runtime's window checks walk
+  the same children. A locked screen is left looking empty. Sheets and
+  drawers (`AXSheets`,
   `AXDrawers`) are always descended, and the snapshot reports whether a modal
   is present, because a modal changes what every other element means.
 - Every surfaced node records its full ancestor chain (role, label,
@@ -269,7 +275,9 @@ seam (the settle loop is one function).
 frontmost, and activating an app steals focus from whatever the user is
 doing, which can send their keystrokes somewhere they did not intend. So:
 each ToolSpec declares `requires_frontmost`; when true, the runtime activates
-the app, runs the tool, and restores the previously frontmost app after. The
+the app, runs the tool, and restores the previously frontmost app after.
+When the app's window is on another Space, activating it switches the
+display to that Space and restoring the previous app switches back. The
 server exposes a "do not steal focus" mode that queues frontmost-requiring
 tools until the machine is idle or the user allows it.
 

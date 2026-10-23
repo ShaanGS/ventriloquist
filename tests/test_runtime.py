@@ -10,7 +10,14 @@ from vent.packs import Pack, PackError, Step, ToolSpec, Verify
 from vent.server import risk_refusal
 from vent.snapshot import VALUE_PREVIEW_LIMIT, snapshot
 
-from .fakes import FakeElement, GuardedElement, TickingElement, textedit_like, textedit_with_menus
+from .fakes import (
+    FakeElement,
+    GuardedElement,
+    TickingElement,
+    on_another_space,
+    textedit_like,
+    textedit_with_menus,
+)
 
 
 def build_write_tool(tree) -> Pack:
@@ -421,3 +428,86 @@ def test_press_waits_for_a_reaction_beyond_its_own_state():
     result = runtime.execute(pack, "toggle_bold", {}, tree)
     assert toggle.value == 1
     assert result.steps[0].detail == "no_reaction"
+
+
+def test_tools_run_on_a_window_on_another_space():
+    """With its window on another Space, TextEdit lists no window, and
+    every tool failed with "no open window" though the document was open.
+    Reads and writes reach it through the app's main window instead."""
+    tree = textedit_like()
+    pack = build_write_tool(tree)
+    body = doc_body(tree)
+    on_another_space(tree)
+    result = runtime.execute(pack, "write_document", {"text": "written off-Space"}, tree)
+    assert result.ok
+    assert body.value == "written off-Space"
+    assert runtime.execute(pack, "read_document", {}, tree).values == ["written off-Space"]
+
+
+def test_settle_watches_a_window_on_another_space():
+    """A fingerprint of only what the app lists would miss the window, see
+    nothing change, and wait out the whole no-reaction window."""
+    tree = textedit_like()
+    pack = build_write_tool(tree)
+    pack.tools[0].steps[0].timeout_s = 2.0
+    on_another_space(tree)
+    result = runtime.execute(pack, "write_document", {"text": "settled text"}, tree)
+    assert result.steps[0].detail == "settled"
+
+
+def test_modal_sheet_on_another_space_still_blocks_execution():
+    tree = textedit_like()
+    pack = build_write_tool(tree)
+    window = tree.children()[0]
+    sheet = FakeElement("AXSheet", "Save changes?")
+    window_attr = window.attribute
+
+    def attribute(name):
+        if name == "AXSheets":
+            return [sheet]
+        return window_attr(name)
+
+    window.attribute = attribute
+    on_another_space(tree)
+    with pytest.raises(runtime.ToolExecutionError, match="modal sheet is open"):
+        runtime.execute(pack, "write_document", {"text": "hi"}, tree)
+    assert window.children()[2].children()[0].value == "hello"
+
+
+def test_raise_window_reaches_a_window_on_another_space():
+    window = FakeElement("AXWindow", "untitled.txt", actions=["AXRaise"])
+    raised = []
+    window.perform = raised.append
+    tree = on_another_space(FakeElement("AXApplication", "TextEdit", children=[window]))
+    tool = ToolSpec(
+        name="raise",
+        description="Raise the document window.",
+        risk="read_only",
+        steps=[Step(op="raise_window", timeout_s=0.2)],
+    )
+    pack = Pack(bundle_id="com.apple.TextEdit", app_name="TextEdit", tools=[tool])
+    assert runtime.execute(pack, "raise", {}, tree).ok
+    assert raised == ["AXRaise"]
+
+
+def test_wait_for_nudges_a_web_area_on_another_space():
+    """Between polls, wait_for scrolls an element into view so a Chromium
+    host republishes its tree. With the window on another Space that
+    element has to be found through the main window, or the wait can only
+    time out."""
+    web = FakeElement("AXWebArea", "Slack", actions=["AXScrollToVisible"])
+    nudged = []
+    web.perform = nudged.append
+    window = FakeElement("AXWindow", "Slack", children=[FakeElement("AXGroup", children=[web])])
+    tree = on_another_space(FakeElement("AXApplication", "Slack", children=[window]))
+    missing = anchors.Anchor("AXButton", "", ["Later"], "", [])
+    tool = ToolSpec(
+        name="wait",
+        description="Wait for a button that never appears.",
+        risk="read_only",
+        steps=[Step(op="wait_for", anchor=missing, timeout_s=0.4)],
+    )
+    pack = Pack(bundle_id="com.tinyspeck.slackmacgap", app_name="Slack", tools=[tool])
+    with pytest.raises(runtime.ToolExecutionError, match="did not appear"):
+        runtime.execute(pack, "wait", {}, tree)
+    assert "AXScrollToVisible" in nudged

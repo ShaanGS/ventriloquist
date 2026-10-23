@@ -90,6 +90,12 @@ def doctor(app_name: str | None) -> None:
         click.secho(f"✓ Tree present, including {web_children} web area(s).", fg="green")
     else:
         click.secho("✓ Tree present.", fg="green")
+    if snap.off_space:
+        click.echo(
+            "  Its window is on another Space, so vent reached it through the "
+            "app's main window. Other windows the app has on other Spaces stay "
+            "out of reach until you switch to them."
+        )
 
 
 @main.command("harness")

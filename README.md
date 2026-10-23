@@ -254,13 +254,17 @@ does with caveats:
   Chromium apps need `--force-renderer-accessibility`. Anything drawn on
   a canvas (Figma's design surface, games) exposes its chrome and
   nothing inside.
-- **The app has to be running, with the window the tool expects, on the
-  Space you're using.** macOS only lists windows on the current Space to
-  accessibility clients, so while you're in a full-screen app or on
-  another desktop, vent sees the app as having no window. The Notes, VS
-  Code, Slack and Outlook tools bring their app to the front while they
-  run and hand focus back afterwards. A locked screen makes every app look
-  empty.
+- **The app has to be running, with the window the tool expects.** macOS
+  only lists windows on the current Space to accessibility clients, so
+  while you're in a full-screen app or on another desktop, vent goes
+  through the app's main window, which macOS still reports. Reading and
+  writing text work there without switching Spaces. A press in an app
+  that isn't in front can change the button and nothing else (TextEdit's
+  Bold does), so the Notes, VS Code, Slack and Outlook tools bring their
+  app to the front while they run and hand focus back afterwards,
+  switching Spaces if they need to. The app's other windows on other
+  Spaces stay out of reach, and so does the title bar of a full-screen
+  window. A locked screen makes every app look empty.
 - **Calls to one app run one at a time.** A GUI is one shared thing, so
   parallel calls against the same app queue.
 - **Preconditions are prose.** VS Code's `search_workspace` says to open

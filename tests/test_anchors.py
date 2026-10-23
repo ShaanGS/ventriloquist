@@ -9,9 +9,16 @@ the one failure mode this project must never have.
 import pytest
 
 from vent import anchors
-from vent.snapshot import snapshot
+from vent.snapshot import render, snapshot
 
-from .fakes import FakeElement, GuardedElement, notes_like, textedit_like, textedit_with_menus
+from .fakes import (
+    FakeElement,
+    GuardedElement,
+    notes_like,
+    on_another_space,
+    textedit_like,
+    textedit_with_menus,
+)
 
 
 def anchor_for(tree: FakeElement, **match) -> anchors.Anchor:
@@ -270,3 +277,57 @@ def test_anchor_without_a_chain_still_searches_menus():
     anchor = anchors.Anchor("AXMenuItem", "menu-new", ["New"], "", [])
     assert anchors.in_menu_bar(anchor)
     assert anchors.resolve(tree, anchor).label == "New"
+
+
+def test_window_on_another_space_is_walked_through_the_main_window():
+    """With its window on another Space, an app lists only its menu bar,
+    and doctor reported Outlook as "0 elements". The main window still
+    answers, so the walk goes through it, once even though it is also the
+    focused window, and records the chains a walk on its own Space would."""
+    tree = textedit_like()
+    tree._children.append(GuardedElement("AXMenuBar"))
+    on_another_space(tree)
+    snap = snapshot(tree)
+
+    on_its_space = snapshot(textedit_like())
+    assert [(n.role, n.value_preview) for n in snap.nodes] == [
+        (n.role, n.value_preview) for n in on_its_space.nodes
+    ]
+    body = next(n for n in snap.nodes if n.identifier == "doc-body")
+    assert anchors.build(body) == anchor_for(textedit_like(), identifier="doc-body")
+    assert snap.focused_window_title == "untitled.txt"
+    assert snap.off_space
+    assert "another Space" in render(snap)
+
+
+def test_anchor_resolves_after_its_window_moves_to_another_space():
+    tree = textedit_like()
+    anchor = anchor_for(tree, identifier="doc-body")
+    on_another_space(tree)
+    assert anchors.resolve(tree, anchor).value == "hello"
+
+
+def test_focus_settles_ties_between_windows_on_another_space():
+    """When the main and focused windows differ, both are walked, and the
+    focused one still settles a window-agnostic tie: its position has to be
+    counted the way the walk counts windows the app didn't list."""
+    app = two_document_app(focused=1)
+    anchor = window_agnostic_anchor(app)
+    first, second = app.children()
+    app._children = []
+    app.main_window = first
+    app.focused_window = second
+    assert anchors.resolve(app, anchor).value == "b"
+
+
+def test_a_locked_screen_still_looks_empty(monkeypatch):
+    """A locked screen hides windows the way another Space does. vent has
+    never read or acted behind it, and reaching for the main window must
+    not start now."""
+    monkeypatch.setattr("vent.snapshot.session_locked", lambda: True)
+    tree = textedit_like()
+    anchor = anchor_for(tree, identifier="doc-body")
+    on_another_space(tree)
+    assert snapshot(tree).nodes == []
+    with pytest.raises(anchors.AnchorLost):
+        anchors.resolve(tree, anchor)

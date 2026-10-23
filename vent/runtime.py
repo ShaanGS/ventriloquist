@@ -23,7 +23,7 @@ from typing import Any, Callable, Optional
 from . import anchors, ax
 from .ax import Element
 from .packs import Pack, Step, ToolSpec, Verify
-from .snapshot import MAX_TREE_DEPTH, SECURE_SUBROLE
+from .snapshot import MAX_TREE_DEPTH, SECURE_SUBROLE, app_children, app_windows
 
 # Settle tuning. After a mutating op the loop waits for the tree to change
 # and then go quiet. An op whose effect never appears is reported, not
@@ -62,7 +62,9 @@ def _shape_hash(element: Element, depth: int = SETTLE_DEPTH, include_menus: bool
     """A cheap fingerprint of the tree's current shape and values.
 
     With include_menus off, menu bar subtrees are left out, the same rule
-    anchor resolution follows for anchors that cannot live in one.
+    anchor resolution follows for anchors that cannot live in one. The
+    root's children come from app_children, so a window on another Space
+    is watched too.
     """
     parts: list[str] = []
     path_keys: set[int] = set()
@@ -78,7 +80,7 @@ def _shape_hash(element: Element, depth: int = SETTLE_DEPTH, include_menus: bool
             path_keys.add(key)
         parts.append(f"{role}|{el.label}|{el.value}")
         if d < depth:
-            for child in el.children():
+            for child in app_children(el) if d == 0 else el.children():
                 visit(child, d + 1)
         if key is not None:
             path_keys.discard(key)
@@ -189,16 +191,17 @@ def _pump_anywhere(root: Element) -> None:
     which in a Chromium host is the web area a few levels down. Bounded so
     a native app with no such element costs a quick no-op, not a crawl."""
     inspected = 0
-    for _, element in root.walk(max_depth=20):
-        inspected += 1
-        if inspected > 100:
-            return
-        try:
-            if "AXScrollToVisible" in element.actions():
-                element.perform("AXScrollToVisible")
+    for top in app_children(root):
+        for _, element in top.walk(max_depth=19):
+            inspected += 1
+            if inspected > 100:
                 return
-        except ax.AXError:
-            continue
+            try:
+                if "AXScrollToVisible" in element.actions():
+                    element.perform("AXScrollToVisible")
+                    return
+            except ax.AXError:
+                continue
 
 
 def _pump_tree(element: Element) -> None:
@@ -271,17 +274,9 @@ def _text_inside(element: Element) -> str:
     return "\n".join(lines)[:READ_TEXT_LIMIT]
 
 
-def _as_element(ref: Any) -> Element:
-    """Wrap a raw AX reference, passing through anything already
-    element-shaped (real Elements, or the fakes the test suite uses)."""
-    return ref if hasattr(ref, "attribute") else Element(ref)
-
-
 def _modal_open(root: Element) -> str:
     """Return the title of an open modal sheet, or empty if none."""
-    windows = root.attribute("AXWindows") or []
-    for ref in windows:
-        window = _as_element(ref)
+    for window in app_windows(root):
         if window.attribute("AXSheets"):
             return window.title or "an untitled window"
     return ""
@@ -324,14 +319,10 @@ def _run_step(
         return StepReport(op=step.op, ok=True, detail=detail)
 
     if step.op == "raise_window":
-        windows = root.attribute("AXWindows")
-        target = _as_element(windows[0]) if windows else None
-        if target is None:
-            children = [c for c in root.children() if c.role == "AXWindow"]
-            target = children[0] if children else None
-        if target is None:
+        windows = app_windows(root)
+        if not windows:
             raise ToolExecutionError(f"{where}: app has no windows to raise")
-        target.perform("AXRaise")
+        windows[0].perform("AXRaise")
         settle(root, step.timeout_s, include_menus=False)
         return StepReport(op=step.op, ok=True)
 
@@ -461,10 +452,7 @@ def execute(
                         f"{tool_name}: precondition failed, {pack.app_name} is not responding"
                     )
             elif pre["kind"] == "window_exists":
-                has_window = bool(root.attribute("AXWindows")) or any(
-                    c.role == "AXWindow" for c in root.children()
-                )
-                if not has_window:
+                if not app_windows(root):
                     raise ToolExecutionError(
                         f"{tool_name}: precondition failed, {pack.app_name} has no open window"
                     )

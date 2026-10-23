@@ -6,7 +6,9 @@ import json
 
 from click.testing import CliRunner
 
-from vent import __version__, cli
+from vent import __version__, cli, harness
+
+from .fakes import on_another_space, textedit_like
 
 
 def test_version_flag_reports_the_package_version():
@@ -58,3 +60,17 @@ def test_mcp_config_tells_claude_desktop_users_what_differs(monkeypatch):
     assert "Claude Desktop works differently" in result.stderr
     assert "while it is closed" in result.stderr
     assert "/opt/tools/python/bin/python3.14" in result.stderr
+
+
+def test_doctor_reaches_a_window_on_another_space(monkeypatch):
+    """Off its Space an app lists no window, and doctor called Outlook
+    "0 elements ... No usable tree" while it was open on another desktop."""
+    monkeypatch.setattr(cli.ax, "is_trusted", lambda: True)
+    monkeypatch.setattr(cli.ax, "find_app", lambda name: cli.ax.RunningApp("TextEdit", "com.apple.TextEdit", 1))
+    monkeypatch.setattr(cli.ax, "app_element", lambda app: on_another_space(textedit_like()))
+    monkeypatch.setattr(harness, "enable_web_accessibility", lambda root: None)
+    monkeypatch.setattr("time.sleep", lambda seconds: None)
+    result = CliRunner().invoke(cli.main, ["doctor", "TextEdit"])
+    assert result.exit_code == 0
+    assert "TextEdit: 4 elements" in result.output
+    assert "another Space" in result.output
