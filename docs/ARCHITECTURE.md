@@ -275,7 +275,8 @@ seam (the settle loop is one function).
 frontmost, and activating an app steals focus from whatever the user is
 doing, which can send their keystrokes somewhere they did not intend. So:
 each ToolSpec declares `requires_frontmost`; when true, the runtime activates
-the app, runs the tool, and restores the previously frontmost app after.
+the app, waits for it to report itself frontmost, runs the tool, and
+restores the previously frontmost app after.
 When the app's window is on another Space, activating it switches the
 display to that Space and restoring the previous app switches back. The
 server exposes a "do not steal focus" mode that queues frontmost-requiring

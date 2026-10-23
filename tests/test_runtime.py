@@ -511,3 +511,39 @@ def test_wait_for_nudges_a_web_area_on_another_space():
     with pytest.raises(runtime.ToolExecutionError, match="did not appear"):
         runtime.execute(pack, "wait", {}, tree)
     assert "AXScrollToVisible" in nudged
+
+
+def test_bring_to_front_waits_for_the_app_to_come_forward(monkeypatch):
+    """Activation lands a moment after it's asked for: from another Space
+    TextEdit reported itself frontmost after 0.13 s. A press sent before
+    then reaches a background app, where TextEdit's Bold flips the button
+    and leaves the text alone, so the runtime waits for AXFrontmost."""
+    reads_before_front = [3]
+    pressed = []
+
+    class App(FakeElement):
+        def attribute(self, name):
+            if name == "AXFrontmost":
+                if reads_before_front[0]:
+                    reads_before_front[0] -= 1
+                    return False
+                return True
+            return super().attribute(name)
+
+    bold = FakeElement("AXCheckBox", "bold", actions=["AXPress"])
+    bold.perform = lambda action="AXPress": pressed.append(reads_before_front[0] == 0)
+    tree = App("AXApplication", "TextEdit", children=[FakeElement("AXWindow", "notes.rtf", children=[bold])])
+    node = next(n for n in snapshot(tree).nodes if n.label == "bold")
+    tool = ToolSpec(
+        name="bold",
+        description="Press Bold.",
+        risk="mutating",
+        requires_frontmost=True,
+        steps=[Step(op="press", anchor=anchors.build(node), settle=False)],
+    )
+    pack = Pack(bundle_id="com.apple.TextEdit", app_name="TextEdit", tools=[tool])
+    monkeypatch.setattr(runtime.ax, "frontmost_app", lambda: None)
+    monkeypatch.setattr(runtime.ax, "activate", lambda app: True)
+    app = runtime.ax.RunningApp("TextEdit", "com.apple.TextEdit", 1)
+    assert runtime.execute(pack, "bold", {}, tree, app=app).ok
+    assert pressed == [True], "the press went out before the app came to the front"

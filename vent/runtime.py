@@ -34,6 +34,13 @@ SETTLE_QUIET_S = 0.15
 SETTLE_NO_REACTION_S = 0.6
 SETTLE_DEPTH = 6
 
+# Activation lands a moment after it's asked for. With its window on
+# another Space, TextEdit reported itself frontmost 0.13 s after the
+# request, while a tool's first press can go out about 0.1 s after it,
+# and a press that beats activation reaches a background app, which may
+# flip the button without acting on it.
+FRONTMOST_WAIT_S = 1.0
+
 HealFn = Callable[[anchors.Anchor, Element], Optional[anchors.Anchor]]
 
 
@@ -274,6 +281,24 @@ def _text_inside(element: Element) -> str:
     return "\n".join(lines)[:READ_TEXT_LIMIT]
 
 
+def _wait_frontmost(root: Element) -> None:
+    """Give an app just activated a moment to report itself frontmost.
+
+    Returns at once for an app already in front or one that doesn't
+    answer AXFrontmost, and after FRONTMOST_WAIT_S for one that never
+    comes forward, which then runs as it did before this wait existed.
+    Never raises: a busy app's error belongs to the step that meets it."""
+    deadline = time.monotonic() + FRONTMOST_WAIT_S
+    while time.monotonic() < deadline:
+        try:
+            frontmost = root.attribute("AXFrontmost")
+        except ax.AXError:
+            return
+        if frontmost is None or frontmost:
+            return
+        time.sleep(SETTLE_POLL_S)
+
+
 def _modal_open(root: Element) -> str:
     """Return the title of an open modal sheet, or empty if none."""
     for window in app_windows(root):
@@ -469,7 +494,8 @@ def execute(
     previous_front = None
     if tool.requires_frontmost and app is not None:
         previous_front = ax.frontmost_app()
-        ax.activate(app)
+        if ax.activate(app):
+            _wait_frontmost(root)
 
     try:
         result = ToolResult(ok=True, tool=tool_name)
