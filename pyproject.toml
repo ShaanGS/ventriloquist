@@ -54,3 +54,7 @@ path = "vent/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["vent"]
+
+[tool.hatch.build.targets.sdist]
+# README media is for GitHub; building vent from source doesn't need it.
+exclude = ["docs/*.gif", "docs/*.png", "docs/assets"]
