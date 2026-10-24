@@ -1,0 +1,1659 @@
+{
+  "format_version": 2,
+  "bundle_id": "com.microsoft.Outlook",
+  "app_name": "Outlook",
+  "app_version": "16.110.1",
+  "os_version": "26.3.1",
+  "locale": "C",
+  "tools": [
+    {
+      "name": "read_selected_message",
+      "description": "Read the email selected in Outlook's message list. Returns four values in order: the subject, the sender line (\"From: ...\"), when it arrived, and the body text.",
+      "risk": "read_only",
+      "requires_frontmost": false,
+      "params": {},
+      "preconditions": [
+        {
+          "kind": "app_running"
+        },
+        {
+          "kind": "window_exists"
+        }
+      ],
+      "steps": [
+        {
+          "op": "read_value",
+          "anchor": {
+            "role": "AXStaticText",
+            "identifier": "_NS:20",
+            "labels": [],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "OutlookWindow",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXSplitGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXSplitGroup",
+                "label": "",
+                "identifier": "_NS:48",
+                "ordinal": 0,
+                "index": 6,
+                "subrole": ""
+              },
+              {
+                "role": "AXSplitGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 2,
+                "subrole": ""
+              },
+              {
+                "role": "AXSplitGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "Message header",
+                "identifier": "HeaderMainContainer",
+                "ordinal": 1,
+                "index": 2,
+                "subrole": ""
+              },
+              {
+                "role": "AXStaticText",
+                "label": "",
+                "identifier": "_NS:20",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              }
+            ]
+          },
+          "expect": {
+            "role": "AXStaticText"
+          }
+        },
+        {
+          "op": "read_value",
+          "anchor": {
+            "role": "AXStaticText",
+            "identifier": "messageHeaderFromContent",
+            "labels": [
+              "messageHeaderFromContent"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "OutlookWindow",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXSplitGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXSplitGroup",
+                "label": "",
+                "identifier": "_NS:48",
+                "ordinal": 0,
+                "index": 6,
+                "subrole": ""
+              },
+              {
+                "role": "AXSplitGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 2,
+                "subrole": ""
+              },
+              {
+                "role": "AXSplitGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "Message header",
+                "identifier": "HeaderMainContainer",
+                "ordinal": 1,
+                "index": 2,
+                "subrole": ""
+              },
+              {
+                "role": "AXScrollArea",
+                "label": "Message Header Details",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXStaticText",
+                "label": "messageHeaderFromContent",
+                "identifier": "messageHeaderFromContent",
+                "ordinal": 0,
+                "index": 1,
+                "subrole": ""
+              }
+            ]
+          },
+          "expect": {
+            "role": "AXStaticText"
+          }
+        },
+        {
+          "op": "read_value",
+          "anchor": {
+            "role": "AXUnknown",
+            "identifier": "messageHeaderTimeStampContent",
+            "labels": [],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "OutlookWindow",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXSplitGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXSplitGroup",
+                "label": "",
+                "identifier": "_NS:48",
+                "ordinal": 0,
+                "index": 6,
+                "subrole": ""
+              },
+              {
+                "role": "AXSplitGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 2,
+                "subrole": ""
+              },
+              {
+                "role": "AXSplitGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "Message header",
+                "identifier": "HeaderMainContainer",
+                "ordinal": 1,
+                "index": 2,
+                "subrole": ""
+              },
+              {
+                "role": "AXScrollArea",
+                "label": "Message Header Details",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXUnknown",
+                "label": "",
+                "identifier": "messageHeaderTimeStampContent",
+                "ordinal": 0,
+                "index": 2,
+                "subrole": ""
+              }
+            ]
+          },
+          "expect": {
+            "role": "AXUnknown"
+          }
+        },
+        {
+          "op": "read_value",
+          "anchor": {
+            "role": "AXWebArea",
+            "identifier": "",
+            "labels": [
+              "Reading Pane"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "OutlookWindow",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXSplitGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXSplitGroup",
+                "label": "",
+                "identifier": "_NS:48",
+                "ordinal": 0,
+                "index": 6,
+                "subrole": ""
+              },
+              {
+                "role": "AXSplitGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 2,
+                "subrole": ""
+              },
+              {
+                "role": "AXSplitGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "Email Renderer View",
+                "ordinal": 2,
+                "index": 4,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXScrollArea",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWebArea",
+                "label": "Reading Pane",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              }
+            ]
+          },
+          "expect": {
+            "role": "AXWebArea"
+          }
+        }
+      ],
+      "verify": []
+    },
+    {
+      "name": "flag_message",
+      "description": "Flag the email selected in Outlook for follow-up, with no due date. Flag before filing, because after a move Outlook selects the next email. An email that is already flagged stays flagged. Brings Outlook to the front while it runs.",
+      "risk": "mutating",
+      "requires_frontmost": true,
+      "params": {},
+      "preconditions": [
+        {
+          "kind": "app_running"
+        },
+        {
+          "kind": "window_exists"
+        }
+      ],
+      "steps": [
+        {
+          "op": "wait_for",
+          "anchor": {
+            "role": "AXMenuItem",
+            "identifier": "handleRicherFlagMenuAction:",
+            "labels": [
+              "No Date"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuBar",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuBarItem",
+                "label": "Message",
+                "identifier": "",
+                "ordinal": 5,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenu",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuItem",
+                "label": "Flag",
+                "identifier": "richerFlagItemMenuValidation:",
+                "ordinal": 21,
+                "index": 21,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenu",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuItem",
+                "label": "No Date",
+                "identifier": "handleRicherFlagMenuAction:",
+                "ordinal": 4,
+                "index": 4,
+                "subrole": ""
+              }
+            ]
+          },
+          "timeout_s": 3.0
+        },
+        {
+          "op": "press",
+          "anchor": {
+            "role": "AXMenuItem",
+            "identifier": "handleRicherFlagMenuAction:",
+            "labels": [
+              "No Date"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuBar",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuBarItem",
+                "label": "Message",
+                "identifier": "",
+                "ordinal": 5,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenu",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuItem",
+                "label": "Flag",
+                "identifier": "richerFlagItemMenuValidation:",
+                "ordinal": 21,
+                "index": 21,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenu",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuItem",
+                "label": "No Date",
+                "identifier": "handleRicherFlagMenuAction:",
+                "ordinal": 4,
+                "index": 4,
+                "subrole": ""
+              }
+            ]
+          },
+          "expect": {
+            "role": "AXMenuItem"
+          }
+        }
+      ],
+      "verify": []
+    },
+    {
+      "name": "file_to_receipts",
+      "description": "Move the email selected in Outlook to the Receipts folder. Brings Outlook to the front while it runs and refuses unless exactly one folder matches \"Receipts\". Afterwards Outlook selects the next email in the list.",
+      "risk": "mutating",
+      "requires_frontmost": true,
+      "params": {},
+      "preconditions": [
+        {
+          "kind": "app_running"
+        },
+        {
+          "kind": "window_exists"
+        }
+      ],
+      "steps": [
+        {
+          "op": "wait_for",
+          "anchor": {
+            "role": "AXMenuItem",
+            "identifier": "handleRicherFlagMenuAction:",
+            "labels": [
+              "No Date"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuBar",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuBarItem",
+                "label": "Message",
+                "identifier": "",
+                "ordinal": 5,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenu",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuItem",
+                "label": "Flag",
+                "identifier": "richerFlagItemMenuValidation:",
+                "ordinal": 21,
+                "index": 21,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenu",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuItem",
+                "label": "No Date",
+                "identifier": "handleRicherFlagMenuAction:",
+                "ordinal": 4,
+                "index": 4,
+                "subrole": ""
+              }
+            ]
+          },
+          "timeout_s": 3.0
+        },
+        {
+          "op": "press",
+          "anchor": {
+            "role": "AXMenuItem",
+            "identifier": "chooseFolder:",
+            "labels": [
+              "Choose Folder..."
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuBar",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuBarItem",
+                "label": "Message",
+                "identifier": "",
+                "ordinal": 5,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenu",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuItem",
+                "label": "Move",
+                "identifier": "moveRecordsToFolderValidation:",
+                "ordinal": 27,
+                "index": 27,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenu",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuItem",
+                "label": "Choose Folder...",
+                "identifier": "chooseFolder:",
+                "ordinal": 2,
+                "index": 2,
+                "subrole": ""
+              }
+            ]
+          },
+          "expect": {
+            "role": "AXMenuItem"
+          },
+          "settle": false
+        },
+        {
+          "op": "wait_for",
+          "anchor": {
+            "role": "AXTextField",
+            "identifier": "_NS:165",
+            "labels": [
+              "search box"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "OutlookWindow",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXSheet",
+                "label": "",
+                "identifier": "_NS:198",
+                "ordinal": 0,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXTextField",
+                "label": "search box",
+                "identifier": "_NS:165",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXSearchField"
+              }
+            ]
+          },
+          "timeout_s": 3.0
+        },
+        {
+          "op": "set_value",
+          "anchor": {
+            "role": "AXTextField",
+            "identifier": "_NS:165",
+            "labels": [
+              "search box"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "OutlookWindow",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXSheet",
+                "label": "",
+                "identifier": "_NS:198",
+                "ordinal": 0,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXTextField",
+                "label": "search box",
+                "identifier": "_NS:165",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXSearchField"
+              }
+            ]
+          },
+          "value": {
+            "literal": "Receipts"
+          },
+          "expect": {
+            "role": "AXTextField"
+          }
+        },
+        {
+          "op": "wait_for",
+          "anchor": {
+            "role": "AXGroup",
+            "identifier": "_NS:8",
+            "labels": [],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "OutlookWindow",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXSheet",
+                "label": "",
+                "identifier": "_NS:198",
+                "ordinal": 0,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXScrollArea",
+                "label": "",
+                "identifier": "_NS:225",
+                "ordinal": 0,
+                "index": 3,
+                "subrole": ""
+              },
+              {
+                "role": "AXList",
+                "label": "Search Results",
+                "identifier": "_NS:185",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXUnknown",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "_NS:8",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              }
+            ]
+          },
+          "timeout_s": 2.0
+        },
+        {
+          "op": "press",
+          "anchor": {
+            "role": "AXButton",
+            "identifier": "_NS:216",
+            "labels": [
+              "Move"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "OutlookWindow",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXSheet",
+                "label": "",
+                "identifier": "_NS:198",
+                "ordinal": 0,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXButton",
+                "label": "Move",
+                "identifier": "_NS:216",
+                "ordinal": 1,
+                "index": 2,
+                "subrole": ""
+              }
+            ]
+          },
+          "expect": {
+            "role": "AXButton"
+          }
+        }
+      ],
+      "verify": []
+    },
+    {
+      "name": "file_to_meetings",
+      "description": "Move the email selected in Outlook to the Meetings folder. Brings Outlook to the front while it runs and refuses unless exactly one folder matches \"Meetings\". Afterwards Outlook selects the next email in the list.",
+      "risk": "mutating",
+      "requires_frontmost": true,
+      "params": {},
+      "preconditions": [
+        {
+          "kind": "app_running"
+        },
+        {
+          "kind": "window_exists"
+        }
+      ],
+      "steps": [
+        {
+          "op": "wait_for",
+          "anchor": {
+            "role": "AXMenuItem",
+            "identifier": "handleRicherFlagMenuAction:",
+            "labels": [
+              "No Date"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuBar",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuBarItem",
+                "label": "Message",
+                "identifier": "",
+                "ordinal": 5,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenu",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuItem",
+                "label": "Flag",
+                "identifier": "richerFlagItemMenuValidation:",
+                "ordinal": 21,
+                "index": 21,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenu",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuItem",
+                "label": "No Date",
+                "identifier": "handleRicherFlagMenuAction:",
+                "ordinal": 4,
+                "index": 4,
+                "subrole": ""
+              }
+            ]
+          },
+          "timeout_s": 3.0
+        },
+        {
+          "op": "press",
+          "anchor": {
+            "role": "AXMenuItem",
+            "identifier": "chooseFolder:",
+            "labels": [
+              "Choose Folder..."
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuBar",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuBarItem",
+                "label": "Message",
+                "identifier": "",
+                "ordinal": 5,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenu",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuItem",
+                "label": "Move",
+                "identifier": "moveRecordsToFolderValidation:",
+                "ordinal": 27,
+                "index": 27,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenu",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuItem",
+                "label": "Choose Folder...",
+                "identifier": "chooseFolder:",
+                "ordinal": 2,
+                "index": 2,
+                "subrole": ""
+              }
+            ]
+          },
+          "expect": {
+            "role": "AXMenuItem"
+          },
+          "settle": false
+        },
+        {
+          "op": "wait_for",
+          "anchor": {
+            "role": "AXTextField",
+            "identifier": "_NS:165",
+            "labels": [
+              "search box"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "OutlookWindow",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXSheet",
+                "label": "",
+                "identifier": "_NS:198",
+                "ordinal": 0,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXTextField",
+                "label": "search box",
+                "identifier": "_NS:165",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXSearchField"
+              }
+            ]
+          },
+          "timeout_s": 3.0
+        },
+        {
+          "op": "set_value",
+          "anchor": {
+            "role": "AXTextField",
+            "identifier": "_NS:165",
+            "labels": [
+              "search box"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "OutlookWindow",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXSheet",
+                "label": "",
+                "identifier": "_NS:198",
+                "ordinal": 0,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXTextField",
+                "label": "search box",
+                "identifier": "_NS:165",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXSearchField"
+              }
+            ]
+          },
+          "value": {
+            "literal": "Meetings"
+          },
+          "expect": {
+            "role": "AXTextField"
+          }
+        },
+        {
+          "op": "wait_for",
+          "anchor": {
+            "role": "AXGroup",
+            "identifier": "_NS:8",
+            "labels": [],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "OutlookWindow",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXSheet",
+                "label": "",
+                "identifier": "_NS:198",
+                "ordinal": 0,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXScrollArea",
+                "label": "",
+                "identifier": "_NS:225",
+                "ordinal": 0,
+                "index": 3,
+                "subrole": ""
+              },
+              {
+                "role": "AXList",
+                "label": "Search Results",
+                "identifier": "_NS:185",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXUnknown",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "_NS:8",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              }
+            ]
+          },
+          "timeout_s": 2.0
+        },
+        {
+          "op": "press",
+          "anchor": {
+            "role": "AXButton",
+            "identifier": "_NS:216",
+            "labels": [
+              "Move"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "OutlookWindow",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXSheet",
+                "label": "",
+                "identifier": "_NS:198",
+                "ordinal": 0,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXButton",
+                "label": "Move",
+                "identifier": "_NS:216",
+                "ordinal": 1,
+                "index": 2,
+                "subrole": ""
+              }
+            ]
+          },
+          "expect": {
+            "role": "AXButton"
+          }
+        }
+      ],
+      "verify": []
+    },
+    {
+      "name": "file_to_reading",
+      "description": "Move the email selected in Outlook to the Reading folder. Brings Outlook to the front while it runs and refuses unless exactly one folder matches \"Reading\". Afterwards Outlook selects the next email in the list.",
+      "risk": "mutating",
+      "requires_frontmost": true,
+      "params": {},
+      "preconditions": [
+        {
+          "kind": "app_running"
+        },
+        {
+          "kind": "window_exists"
+        }
+      ],
+      "steps": [
+        {
+          "op": "wait_for",
+          "anchor": {
+            "role": "AXMenuItem",
+            "identifier": "handleRicherFlagMenuAction:",
+            "labels": [
+              "No Date"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuBar",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuBarItem",
+                "label": "Message",
+                "identifier": "",
+                "ordinal": 5,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenu",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuItem",
+                "label": "Flag",
+                "identifier": "richerFlagItemMenuValidation:",
+                "ordinal": 21,
+                "index": 21,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenu",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuItem",
+                "label": "No Date",
+                "identifier": "handleRicherFlagMenuAction:",
+                "ordinal": 4,
+                "index": 4,
+                "subrole": ""
+              }
+            ]
+          },
+          "timeout_s": 3.0
+        },
+        {
+          "op": "press",
+          "anchor": {
+            "role": "AXMenuItem",
+            "identifier": "chooseFolder:",
+            "labels": [
+              "Choose Folder..."
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuBar",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 1,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuBarItem",
+                "label": "Message",
+                "identifier": "",
+                "ordinal": 5,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenu",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuItem",
+                "label": "Move",
+                "identifier": "moveRecordsToFolderValidation:",
+                "ordinal": 27,
+                "index": 27,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenu",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXMenuItem",
+                "label": "Choose Folder...",
+                "identifier": "chooseFolder:",
+                "ordinal": 2,
+                "index": 2,
+                "subrole": ""
+              }
+            ]
+          },
+          "expect": {
+            "role": "AXMenuItem"
+          },
+          "settle": false
+        },
+        {
+          "op": "wait_for",
+          "anchor": {
+            "role": "AXTextField",
+            "identifier": "_NS:165",
+            "labels": [
+              "search box"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "OutlookWindow",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXSheet",
+                "label": "",
+                "identifier": "_NS:198",
+                "ordinal": 0,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXTextField",
+                "label": "search box",
+                "identifier": "_NS:165",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXSearchField"
+              }
+            ]
+          },
+          "timeout_s": 3.0
+        },
+        {
+          "op": "set_value",
+          "anchor": {
+            "role": "AXTextField",
+            "identifier": "_NS:165",
+            "labels": [
+              "search box"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "OutlookWindow",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXSheet",
+                "label": "",
+                "identifier": "_NS:198",
+                "ordinal": 0,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXTextField",
+                "label": "search box",
+                "identifier": "_NS:165",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXSearchField"
+              }
+            ]
+          },
+          "value": {
+            "literal": "Reading"
+          },
+          "expect": {
+            "role": "AXTextField"
+          }
+        },
+        {
+          "op": "wait_for",
+          "anchor": {
+            "role": "AXGroup",
+            "identifier": "_NS:8",
+            "labels": [],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "OutlookWindow",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXSheet",
+                "label": "",
+                "identifier": "_NS:198",
+                "ordinal": 0,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXScrollArea",
+                "label": "",
+                "identifier": "_NS:225",
+                "ordinal": 0,
+                "index": 3,
+                "subrole": ""
+              },
+              {
+                "role": "AXList",
+                "label": "Search Results",
+                "identifier": "_NS:185",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXUnknown",
+                "label": "",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXGroup",
+                "label": "",
+                "identifier": "_NS:8",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              }
+            ]
+          },
+          "timeout_s": 2.0
+        },
+        {
+          "op": "press",
+          "anchor": {
+            "role": "AXButton",
+            "identifier": "_NS:216",
+            "labels": [
+              "Move"
+            ],
+            "window_title": "",
+            "chain": [
+              {
+                "role": "AXApplication",
+                "label": "Outlook",
+                "identifier": "",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": ""
+              },
+              {
+                "role": "AXWindow",
+                "label": "",
+                "identifier": "OutlookWindow",
+                "ordinal": 0,
+                "index": 0,
+                "subrole": "AXStandardWindow"
+              },
+              {
+                "role": "AXSheet",
+                "label": "",
+                "identifier": "_NS:198",
+                "ordinal": 0,
+                "index": 5,
+                "subrole": ""
+              },
+              {
+                "role": "AXButton",
+                "label": "Move",
+                "identifier": "_NS:216",
+                "ordinal": 1,
+                "index": 2,
+                "subrole": ""
+              }
+            ]
+          },
+          "expect": {
+            "role": "AXButton"
+          }
+        }
+      ],
+      "verify": []
+    }
+  ],
+  "healed_pending": []
+}

@@ -66,7 +66,9 @@ Everything lives in the `vent/` package. One file per concern:
   `pick`, `reveal`, `raise_window`, `open_app`, `wait_for`, `read_value`.
   There is deliberately no exec, no shell, no AppleScript, no arbitrary code.
   Loading validates everything and rejects unknown ops or risks. Saves are
-  atomic (temp file plus rename).
+  atomic (temp file plus rename). Packs that aren't bundled live in `examples/`;
+  `examples/outlook/` is the one from the README demo, and copying its
+  `pack.json` into `~/.ventriloquist/packs/com.microsoft.Outlook/` installs it.
 - `runtime.py`. Deterministic replay. For each step: resolve the anchor,
   assert the expected role, perform the action, then wait for the tree to
   settle (a shape-hash poll that distinguishes "reacted then went quiet" from

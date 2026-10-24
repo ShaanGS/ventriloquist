@@ -120,6 +120,10 @@ explains why.
 | VS Code | `show_explorer`, `show_search`, `show_source_control`, `search_workspace` | Launch VS Code with `--force-renderer-accessibility` |
 | Slack | `show_home`, `filter_channels` | Same flag as VS Code |
 
+The Outlook tools in the demo aren't bundled: they're tied to three test
+folders. They're in [examples/outlook](https://github.com/ShaanGS/ventriloquist/tree/main/examples/outlook)
+as a pack you can copy and adapt.
+
 Electron apps like VS Code and Slack only publish a working tree when
 started with that flag, for example
 `open -a "Visual Studio Code" --args --force-renderer-accessibility`.
@@ -233,8 +237,9 @@ does with caveats:
   Space you're using.** macOS only lists windows on the current Space to
   accessibility clients, so while you're in a full-screen app or on
   another desktop, vent sees the app as having no window. The Notes, VS
-  Code, and Slack tools bring their app to the front while they run and
-  hand focus back afterwards. A locked screen makes every app look empty.
+  Code, Slack and Outlook tools bring their app to the front while they
+  run and hand focus back afterwards. A locked screen makes every app look
+  empty.
 - **Calls to one app run one at a time.** A GUI is one shared thing, so
   parallel calls against the same app queue.
 - **Preconditions are prose.** VS Code's `search_workspace` says to open
