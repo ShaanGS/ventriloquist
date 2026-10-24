@@ -74,3 +74,21 @@ def test_doctor_reaches_a_window_on_another_space(monkeypatch):
     assert result.exit_code == 0
     assert "TextEdit: 4 elements" in result.output
     assert "another Space" in result.output
+
+
+def test_doctor_asks_for_a_window_when_the_app_has_none(monkeypatch):
+    """With its mail window closed, Outlook lists no window at all, and
+    doctor said it "cannot be packed yet" though it packs fine once a
+    window is open."""
+    tree = textedit_like()
+    tree._children.clear()
+    monkeypatch.setattr(cli.ax, "is_trusted", lambda: True)
+    monkeypatch.setattr(cli.ax, "session_locked", lambda: False)
+    monkeypatch.setattr(cli.ax, "find_app", lambda name: cli.ax.RunningApp("TextEdit", "com.apple.TextEdit", 1))
+    monkeypatch.setattr(cli.ax, "app_element", lambda app: tree)
+    monkeypatch.setattr(harness, "enable_web_accessibility", lambda root: None)
+    monkeypatch.setattr("time.sleep", lambda seconds: None)
+    result = CliRunner().invoke(cli.main, ["doctor", "TextEdit"])
+    assert result.exit_code == 1
+    assert "TextEdit is running but has no open window" in result.output
+    assert "cannot be packed" not in result.output

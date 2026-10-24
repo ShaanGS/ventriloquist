@@ -18,7 +18,7 @@ from pathlib import Path
 import click
 
 from . import __version__, anchors, ax, packs, paths, runtime
-from .snapshot import MAX_TREE_DEPTH, render, snapshot
+from .snapshot import MAX_TREE_DEPTH, app_windows, render, snapshot
 
 
 def _user_pack_path(bundle_id: str) -> Path:
@@ -67,6 +67,7 @@ def doctor(app_name: str | None) -> None:
         web_children = sum(
             1 for n in snap.nodes if n.role == "AXWebArea"
         )
+        windows = app_windows(root)
     except ax.AXError as exc:
         click.secho(str(exc), fg="red")
         sys.exit(1)
@@ -77,6 +78,12 @@ def doctor(app_name: str | None) -> None:
             click.secho(
                 "✗ The screen is locked. Every app serves an empty tree until "
                 "the session is unlocked; this says nothing about the app.",
+                fg="red",
+            )
+        elif not windows:
+            click.secho(
+                f"✗ {app.name} is running but has no open window. "
+                "Open one and run vent doctor again.",
                 fg="red",
             )
         else:
