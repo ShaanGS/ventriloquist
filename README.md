@@ -1,8 +1,9 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/ShaanGS/ventriloquist/main/docs/icon.svg" width="128" height="128" alt="Ventriloquist icon">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ShaanGS/ventriloquist/main/docs/assets/banner-dark.png">
+    <img src="https://raw.githubusercontent.com/ShaanGS/ventriloquist/main/docs/assets/banner-light.png" width="900" alt="Ventriloquist: lets AI use Mac apps. The pixel ventriloquist dummy icon beside a classic Mac menu of Outlook tools.">
+  </picture>
 </p>
-
-<h1 align="center">Ventriloquist</h1>
 
 <p align="center">
   Turn Mac apps into MCP tools your AI agent can call.
