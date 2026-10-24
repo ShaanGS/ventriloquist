@@ -142,14 +142,34 @@ of [docs/ARCHITECTURE.md](https://github.com/ShaanGS/ventriloquist/blob/main/doc
 
 Most computer-use agents are interpreters. A model looks at your app and
 decides every action, every time. That works on any app with no setup,
-and on a simple task it's no slower than vent: in a TextEdit test,
-Claude's computer use needed the same two tool calls and about the same
-total time. But every run pays again for screenshots and model decisions.
-This is the compiler version. You pay the model cost once during
-exploration and get back tools like `write_document(text)`, which run no
-model on vent's side. In that TextEdit test, vent added about 6x fewer
-tokens to the agent's context per task, because it returns text instead
-of screenshots.
+but every run pays again for screenshots and model decisions. This is the
+compiler version. You pay the model cost once, while a pack is recorded,
+and get back tools like `write_document(text)` or `file_to_receipts()`,
+which run no model on vent's side. The agent still reads, judges and
+picks the tool; vent does the clicking.
+
+On a one-step task the two are even: in a TextEdit test, Claude's
+computer use needed the same two tool calls and about the same total
+time, and vent added about 6x fewer tokens to the agent's context. On a
+longer task the difference shows. Triaging six test emails in new Outlook
+(read each one, flag it if it needs a reply or has a deadline, file it
+into one of three folders), both filed all six correctly. vent took 1:59
+and made no wrong clicks. Claude's computer use took 2:31, made two
+harmless wrong moves, and put about 3.6x as many tokens into the context
+(18k against 5k), because it works from screenshots and vent returns
+text. The TextEdit test was three rounds each and the Outlook one a
+single run each, with the same model;
+[docs/BENCHMARKS.md](https://github.com/ShaanGS/ventriloquist/blob/main/docs/BENCHMARKS.md)
+has the method and the caveats.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ShaanGS/ventriloquist/main/docs/assets/benchmark-dark.png">
+    <img src="https://raw.githubusercontent.com/ShaanGS/ventriloquist/main/docs/assets/benchmark-light.png" width="900" alt="Bar chart. Sorting six test emails in Outlook with the same model: with Ventriloquist, Claude read 5,063 tokens and took 1:59; with computer use, it read 18,089 tokens and took 2:31.">
+  </picture>
+  <br>
+  <sub>Sorting six test emails in new Outlook for Mac. Same model, one run each.</sub>
+</p>
 
 On the author's Mac, through Claude Code, a TextEdit read takes about half
 a second end to end and a write about 1.1 s. Measured with a plain MCP
