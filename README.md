@@ -14,15 +14,15 @@
 
 Ventriloquist learns a Mac app once through the macOS accessibility API
 and keeps the actions worth having as typed tools, like
-`textedit_write_document` or `slack_filter_channels`. Your agent calls
+`outlook_file_to_receipts` or `textedit_write_document`. Your agent calls
 them over MCP, and every call replays the recorded steps: no screenshots
 and no vision model. The agent still decides which tool to call. It never
 decides where to click.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/ShaanGS/ventriloquist/main/docs/demo.gif" width="900" alt="An agent calls vent's tools: VS Code opens its Search view and searches the repo for refuse, then a note appears in TextEdit. Nobody touches the mouse.">
+  <img src="https://raw.githubusercontent.com/ShaanGS/ventriloquist/main/docs/demo.gif" width="900" alt="A Claude session triages six test emails in new Outlook through vent's tools: it reads each email as text, flags the two that need a reply or have a deadline, and files all six into Receipts, Meetings or Reading. Email addresses are blurred.">
   <br>
-  <sub>A real run. Each tool call plays at real speed; the agent's pauses between calls are cut.</sub>
+  <sub>A real run on test emails, by an agent that hadn't seen the expected answers: 6 of 6 filed. The preview is sped up 25x; email 1 plays at real speed with the agent's pauses cut.</sub>
 </p>
 <!-- mcp-name: io.github.ShaanGS/ventriloquist -->
 
