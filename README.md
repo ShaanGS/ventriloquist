@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ShaanGS/ventriloquist/main/docs/assets/banner-dark.png">
-    <img src="https://raw.githubusercontent.com/ShaanGS/ventriloquist/main/docs/assets/banner-light.png" width="900" alt="Ventriloquist: lets AI use Mac apps. The pixel ventriloquist dummy icon beside a classic Mac menu of Outlook tools.">
+    <img src="https://raw.githubusercontent.com/ShaanGS/ventriloquist/main/docs/assets/banner-light.png" width="900" alt="Ventriloquist: lets AI use Mac apps. Beside the name, the pixel ventriloquist dummy says outlook_flag_message in a speech bubble.">
   </picture>
 </p>
 
