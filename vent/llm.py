@@ -136,11 +136,19 @@ def _complete_via_cli(system: str, user_text: str, schema: dict, model: str) -> 
                 f"The installed claude CLI is too old for the flags vent runs it with "
                 f"({stderr[:200]}). Run `claude update`, then retry."
             )
-        raise ModelError(f"claude CLI exited with {proc.returncode}: {stderr[:300]}")
     try:
         envelope = json.loads(proc.stdout)
     except json.JSONDecodeError as exc:
+        if proc.returncode != 0:
+            raise ModelError(f"claude CLI exited with {proc.returncode}: {proc.stderr.strip()[:300]}") from exc
         raise ModelError(f"claude CLI returned a malformed envelope: {exc}") from exc
+    if not isinstance(envelope, dict):
+        raise ModelError("claude CLI returned a malformed envelope: not a JSON object")
+    # Claude Code 2.1 exits 1 on an error but still prints the envelope, its
+    # result saying what went wrong ("Not logged in · Please run /login"),
+    # so an error envelope is read the same whatever the exit status.
+    if proc.returncode != 0 and not envelope.get("is_error"):
+        raise ModelError(f"claude CLI exited with {proc.returncode}: {proc.stderr.strip()[:300]}")
 
     result_text = str(envelope.get("result", ""))
     if envelope.get("is_error"):

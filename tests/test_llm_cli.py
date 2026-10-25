@@ -76,6 +76,15 @@ def test_cli_backend_auth_failure_is_unavailable_not_error(monkeypatch):
         call(monkeypatch, proc)
 
 
+def test_cli_backend_not_logged_in_exit_1_says_so(monkeypatch):
+    """Claude Code 2.1 exits 1 with the error in the envelope on stdout and
+    nothing on stderr. The message must say to sign in, not just "exited
+    with 1" (seen live on 2.1.296)."""
+    proc = FakeProc(envelope("Not logged in · Please run /login", is_error=True), returncode=1)
+    with pytest.raises(llm.ModelUnavailable, match="claude login"):
+        call(monkeypatch, proc)
+
+
 def test_cli_backend_other_cli_error(monkeypatch):
     proc = FakeProc(envelope("model overloaded", is_error=True))
     with pytest.raises(llm.ModelError, match="overloaded"):
