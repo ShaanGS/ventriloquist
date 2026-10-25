@@ -128,6 +128,42 @@ def test_a_probe_write_the_app_did_not_answer_is_still_taken_out(monkeypatch):
     assert not trace.actions[0].executed
 
 
+def test_a_field_whose_value_cannot_be_read_is_not_probed(monkeypatch):
+    """A busy app's field read as empty, passed the empty-field rule, and
+    its text was overwritten with the probe and then "restored" to blank."""
+    from vent import ax
+
+    class BusyField(FakeElement):
+        busy = False
+
+        @property
+        def value(self):
+            if self.busy:
+                raise ax.AXTransientError("App is not answering accessibility queries (AXError -25204).")
+            return self._value
+
+        @value.setter
+        def value(self, text):
+            if self.busy:
+                self.written_while_busy = text
+            self._value = text
+
+    tree, body = probe_the_body(monkeypatch, BusyField)
+    body.value = "the user's draft"
+    body_id = next(n.id for n in snapshot(tree).nodes if n.identifier == "doc-body")
+
+    def nominate_then_go_busy(**kwargs):
+        body.busy = True  # the app stops answering between the snapshot and the live read
+        return {"targets": [{"id": body_id, "op": "set_value", "why": "text field"}]}
+
+    llm.set_completer_for_tests(nominate_then_go_busy)
+    trace = explore(FakeApp(), tree, policy_mod.Policy(), rounds=1)
+    assert not trace.actions[0].executed
+    assert "could not be read" in trace.actions[0].reason
+    assert not hasattr(body, "written_while_busy")
+    assert body._value == "the user's draft"
+
+
 def test_policy_refusals_are_recorded_not_executed(monkeypatch):
     app_version_stub(monkeypatch)
     tree = textedit_like()

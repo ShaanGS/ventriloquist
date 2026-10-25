@@ -269,7 +269,12 @@ def explore(
             elif op == "set_value":
                 # Re-read the live value; the cached preview is truncated
                 # and may be stale (TOCTOU). Empty is required to probe.
-                verdict = pol.screen_set_value(node, _live_value(node))
+                current = _live_value(node)
+                verdict = (
+                    pol.screen_set_value(node, current)
+                    if current is not None
+                    else policy_mod.Verdict(False, UNREADABLE_FIELD, "unknown")
+                )
             else:
                 continue
 
@@ -301,12 +306,19 @@ def explore(
     return trace
 
 
-def _live_value(node: Node) -> str:
+def _live_value(node: Node) -> Optional[str]:
+    """A field's value read live: "" when it has none, None when the app
+    didn't answer. Unknown must never pass for empty: a busy app's
+    populated field read as "", passed the empty-field rule, and was
+    overwritten, then "restored" to blank."""
     try:
         value = node.element.value
-        return "" if value is None else str(value)
     except ax.AXError:
-        return ""
+        return None
+    return "" if value is None else str(value)
+
+
+UNREADABLE_FIELD = "the field's current value could not be read; default deny"
 
 
 def _execute_probe(
@@ -333,6 +345,11 @@ def _execute_probe(
         anchor=anchor.to_dict(),
         nodes_before=len(before.nodes),
     )
+    if original_value is None:
+        # Without the value there is nothing to restore it to.
+        action.executed = False
+        action.reason = UNREADABLE_FIELD
+        return action
 
     # Whether the probe text may be in the field, and so must be taken out
     # again whatever happens next. The restore used to run only after a
