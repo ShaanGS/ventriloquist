@@ -20,7 +20,7 @@
       "environmentVariables": [
         {
           "name": "VENT_ALLOW_HIGH",
-          "description": "Set to 1 to allow tools a pack marks as high risk. They are refused otherwise.",
+          "description": "Set to 1 to run tools a pack marks as high risk without asking. Without it, they're offered only to clients that can ask you to confirm each call (MCP elicitation).",
           "isRequired": false,
           "format": "string"
         },
@@ -33,6 +33,18 @@
         {
           "name": "VENT_HOME",
           "description": "Directory for your own packs and traces. Defaults to ~/.ventriloquist.",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "VENT_READ_ONLY",
+          "description": "Set to 1 to serve read-only tools only. Every other call is refused, even with VENT_ALLOW_HIGH.",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "VENT_NO_VALUES",
+          "description": "Set to 1, together with VENT_HEAL=1, to keep field values out of what the healer sends to the model.",
           "isRequired": false,
           "format": "string"
         }
