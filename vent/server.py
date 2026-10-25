@@ -26,9 +26,11 @@ from __future__ import annotations
 import os
 import re
 import sys
+import threading
 import unicodedata
 from contextlib import AsyncExitStack
 from pathlib import Path
+from typing import Awaitable, Callable
 
 import anyio
 import mcp.types as types
@@ -50,6 +52,10 @@ SLUG_MAX = 63
 TITLE_LIMIT = 100
 DESCRIPTION_LIMIT = 1000
 PARAM_DESCRIPTION_LIMIT = 200
+
+# How long the main thread waits between turns of AppKit's run loop. Each
+# turn runs the loop for 50 ms (ax.refresh_app_state).
+RUN_LOOP_IDLE_S = 0.02
 
 
 def _ascii(text: str) -> str:
@@ -262,11 +268,6 @@ def build_server(search_path: list[Path]) -> Server:
         if refusal is not None:
             return _error(refusal)
 
-        # This handler runs on the main thread, the only place AppKit
-        # applies app launches, quits and activations. The tool itself runs
-        # on a worker thread, which would otherwise see the state from the
-        # server's first call.
-        ax.refresh_app_state()
         try:
             async with AsyncExitStack() as held:
                 # One tool call per app at a time, held for the whole call.
@@ -308,6 +309,45 @@ def build_server(search_path: list[Path]) -> Server:
     )
 
 
+def serve_beside_run_loop(main: Callable[[], Awaitable[None]]) -> None:
+    """Run the server's event loop on a thread of its own, and keep AppKit's
+    main run loop turning on this, the main thread, until it ends.
+
+    AppKit applies app launches, quits and activations only while the main
+    run loop runs, and tool calls read that state from worker threads (to
+    hand focus back to the app that was in front). The call handler used to
+    run the loop itself before each call, on the main thread where the
+    event loop also ran, which stalled the client's messages for the length
+    of every pump."""
+    failure: list[BaseException] = []
+
+    def serve() -> None:
+        try:
+            anyio.run(main)
+        except BaseException as exc:  # raised again on the main thread
+            failure.append(exc)
+
+    # A daemon, so an interrupt on the main thread ends the process even
+    # while the transport's own threads sit blocked reading stdin.
+    thread = threading.Thread(target=serve, name="vent-serve", daemon=True)
+    thread.start()
+    pumping = True
+    while thread.is_alive():
+        if pumping:
+            try:
+                ax.refresh_app_state()
+            except Exception as exc:
+                pumping = False
+                print(
+                    f"warning: AppKit's run loop failed ({exc!r}); apps opened or brought to the "
+                    "front from now on may go unseen until vent serve restarts.",
+                    file=sys.stderr,
+                )
+        thread.join(RUN_LOOP_IDLE_S)
+    if failure:
+        raise failure[0]
+
+
 def serve_stdio(search_path: list[Path]) -> None:
     server = build_server(search_path)
     try:
@@ -326,4 +366,4 @@ def serve_stdio(search_path: list[Path]) -> None:
         async with stdio_server() as (read, write):
             await server.run(read, write, server.create_initialization_options())
 
-    anyio.run(main)
+    serve_beside_run_loop(main)

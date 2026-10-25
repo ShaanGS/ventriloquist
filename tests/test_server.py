@@ -17,7 +17,7 @@ import vent
 from vent import ax, server as server_mod
 from vent.packs import Step, ToolSpec, save
 from vent.runtime import ToolResult
-from vent.server import READ_NOTE, build_server, result_text
+from vent.server import READ_NOTE, build_server, result_text, serve_beside_run_loop
 
 from .test_packs import sample_pack
 
@@ -186,27 +186,67 @@ def test_high_risk_tool_is_refused_over_mcp_without_the_opt_in(tmp_path, monkeyp
     assert "VENT_ALLOW_HIGH=1" in result.content[0].text
 
 
-def test_app_state_is_refreshed_on_the_event_loop_before_the_app_lookup(tmp_path, monkeypatch):
-    """AppKit applies app launches, quits and activations only on the main
-    run loop, and the tool runs on a worker thread. So the refresh has to
-    come first, on the thread running the event loop."""
-    events = []
-    monkeypatch.setattr(ax, "refresh_app_state", lambda: events.append(("refresh", threading.get_ident())))
+def test_a_call_runs_off_the_event_loop_and_never_pumps_appkit_there(tmp_path, monkeypatch):
+    """Pumping AppKit's run loop from the handler stalled every client
+    message for the length of the pump. serve_stdio keeps the run loop
+    turning on the main thread instead (see the next tests)."""
+    pumps = []
+    monkeypatch.setattr(ax, "refresh_app_state", lambda: pumps.append(threading.get_ident()))
+    lookups = []
 
     def lookup(bundle_id):
-        events.append(("lookup", threading.get_ident()))
+        lookups.append(threading.get_ident())
         raise ax.AXError(f"No running application with bundle id {bundle_id!r}. Is the app open?")
 
     monkeypatch.setattr(ax, "find_app_by_bundle", lookup)
-    pack = sample_pack()
-    save(pack, tmp_path / pack.bundle_id / "pack.json")
-    result = call(build_server([tmp_path]), "textedit_write_document", {"text": "x"})
+    result = call(served(tmp_path, sample_pack()), "textedit_write_document", {"text": "x"})
 
     assert result.is_error
     assert "Is the app open" in result.content[0].text
-    assert [name for name, _ in events] == ["refresh", "lookup"]
-    assert events[0][1] == threading.get_ident()  # connect() runs the event loop on this thread
-    assert events[1][1] != events[0][1]
+    assert pumps == []
+    assert lookups and lookups[0] != threading.get_ident()  # connect() runs the event loop on this thread
+
+
+def test_serving_keeps_appkit_turning_on_the_main_thread(monkeypatch):
+    pumps = []
+    monkeypatch.setattr(ax, "refresh_app_state", lambda: pumps.append(threading.get_ident()))
+    event_loop_threads = []
+
+    async def main():
+        event_loop_threads.append(threading.get_ident())
+        while len(pumps) < 3:
+            await anyio.sleep(0.01)
+
+    serve_beside_run_loop(main)
+    assert event_loop_threads and event_loop_threads[0] != threading.get_ident()
+    assert len(pumps) >= 3
+    assert set(pumps) == {threading.get_ident()}
+
+
+def test_a_crash_in_the_server_reaches_the_caller(monkeypatch):
+    monkeypatch.setattr(ax, "refresh_app_state", lambda: None)
+
+    async def main():
+        raise RuntimeError("transport fell over")
+
+    with pytest.raises(RuntimeError, match="transport fell over"):
+        serve_beside_run_loop(main)
+
+
+def test_a_failing_run_loop_does_not_stop_the_server(monkeypatch, capsys):
+    def broken_pump():
+        raise RuntimeError("no run loop")
+
+    monkeypatch.setattr(ax, "refresh_app_state", broken_pump)
+    finished = []
+
+    async def main():
+        await anyio.sleep(0.1)
+        finished.append(True)
+
+    serve_beside_run_loop(main)
+    assert finished == [True]
+    assert capsys.readouterr().err.count("AppKit's run loop failed") == 1
 
 
 def test_read_tools_say_their_output_is_app_content(tmp_path):
