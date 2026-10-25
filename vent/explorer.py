@@ -24,13 +24,19 @@ from typing import Callable, Optional
 
 from . import anchors, ax, llm, policy as policy_mod
 from .runtime import cancel_dialog, settle
-from .snapshot import Node, Snapshot, open_dialogs, render, snapshot
+from .snapshot import Node, Snapshot, _as_element, open_dialogs, render, snapshot
 
 PROBE_TEXT = "vent probe"
 MAX_TARGETS_PER_ROUND = 4
 # How many sheets or dialogs the watchdog cancels in a row before giving
 # up, in case cancelling one only uncovers another.
 MAX_DISMISSALS = 3
+
+# Menus nearly every English Mac app has. The policy's verb lists are
+# English, so an app showing fewer than two of these is taken to be in
+# another language. One is not enough: Dutch apps name their Help menu
+# Help, and Italian ones their File menu File.
+ENGLISH_MENUS = {"file", "edit", "view", "window", "help"}
 
 NOMINATE_SCHEMA = {
     "type": "object",
@@ -176,6 +182,37 @@ def _dismiss_modal(root: ax.Element, pol: policy_mod.Policy, trigger: Node) -> b
     return not open_dialogs(root)
 
 
+def _menu_titles(root: ax.Element) -> list[str]:
+    """The titles in the app's menu bar, left to right."""
+    menu_bar = next((child for child in root.children() if child.role == "AXMenuBar"), None)
+    if menu_bar is None:
+        ref = root.attribute("AXMenuBar")
+        if ref is None:
+            return []
+        menu_bar = _as_element(ref)
+    return [item.label.strip() for item in menu_bar.children() if item.role == "AXMenuBarItem"]
+
+
+def _not_in_english(root: ax.Element, app: ax.RunningApp) -> str:
+    """Why probing must not start because the app's UI is plainly not in
+    English, or "" when it is, or when there is too little to tell.
+
+    The policy only knows English verbs, so in a German app "Löschen"
+    (delete) would pass every check. The menu bar says what language an
+    app runs in; the Apple menu and the app's own menu are left out, since
+    neither says."""
+    menus = [title for title in _menu_titles(root) if title and title not in ("Apple", app.name)]
+    if len(menus) < 3 or sum(title.casefold() in ENGLISH_MENUS for title in menus) >= 2:
+        return ""
+    shown = ", ".join(repr(title) for title in menus[:5])
+    return (
+        f"{app.name}'s menus aren't in English ({shown}). The safety policy only reads "
+        "English labels, so it can't tell which controls are safe to press, and probing "
+        f"is refused. Switch {app.name} to English in System Settings, General, Language & "
+        "Region, Applications, then explore again."
+    )
+
+
 def explore(
     app: ax.RunningApp,
     root: ax.Element,
@@ -185,6 +222,10 @@ def explore(
     redact_values: bool = False,
 ) -> Trace:
     """Run survey and probe phases against a live app, returning the trace."""
+    foreign = _not_in_english(root, app)
+    if foreign:
+        raise ExplorationBlocked(foreign)
+
     trace = Trace(
         bundle_id=app.bundle_id or "",
         app_name=app.name,

@@ -216,6 +216,43 @@ def test_exploration_does_not_start_behind_an_open_sheet(monkeypatch):
         explore(FakeApp(), tree, policy_mod.Policy(), rounds=1)
 
 
+def with_menus(*titles):
+    """textedit_like with a menu bar showing these titles after the Apple
+    and TextEdit menus."""
+    tree = textedit_like()
+    items = [FakeElement("AXMenuBarItem", title) for title in ("Apple", "TextEdit", *titles)]
+    tree._children.append(FakeElement("AXMenuBar", children=items))
+    return tree
+
+
+def test_probing_is_refused_when_the_menus_are_not_in_english(monkeypatch):
+    """The verb lists are English, so in a German TextEdit "Löschen"
+    (delete) would pass every check. No model call is made either."""
+    app_version_stub(monkeypatch)
+    calls = []
+    llm.set_completer_for_tests(lambda **kwargs: calls.append(kwargs) or {"targets": []})
+    german = with_menus("Ablage", "Bearbeiten", "Format", "Darstellung", "Fenster", "Hilfe")
+    with pytest.raises(ExplorationBlocked, match="TextEdit's menus aren't in English") as refused:
+        explore(FakeApp(), german, policy_mod.Policy(), rounds=1)
+    assert "'Ablage'" in str(refused.value) and "Language & Region" in str(refused.value)
+    assert calls == []
+
+    # One English-looking title is not enough: Dutch apps have a Help menu.
+    dutch = with_menus("Archief", "Wijzig", "Weergave", "Venster", "Help")
+    with pytest.raises(ExplorationBlocked, match="aren't in English"):
+        explore(FakeApp(), dutch, policy_mod.Policy(), rounds=1)
+
+
+def test_probing_goes_ahead_in_english_or_when_the_menus_say_too_little(monkeypatch):
+    app_version_stub(monkeypatch)
+    scripted([])
+    explore(FakeApp(), with_menus("File", "Edit", "Format", "View", "Window", "Help"), policy_mod.Policy(), rounds=1)
+    scripted([])
+    explore(FakeApp(), with_menus("Game", "Window", "Help"), policy_mod.Policy(), rounds=1)
+    scripted([])
+    explore(FakeApp(), with_menus("Fichier", "Aide"), policy_mod.Policy(), rounds=1)
+
+
 def test_trace_round_trips_through_disk(tmp_path, monkeypatch):
     app_version_stub(monkeypatch)
     trace = Trace(bundle_id="com.example.app", app_name="Example", app_version="2.0")
