@@ -32,6 +32,13 @@ PRECONDITION_KINDS = {"app_running", "window_exists"}
 FORMAT_VERSION = 2
 READABLE_VERSIONS = {1, 2}  # version 2 added ChainLink.subrole
 
+# The AX actions a press step may perform. An open action name would reopen
+# the closed op set: an app decides for itself what an action it defines
+# does, so only the standard ones get through.
+PRESS_ACTIONS = {
+    "AXPress", "AXConfirm", "AXShowMenu", "AXIncrement", "AXDecrement", "AXPick", "AXCancel", "AXRaise",
+}
+
 # JSON Schema types a parameter may declare. Arguments are typed into fields
 # and compared with what fields show, so only scalars make sense.
 PARAM_TYPES = {"string", "number", "integer", "boolean"}
@@ -198,12 +205,15 @@ class Step:
             expect = _object(expect, f"{where} expect")
             if "role" in expect:
                 _text(expect["role"], f"{where} expect role")
+        action = data.get("action", "AXPress")
+        if not isinstance(action, str) or action not in PRESS_ACTIONS:
+            raise PackError(f"{where}: action {action!r} is not allowed. Allowed: {sorted(PRESS_ACTIONS)}")
         return cls(
             op=op,
             anchor=anchor,
             value=value,
             expect=expect,
-            action=data.get("action", "AXPress"),
+            action=action,
             timeout_s=_timeout(data.get("timeout_s", 5.0), where),
             settle=_flag(data.get("settle", True), f"{where} settle"),
         )

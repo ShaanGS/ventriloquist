@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from vent import anchors
+from vent import anchors, packs
 from vent.packs import Pack, PackError, Step, ToolSpec, Verify, load, save
 from vent.snapshot import snapshot
 
@@ -250,6 +250,26 @@ def test_step_timeouts_are_bounded(tmp_path, seconds):
 def test_a_step_may_wait_up_to_two_minutes():
     data = edited(lambda data: set_in(first_step(data), "timeout_s", 120))
     assert Pack.from_dict(data).tools[0].steps[0].timeout_s == 120.0
+
+
+def press_pack(action):
+    pack = sample_pack()
+    body = pack.tools[0].steps[0].anchor
+    pack.tools.append(
+        ToolSpec(name="open_menu", description="", risk="mutating", steps=[Step(op="press", anchor=body, action=action)])
+    )
+    return pack.to_dict()
+
+
+@pytest.mark.parametrize("action", sorted(packs.PRESS_ACTIONS))
+def test_standard_press_actions_load(action):
+    assert Pack.from_dict(press_pack(action)).tool("open_menu").steps[0].action == action
+
+
+@pytest.mark.parametrize("action", ["AXZoomWindow", "AXOpen", "press", ""])
+def test_other_press_actions_are_refused(action):
+    with pytest.raises(PackError, match="not allowed"):
+        Pack.from_dict(press_pack(action))
 
 
 def test_shipped_packs_pin_no_window_titles():
