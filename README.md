@@ -36,6 +36,10 @@ uv tool install ventriloquist-mcp
 vent doctor
 ```
 
+If your shell says `vent: command not found`, uv's tool folder isn't on
+your PATH yet (common after `brew install uv`): run `uv tool update-shell`
+and open a new terminal.
+
 `vent doctor` checks the one permission vent needs. If it says
 Accessibility is missing, open System Settings > Privacy & Security >
 Accessibility, switch on your terminal app, restart the terminal, and run
