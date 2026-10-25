@@ -130,6 +130,31 @@ def test_secure_fields_never_surface():
     assert not any("hunter2" in n.value_preview for n in snap.nodes)
 
 
+def test_a_field_that_turned_secure_is_never_resolved():
+    """A plain text field records no subrole, so the subrole check had
+    nothing to compare and resolution bound the field after it became a
+    password field. The walk now skips secure fields outright."""
+    tree = textedit_like()
+    field = FakeElement("AXTextField", "Account", identifier="account", value="")
+    tree.children()[0]._children.append(field)
+    anchor = anchor_for(tree, identifier="account")
+    field.subrole = "AXSecureTextField"
+    with pytest.raises(anchors.AnchorLost):
+        anchors.resolve(tree, anchor)
+
+
+def test_a_secure_twin_is_not_a_candidate():
+    """A password field next to a plain field with the same label used to
+    make the plain one ambiguous, or worse, win."""
+    tree = textedit_like()
+    window = tree.children()[0]
+    plain = FakeElement("AXTextField", "Code", value="")
+    window._children.append(plain)
+    anchor = anchor_for(tree, role="AXTextField")
+    window._children.insert(0, FakeElement("AXTextField", "Code", subrole="AXSecureTextField", value="1234"))
+    assert anchors.resolve(tree, anchor) is plain
+
+
 def test_truncation_is_explicit():
     tree = textedit_like()
     snap = snapshot(tree, max_nodes=1)

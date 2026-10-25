@@ -156,6 +156,17 @@ def _bind(value_spec: Optional[dict], args: dict[str, Any], tool: str) -> Any:
     raise ToolExecutionError(f"{tool}: value spec must contain 'param' or 'literal'")
 
 
+def _refuse_secure(element: Element, where: str) -> None:
+    """SECURITY.md T4 where it counts. Resolution never binds a secure text
+    field, but a field can turn secure after the walk passed it (a sign-in
+    form swapping a plain field for a password one), so the subrole is read
+    again, live, before anything reads or writes the element."""
+    if element.subrole == SECURE_SUBROLE:
+        raise ToolExecutionError(
+            f"{where}: the element is a secure text field. vent never reads or writes those."
+        )
+
+
 def _resolve(
     step_anchor: anchors.Anchor,
     root: Element,
@@ -164,7 +175,7 @@ def _resolve(
     where: str,
 ) -> Element:
     try:
-        return anchors.resolve(root, step_anchor, low_confidence=low_confidence)
+        element = anchors.resolve(root, step_anchor, low_confidence=low_confidence)
     except (anchors.AnchorLost, anchors.AnchorAmbiguous) as exc:
         if heal is None:
             raise ToolExecutionError(f"{where}: {exc}") from exc
@@ -173,7 +184,9 @@ def _resolve(
             raise ToolExecutionError(f"{where}: {exc} (healing declined)") from exc
         # The healed anchor is used for this one call. Persisting it is the
         # healer's job and goes through quarantine, never through here.
-        return anchors.resolve(root, healed, low_confidence=False)
+        element = anchors.resolve(root, healed, low_confidence=False)
+    _refuse_secure(element, where)
+    return element
 
 
 def _check_expect(element: Element, expect: Optional[dict], where: str) -> None:
@@ -323,7 +336,7 @@ def _run_step(
         deadline = time.monotonic() + step.timeout_s
         while time.monotonic() < deadline:
             try:
-                anchors.resolve(root, step.anchor, low_confidence=low_confidence)
+                _refuse_secure(anchors.resolve(root, step.anchor, low_confidence=low_confidence), where)
                 return StepReport(op=step.op, ok=True)
             except (anchors.AnchorLost, anchors.AnchorAmbiguous):
                 # Resolution only reads, and reads never flush a Chromium

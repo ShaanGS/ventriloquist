@@ -44,7 +44,7 @@ from difflib import SequenceMatcher
 from typing import Iterator, Optional
 
 from .ax import Element
-from .snapshot import MAX_TREE_DEPTH, ChainLink, Node, app_children
+from .snapshot import MAX_TREE_DEPTH, SECURE_SUBROLE, ChainLink, Node, app_children
 
 
 class AnchorLost(RuntimeError):
@@ -154,7 +154,9 @@ def _walk_with_chains(
     appear, the rule snapshot applies by default. Indices still count the
     skipped menu bars, so chains line up with a snapshot's link for link.
     The root's children come from app_children, as in a snapshot, so a
-    window on another Space is still searched.
+    window on another Space is still searched. Secure text fields are
+    skipped with their subtrees, as snapshot skips them (SECURITY.md T4),
+    so no anchor can resolve to one, whatever it recorded.
     """
 
     # Ancestor-path cycle guard, not a global visited set: AX trees are
@@ -180,13 +182,16 @@ def _walk_with_chains(
                 role_counts[role] = ordinal + 1
                 if not include_menus and role == "AXMenuBar":
                     continue
+                subrole = child.subrole
+                if subrole == SECURE_SUBROLE:
+                    continue
                 link = ChainLink(
                     role=role,
                     label=child.label,
                     identifier=str(child.attribute("AXIdentifier") or ""),
                     ordinal=ordinal,
                     index=index,
-                    subrole=child.subrole,
+                    subrole=subrole,
                 )
                 yield from visit(child, chain + (link,), depth + 1)
         finally:
@@ -239,6 +244,12 @@ def _score(anchor: Anchor, chain: tuple[ChainLink, ...]) -> tuple[float, dict]:
 
     if leaf.role != anchor.role:
         return -1.0, {"disqualified": "role mismatch"}
+
+    if leaf.subrole == SECURE_SUBROLE:
+        # Belt and braces with the walk, which skips these. The subrole
+        # check below would not catch one: it only compares when the
+        # anchor recorded a subrole, and a plain text field records none.
+        return -1.0, {"disqualified": "secure text field"}
 
     if anchor.identifier and leaf.identifier and leaf.identifier != anchor.identifier:
         # A different non-empty identifier is a different element. This is

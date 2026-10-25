@@ -243,6 +243,61 @@ def test_a_write_recorded_in_one_document_never_lands_in_another():
     assert taxes_window.children()[0].children()[0].value == "1040 figures"
 
 
+def account_form():
+    """A sign-in form whose account field a pack recorded while it was a
+    plain text field, with tools that write and read it."""
+    field = FakeElement("AXTextField", "Account", identifier="account", value="")
+    tree = FakeElement("AXApplication", "App", children=[FakeElement("AXWindow", "Sign In", children=[field])])
+    anchor = anchors.build(next(n for n in snapshot(tree).nodes if n.identifier == "account"))
+    write = ToolSpec(
+        name="type_account",
+        description="Type into the account field.",
+        risk="mutating",
+        params={"text": {"type": "string", "description": "Text."}},
+        steps=[Step(op="set_value", anchor=anchor, value={"param": "text"}, timeout_s=0.2)],
+    )
+    read = ToolSpec(
+        name="read_account",
+        description="Read the account field.",
+        risk="read_only",
+        steps=[Step(op="read_value", anchor=anchor)],
+    )
+    return tree, field, Pack(bundle_id="app.test", app_name="App", tools=[write, read])
+
+
+def test_tools_never_write_or_read_a_field_that_turned_secure():
+    tree, field, pack = account_form()
+    field.subrole = "AXSecureTextField"
+    field.value = "hunter2"
+    with pytest.raises(runtime.ToolExecutionError):
+        runtime.execute(pack, "type_account", {"text": "typed"}, tree)
+    assert field.value == "hunter2"
+    with pytest.raises(runtime.ToolExecutionError) as refused:
+        runtime.execute(pack, "read_account", {}, tree)
+    assert "hunter2" not in str(refused.value)
+
+
+def test_a_field_that_turns_secure_after_resolution_is_refused(monkeypatch):
+    """Resolution and the write are separate moments. The runtime reads the
+    subrole again, live, so a field that turned secure in between is
+    still refused."""
+    tree, field, pack = account_form()
+    real_resolve = anchors.resolve
+
+    def resolve_then_turn_secure(root, anchor, low_confidence=False):
+        element = real_resolve(root, anchor, low_confidence=low_confidence)
+        field.subrole = "AXSecureTextField"
+        return element
+
+    monkeypatch.setattr(runtime.anchors, "resolve", resolve_then_turn_secure)
+    with pytest.raises(runtime.ToolExecutionError, match="secure text field"):
+        runtime.execute(pack, "type_account", {"text": "typed"}, tree)
+    assert field.value == ""
+    field.subrole = ""
+    with pytest.raises(runtime.ToolExecutionError, match="secure text field"):
+        runtime.execute(pack, "read_account", {}, tree)
+
+
 def test_wait_for_requires_anchor_at_load():
     with pytest.raises(PackError, match="requires an anchor"):
         Step.from_dict({"op": "wait_for"}, where="test")
