@@ -147,7 +147,7 @@ def test_conflicting_identifier_disqualifies_even_as_sole_candidate():
         anchors.resolve(tree, anchor)
 
 
-def test_recorded_window_title_penalizes_lookalike_window():
+def test_recorded_window_title_disqualifies_lookalike_window():
     # Two structurally identical document windows; the anchor was recorded
     # in one of them. With only the other window open, structure alone
     # matches perfectly, and only the window title says it is the wrong
@@ -171,8 +171,56 @@ def test_recorded_window_title_penalizes_lookalike_window():
     wrong = FakeElement(
         "AXApplication", "TextEdit", children=[make_window("taxes.txt", "b")]
     )
-    with pytest.raises((anchors.AnchorLost, anchors.AnchorAmbiguous)):
+    with pytest.raises(anchors.AnchorLost):
         anchors.resolve(wrong, anchor)
+
+
+def document_window(title, body, identifier="First Text View"):
+    """A TextEdit document window. Every document's text area carries the
+    same nib-derived identifier, as in the real app."""
+    return FakeElement(
+        "AXWindow",
+        title,
+        subrole="AXStandardWindow",
+        children=[
+            FakeElement(
+                "AXScrollArea",
+                children=[FakeElement("AXTextArea", value=body, identifier=identifier)],
+            )
+        ],
+    )
+
+
+def test_title_pinned_anchor_never_binds_in_another_document():
+    """A tool recorded in vent-demo.txt overwrote taxes-2025.txt. The
+    shared identifier is worth 6 and a title mismatch cost only 2, so the
+    taxes text area cleared the bar with room to spare."""
+    recorded = FakeElement("AXApplication", "TextEdit", children=[document_window("vent-demo.txt", "demo")])
+    anchor = anchor_for(recorded, role="AXTextArea")
+    assert anchor.window_title == "vent-demo.txt"
+
+    taxes_only = FakeElement("AXApplication", "TextEdit", children=[document_window("taxes-2025.txt", "1040")])
+    with pytest.raises(anchors.AnchorLost, match="window title mismatch"):
+        anchors.resolve(taxes_only, anchor)
+
+    # With both documents open the pinned one is found, even when the
+    # taxes window is the focused one.
+    both = FakeElement(
+        "AXApplication",
+        "TextEdit",
+        children=[document_window("taxes-2025.txt", "1040"), document_window("vent-demo.txt", "demo")],
+    )
+    both.focused_window = both.children()[0]
+    assert anchors.resolve(both, anchor).value == "demo"
+
+
+def test_title_pinned_anchor_still_searches_an_untitled_window():
+    """Only a different non-empty title disqualifies. A window that reports
+    no title at all is searched as before."""
+    recorded = FakeElement("AXApplication", "TextEdit", children=[document_window("vent-demo.txt", "demo")])
+    anchor = anchor_for(recorded, role="AXTextArea")
+    untitled = FakeElement("AXApplication", "TextEdit", children=[document_window("", "demo")])
+    assert anchors.resolve(untitled, anchor).value == "demo"
 
 
 def test_same_window_title_still_resolves():

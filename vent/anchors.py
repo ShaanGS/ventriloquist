@@ -19,10 +19,13 @@ the contract; the short version:
   degraded match. Labels are localized and state-dependent (a Play button
   relabels itself Pause), so an anchor remembers every label it has seen
   the element wear and treats them as hints.
-- Window identity is scored explicitly. AppKit window identifiers are
+- Window identity is part of the address. AppKit window identifiers are
   nib-derived and identical across documents, so the window title is the
-  only thing separating "vent-demo.txt" from "taxes-2025.txt". A recorded
-  window title that mismatches costs heavily.
+  only thing separating "vent-demo.txt" from "taxes-2025.txt". A candidate
+  in a window whose non-empty title differs from the recorded one is
+  disqualified, the same rule as a conflicting identifier; a penalty was
+  outscored by the documents' shared identifier, and a tool recorded in
+  vent-demo.txt overwrote taxes-2025.txt.
 - An anchor with no recorded window title is window-agnostic on purpose
   (a shared pack's "frontmost document" tool). When its close candidates
   sit in different windows, the one in the app's focused window wins,
@@ -254,6 +257,12 @@ def _score(anchor: Anchor, chain: tuple[ChainLink, ...]) -> tuple[float, dict]:
         # a close button and a zoom button are both unlabeled AXButtons.
         return -1.0, {"disqualified": "subrole mismatch"}
 
+    candidate_title = _candidate_window_title(chain)
+    if anchor.window_title and candidate_title and candidate_title != anchor.window_title:
+        # Another document, not a degraded match (see the module docstring).
+        # An untitled window is still searched, as before.
+        return -1.0, {"disqualified": "window title mismatch"}
+
     breakdown: dict[str, float] = {"role": W_ROLE}
     score = W_ROLE
 
@@ -275,14 +284,9 @@ def _score(anchor: Anchor, chain: tuple[ChainLink, ...]) -> tuple[float, dict]:
             score -= W_LABEL / 2
             breakdown["label"] = -W_LABEL / 2
 
-    if anchor.window_title:
-        candidate_title = _candidate_window_title(chain)
-        if candidate_title == anchor.window_title:
-            score += W_WINDOW
-            breakdown["window"] = W_WINDOW
-        elif candidate_title:
-            score -= W_WINDOW
-            breakdown["window"] = -W_WINDOW
+    if anchor.window_title and candidate_title == anchor.window_title:
+        score += W_WINDOW
+        breakdown["window"] = W_WINDOW
 
     similarity = _ancestry_similarity(anchor.chain, chain)
     score += W_CHAIN * similarity
@@ -339,13 +343,22 @@ def resolve(root: Element, anchor: Anchor, low_confidence: bool = False) -> Elem
     # roughly 410 elements), and walking it was most of every tool call, so
     # it is walked only for anchors that can live there.
     candidates: list[_Candidate] = []
+    ruled_out: dict[str, int] = {}
     for element, chain in _walk_with_chains(root, MAX_TREE_DEPTH, in_menu_bar(anchor)):
         score, breakdown = _score(anchor, chain)
         if score >= 0:
             candidates.append(_Candidate(element=element, chain=chain, score=score, breakdown=breakdown))
+        elif breakdown["disqualified"] != "role mismatch":
+            reason = breakdown["disqualified"]
+            ruled_out[reason] = ruled_out.get(reason, 0) + 1
 
     if not candidates:
-        raise AnchorLost(f"No viable element with role {anchor.role} found")
+        # Say what was ruled out, so "lost" can be told apart from "found,
+        # but in another window".
+        why = ", ".join(f"{count} {reason}" for reason, count in ruled_out.items())
+        raise AnchorLost(
+            f"No viable element with role {anchor.role} found" + (f" (ruled out: {why})" if why else "")
+        )
 
     candidates.sort(key=lambda c: c.score, reverse=True)
     best = candidates[0]

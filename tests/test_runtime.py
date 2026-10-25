@@ -218,6 +218,31 @@ def test_healer_is_consulted_and_used_without_being_persisted():
     assert pack.tools[0].steps[0].anchor.identifier == "doc-body"
 
 
+def test_a_write_recorded_in_one_document_never_lands_in_another():
+    """The tool was recorded in vent-demo.txt. With only taxes-2025.txt
+    open, its text area matches everything but the window, and the call
+    must fail rather than overwrite the taxes."""
+
+    def document(title, body):
+        return FakeElement(
+            "AXWindow",
+            title,
+            children=[
+                FakeElement(
+                    "AXScrollArea",
+                    children=[FakeElement("AXTextArea", value=body, identifier="doc-body")],
+                )
+            ],
+        )
+
+    pack = build_write_tool(FakeElement("AXApplication", "TextEdit", children=[document("vent-demo.txt", "demo")]))
+    taxes_window = document("taxes-2025.txt", "1040 figures")
+    taxes = FakeElement("AXApplication", "TextEdit", children=[taxes_window])
+    with pytest.raises(runtime.ToolExecutionError, match="window title mismatch"):
+        runtime.execute(pack, "write_document", {"text": "overwritten"}, taxes)
+    assert taxes_window.children()[0].children()[0].value == "1040 figures"
+
+
 def test_wait_for_requires_anchor_at_load():
     with pytest.raises(PackError, match="requires an anchor"):
         Step.from_dict({"op": "wait_for"}, where="test")
