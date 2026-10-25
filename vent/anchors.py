@@ -113,10 +113,12 @@ class Anchor:
         )
 
 
-def _repeats_title(label: str, window_title: str) -> bool:
-    """Whether a label carries the window's title, the volatile user data
-    the window link is blanked for."""
-    return bool(window_title) and window_title in label
+def _repeats_title(link: ChainLink, window_title: str) -> bool:
+    """Whether a link's label carries the window's title, the volatile user
+    data the window link is blanked for. The app's own name on the root
+    link is not user data, and a window titled after its app (Notes) would
+    otherwise blank it."""
+    return link.role != "AXApplication" and bool(window_title) and window_title in link.label
 
 
 def build(node: Node) -> Anchor:
@@ -139,7 +141,7 @@ def build(node: Node) -> Anchor:
             role=link.role,
             label=(
                 ""
-                if link.role == "AXWindow" or (index < last and _repeats_title(link.label, title))
+                if link.role == "AXWindow" or (index < last and _repeats_title(link, title))
                 else link.label
             ),
             identifier=link.identifier,
@@ -256,7 +258,7 @@ def _ancestry_similarity(
     def key(link: ChainLink, title: str) -> str:
         if link.role == "AXWindow":
             return link.role
-        label = "" if _repeats_title(link.label, title) else link.label
+        label = "" if _repeats_title(link, title) else link.label
         return f"{link.role}:{link.identifier or label}"
 
     return SequenceMatcher(

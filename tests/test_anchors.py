@@ -370,6 +370,15 @@ def test_recorded_chains_leave_out_labels_that_carry_the_window_title():
     assert labels[-1] == "Home"  # and so does the element's own
 
 
+def test_a_window_titled_after_its_app_keeps_the_app_name():
+    """The app's own name on the root link is not user data."""
+    tree = textedit_like()
+    window = tree.children()[0]
+    window.title = window.label = "TextEdit"
+    anchor = anchor_for(tree, identifier="doc-body")
+    assert anchor.chain[0].label == "TextEdit"
+
+
 def test_title_free_chains_still_match_after_the_window_title_changes():
     """Matching keys labels the same way, so the anchor scores a full chain
     match after a channel or workspace switch retitles the window."""
