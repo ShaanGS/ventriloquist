@@ -1,6 +1,8 @@
 """Pack schema validation: the closed op set is enforced at load, and
 packs survive a save/load round trip with anchors intact."""
 
+import json
+
 import pytest
 
 from vent import anchors
@@ -126,6 +128,111 @@ def test_shipped_packs_all_load():
     for path in pack_files:
         pack = load(path)
         assert pack.tools, f"{path} loaded but has no tools"
+
+
+def write_json(path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data))
+    return path
+
+
+def edited(edit):
+    """sample_pack() as JSON, changed in place by edit(data), or replaced by
+    what edit returns."""
+    data = sample_pack().to_dict()
+    replacement = edit(data)
+    return data if replacement is None else replacement
+
+
+def first_step(data):
+    return data["tools"][0]["steps"][0]
+
+
+def set_in(target, key, value):
+    target[key] = value
+
+
+def drop(target, key):
+    del target[key]
+
+
+MALFORMED = {
+    "a list at the top": lambda data: [data],
+    "a tool given as a string": lambda data: set_in(data, "tools", ["write_document"]),
+    "tools given as an object": lambda data: set_in(data, "tools", {"write_document": {}}),
+    "params given as a list": lambda data: set_in(data["tools"][0], "params", ["text"]),
+    "a param given as a string": lambda data: set_in(data["tools"][0], "params", {"text": "Content."}),
+    "a param with an unknown type": lambda data: set_in(data["tools"][0], "params", {"text": {"type": "text"}}),
+    "a param typed as a list of types": lambda data: set_in(
+        data["tools"][0], "params", {"text": {"type": ["string", "null"]}}
+    ),
+    "a param name with a space": lambda data: set_in(
+        data["tools"][0], "params", {"the text": {"type": "string"}}
+    ),
+    "a step given as a string": lambda data: set_in(data["tools"][0], "steps", ["set_value"]),
+    "an op given as a list": lambda data: set_in(first_step(data), "op", ["press"]),
+    "an anchor given as a string": lambda data: set_in(first_step(data), "anchor", "AXTextArea"),
+    "a chain given as an object": lambda data: set_in(first_step(data)["anchor"], "chain", {"role": "AXWindow"}),
+    "a chain link given as a string": lambda data: set_in(first_step(data)["anchor"], "chain", ["AXWindow"]),
+    "a chain ordinal given as text": lambda data: set_in(first_step(data)["anchor"]["chain"][0], "ordinal", "0"),
+    "labels given as a string": lambda data: set_in(first_step(data)["anchor"], "labels", "Body"),
+    "a value with both a param and a literal": lambda data: set_in(
+        first_step(data), "value", {"param": "text", "literal": "x"}
+    ),
+    "a set_value with no value": lambda data: drop(first_step(data), "value"),
+    "settle given as text": lambda data: set_in(first_step(data), "settle", "false"),
+    "requires_frontmost given as text": lambda data: set_in(data["tools"][0], "requires_frontmost", "yes"),
+    "preconditions given as an object": lambda data: set_in(data["tools"][0], "preconditions", {"kind": "app_running"}),
+    "a precondition given as a string": lambda data: set_in(data["tools"][0], "preconditions", ["app_running"]),
+    "a verify given as a string": lambda data: set_in(data["tools"][0], "verify", ["value_contains"]),
+    "a verify on an undeclared param": lambda data: set_in(data["tools"][0]["verify"][0], "param", "ghost"),
+    "a description given as a number": lambda data: set_in(data["tools"][0], "description", 7),
+    "an os_version given as a number": lambda data: set_in(data, "os_version", 26.3),
+    "healed_pending given as an object": lambda data: set_in(data, "healed_pending", {"original": {}}),
+    "a heal entry given as a string": lambda data: set_in(data, "healed_pending", ["fix"]),
+    "a heal entry with no healed anchor": lambda data: set_in(
+        data, "healed_pending", [{"original": {"role": "AXTextArea"}}]
+    ),
+    "a format_version of true": lambda data: set_in(data, "format_version", True),
+}
+
+
+@pytest.mark.parametrize("shape", sorted(MALFORMED))
+def test_every_malformed_shape_is_a_packerror(tmp_path, shape):
+    """One malformed pack used to crash vent serve at startup: a list where
+    an object belongs raised AttributeError out of the loader, and params
+    given as a list loaded and then broke tools/list."""
+    path = write_json(tmp_path / "com.apple.TextEdit" / "pack.json", edited(MALFORMED[shape]))
+    with pytest.raises(PackError) as raised:
+        load(path)
+    assert str(path) in str(raised.value)
+
+
+def test_bytes_that_are_not_utf8_are_a_packerror(tmp_path):
+    path = tmp_path / "p" / "pack.json"
+    path.parent.mkdir()
+    path.write_bytes(b'{"format_version": 2, "app_name": "Caf\xe9"}')
+    with pytest.raises(PackError, match="not UTF-8"):
+        load(path)
+
+
+def test_a_utf8_byte_order_mark_is_accepted(tmp_path):
+    path = tmp_path / "p" / "pack.json"
+    save(sample_pack(), path)
+    path.write_bytes(b"\xef\xbb\xbf" + path.read_bytes())
+    assert load(path).bundle_id == "com.apple.TextEdit"
+
+
+def test_load_all_skips_every_kind_of_broken_pack(tmp_path, capsys):
+    from vent.packs import load_all
+
+    save(sample_pack(), tmp_path / "good" / "pack.json")
+    write_json(tmp_path / "listed" / "pack.json", [sample_pack().to_dict()])
+    (tmp_path / "latin1" / "pack.json").parent.mkdir()
+    (tmp_path / "latin1" / "pack.json").write_bytes(b"\xff\xfe")
+    write_json(tmp_path / "params" / "pack.json", edited(MALFORMED["params given as a list"]))
+    assert [pack.bundle_id for pack in load_all(tmp_path)] == ["com.apple.TextEdit"]
+    assert capsys.readouterr().err.count("warning: skipping") == 3
 
 
 def test_shipped_packs_pin_no_window_titles():
