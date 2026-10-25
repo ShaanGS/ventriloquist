@@ -20,6 +20,7 @@ import math
 import platform
 import re
 import sys
+import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
@@ -73,6 +74,21 @@ def pack_file(directory: Path, bundle_id: str) -> Path:
     if not valid_bundle_id(bundle_id):
         raise PackError(f"{bundle_id!r} is not a bundle id (reverse-DNS letters, digits, '-' and '_' only)")
     return Path(directory) / bundle_id / "pack.json"
+
+
+def clean_text(text: str, limit: int) -> str:
+    """Strip control, format and bidi-override characters, fold whitespace
+    to single spaces, and cap the length. For text a model or a pack author
+    wrote that a person or a client model reads, so it cannot forge
+    structure or hide characters there (SECURITY.md T5). Line breaks and
+    tabs become spaces first, so the words either side stay apart."""
+    kept = []
+    for ch in text:
+        if ch.isspace():
+            kept.append(" ")
+        elif not unicodedata.category(ch).startswith("C"):  # control, format, surrogate, etc.
+            kept.append(ch)
+    return " ".join("".join(kept).split())[:limit]
 
 
 def _kind(value: Any) -> str:
