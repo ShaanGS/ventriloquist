@@ -4,7 +4,7 @@ The notes for every release are on
 [GitHub Releases](https://github.com/ShaanGS/ventriloquist/releases). This
 file lists what has changed since the last one.
 
-## 0.3.0 (Unreleased)
+## 0.3.0 (2026-10-26)
 
 Safety fixes from a review before the launch, and a gate that asks you
 before a high-risk tool runs.
