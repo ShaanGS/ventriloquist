@@ -278,6 +278,7 @@ def _run_tool(
     arguments: dict,
     writable_dir: Path,
     allow_heal: bool,
+    redact_values: bool,
 ) -> runtime.ToolResult:
     """One call against the live app, on a worker thread. The caller holds
     the app's lock, and the front's when the tool needs it."""
@@ -291,6 +292,7 @@ def _run_tool(
             packs.pack_file(writable_dir, pack.bundle_id),
             ask_model=allow_heal,
             low_confidence=low_confidence,
+            redact_values=redact_values,
         )
     return runtime.execute(
         pack, spec.name, arguments, root,
@@ -357,6 +359,10 @@ def build_server(search_path: list[Path]) -> Server:
     # fully deterministic. Deterministic reuse of an already-quarantined
     # fix still runs (it costs nothing and re-screens on every use).
     allow_heal = os.getenv("VENT_HEAL") == "1"
+    # With VENT_NO_VALUES=1 as well, the snapshot a heal sends the model
+    # leaves field values out, as `vent explore --no-values` does
+    # (SECURITY.md T6).
+    redact_values = os.getenv("VENT_NO_VALUES") == "1"
 
     async def on_list_tools(ctx, params) -> types.ListToolsResult:
         can_confirm = client_can_confirm(ctx)
@@ -416,7 +422,7 @@ def build_server(search_path: list[Path]) -> Server:
                         "Giving up on the queue."
                     )
                 result = await anyio.to_thread.run_sync(
-                    _run_tool, pack, spec, arguments, writable_dir, allow_heal, limiter=tool_threads
+                    _run_tool, pack, spec, arguments, writable_dir, allow_heal, redact_values, limiter=tool_threads
                 )
         except (runtime.ToolExecutionError, ax.AXError, packs.PackError) as exc:
             # The message names the app, tool, and step, which is what

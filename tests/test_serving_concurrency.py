@@ -34,7 +34,7 @@ class Runs:
         self.gates[key] = threading.Event()
         self.started[key] = threading.Event()
 
-    def __call__(self, pack, spec, arguments, writable_dir, allow_heal):
+    def __call__(self, pack, spec, arguments, writable_dir, allow_heal, redact_values):
         key = f"{pack.app_name}.{spec.name}"
         with self.lock:
             self.events.append(("start", key, arguments.get("text")))

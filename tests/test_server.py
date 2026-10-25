@@ -22,6 +22,7 @@ from vent.packs import Step, ToolSpec, save
 from vent.runtime import ToolResult
 from vent.server import READ_NOTE, build_server, result_text, serve_beside_run_loop
 
+from .fakes import textedit_like
 from .test_packs import sample_pack
 
 MODES = ["auto", "legacy"]  # the 2026-07-28 per-request protocol, and the handshake one before it
@@ -67,7 +68,7 @@ def runs(monkeypatch):
     """Stub out the live part of a call and record what reached it."""
     calls = []
 
-    def fake_run(pack, spec, arguments, writable_dir, allow_heal):
+    def fake_run(pack, spec, arguments, writable_dir, allow_heal, redact_values):
         calls.append((spec.name, dict(arguments)))
         return ToolResult(ok=True, tool=spec.name, detail="1 step")
 
@@ -385,6 +386,41 @@ def test_missing_arguments_are_refused_before_anything_queues(tmp_path, runs):
     assert result.is_error
     assert "missing arguments ['text']" in result.content[0].text
     assert runs == []
+
+
+@pytest.mark.parametrize(
+    "env, asked_for",
+    [
+        ({}, {"ask_model": False, "redact_values": False}),
+        ({"VENT_HEAL": "1"}, {"ask_model": True, "redact_values": False}),
+        ({"VENT_HEAL": "1", "VENT_NO_VALUES": "1"}, {"ask_model": True, "redact_values": True}),
+    ],
+    ids=["quarantine only", "VENT_HEAL", "VENT_HEAL and VENT_NO_VALUES"],
+)
+def test_served_healing_follows_vent_heal_and_vent_no_values(tmp_path, monkeypatch, env, asked_for):
+    """A heal asks the model only under VENT_HEAL=1, and VENT_NO_VALUES=1
+    keeps field values out of the snapshot it sends."""
+    for name in ("VENT_HEAL", "VENT_NO_VALUES"):
+        monkeypatch.delenv(name, raising=False)
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    built = []
+
+    def make_heal_callback(pack, pack_path, **options):
+        built.append(options)
+        return lambda broken, root: None
+
+    monkeypatch.setattr(server_mod.heal, "make_heal_callback", make_heal_callback)
+    monkeypatch.setattr(ax, "find_app_by_bundle", lambda bundle_id: ax.RunningApp("TextEdit", bundle_id, 1))
+    monkeypatch.setattr(ax, "app_element", lambda app: textedit_like())
+    monkeypatch.setattr(ax, "app_version", lambda app: "1.19")
+    monkeypatch.setattr(runtime, "execute", lambda *args, **kwargs: ToolResult(ok=True, tool="write_document", detail="1 step"))
+    pack = sample_pack()
+    pack.healed_pending = [{"original": {"role": "AXTextArea"}, "healed": {"role": "AXTextArea"}}]
+
+    result = call(served(tmp_path, pack), "textedit_write_document", {"text": "x"})
+    assert not result.is_error, result.content[0].text
+    assert [{key: options[key] for key in asked_for} for options in built] == [asked_for]
 
 
 def test_a_call_runs_off_the_event_loop_and_never_pumps_appkit_there(tmp_path, monkeypatch):

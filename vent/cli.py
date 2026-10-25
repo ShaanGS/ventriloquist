@@ -251,7 +251,10 @@ def _find_pack(name: str) -> packs.Pack:
 @click.argument("tool_name")
 @click.option("--arg", "arg_pairs", multiple=True, help="Tool argument as key=value. Repeatable.")
 @click.option("--heal", "do_heal", is_flag=True, help="Re-ground broken anchors with a model and quarantine the fix.")
-def run(app_name: str, tool_name: str, arg_pairs: tuple[str, ...], do_heal: bool) -> None:
+@click.option(
+    "--no-values", is_flag=True, help="With --heal: leave field values out of the snapshot sent to the model."
+)
+def run(app_name: str, tool_name: str, arg_pairs: tuple[str, ...], do_heal: bool, no_values: bool) -> None:
     """Execute one compiled tool against the live app, without MCP."""
     from . import heal as heal_mod
 
@@ -272,6 +275,7 @@ def run(app_name: str, tool_name: str, arg_pairs: tuple[str, ...], do_heal: bool
             pack_path = _user_pack_path(pack.bundle_id)
             heal_cb = heal_mod.make_heal_callback(
                 pack, pack_path, notify=click.echo, ask_model=do_heal, low_confidence=low_confidence,
+                redact_values=no_values,
             )
         result = runtime.execute(
             pack, tool_name, args, root, app=app, low_confidence=low_confidence, heal=heal_cb,
