@@ -73,3 +73,57 @@ jobs:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+
+  # Lists the new version in the official MCP registry. The registry checks
+  # the package on PyPI, so this runs after the publish job. GitHub's OIDC
+  # token proves the job runs in a ShaanGS repository, which is what the
+  # io.github.ShaanGS namespace needs, so no secret is stored for it.
+  mcp-registry:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      # A fixed publisher release and the SHA-256 GitHub lists for its
+      # linux_amd64 archive on that release page. Change both together.
+      MCP_PUBLISHER_VERSION: v1.8.1
+      MCP_PUBLISHER_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install mcp-publisher, checking its checksum
+        run: |
+          archive="$RUNNER_TEMP/mcp-publisher_linux_amd64.tar.gz"
+          curl --fail --location --silent --show-error --output "$archive" \
+            "https://github.com/modelcontextprotocol/registry/releases/download/$MCP_PUBLISHER_VERSION/mcp-publisher_linux_amd64.tar.gz"
+          echo "$MCP_PUBLISHER_SHA256  $archive" | sha256sum --check --strict
+          tar -xzf "$archive" -C "$RUNNER_TEMP" mcp-publisher
+          "$RUNNER_TEMP/mcp-publisher" --version
+      - name: Wait for PyPI to list the new version
+        # A fresh upload can take a minute or two to show up in PyPI's JSON
+        # API, which is what the registry checks.
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent --output /dev/null "https://pypi.org/pypi/ventriloquist-mcp/$version/json"; then
+              echo "PyPI lists ventriloquist-mcp $version"
+              exit 0
+            fi
+            echo "PyPI doesn't list $version yet (try $attempt of 20), waiting 15 s"
+            sleep 15
+          done
+          echo "PyPI never listed ventriloquist-mcp $version"
+          exit 1
+      - name: Publish server.json to the MCP registry
+        # Logging in on every try keeps the short-lived registry token fresh.
+        run: |
+          for attempt in 1 2 3; do
+            if "$RUNNER_TEMP/mcp-publisher" login github-oidc && "$RUNNER_TEMP/mcp-publisher" publish; then
+              exit 0
+            fi
+            echo "Publishing failed (try $attempt of 3), waiting 30 s"
+            sleep 30
+          done
+          exit 1
