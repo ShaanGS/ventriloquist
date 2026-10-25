@@ -12,10 +12,9 @@ don't open a public issue for a security problem.
 
 Ventriloquist drives real apps on a real Mac, with real data in them. This
 document lists what can go wrong and what the code does about it. It was
-red-teamed before any code existed and rewritten from the findings; that
-review proved two of the first draft's claims false, which is why it
-existed. It was checked against the code again for 0.3.0. Anything not
-built yet is marked **Planned**.
+red-teamed before any code existed and rewritten from the findings (the
+review proved two of the first draft's claims false), and checked against
+the code again for 0.3.0. Anything not built yet is marked **Planned**.
 
 ### Assets
 
@@ -31,7 +30,8 @@ action space is a closed set of typed ops that its own runtime carries
 out: `press`, `set_value`, `pick`, `reveal`, `raise_window`, `open_app`,
 `wait_for` and `read_value`. None of them runs code or AppleScript, or
 builds a command out of text. `open_app` runs macOS's `open -b` with the
-pack's bundle id as a fixed argument, never through a shell.
+pack's bundle id as a fixed argument, never through a shell, and with its
+input and output pointed away from the MCP connection.
 
 `read_value` is the one op that moves data out. It returns an element's
 live value or, for an element with no value of its own such as a web view,
@@ -51,9 +51,12 @@ blocklist to catch. vent's own first demo emptied and rewrote a document
 this way. So these rules look at the op, not the label:
 
 - While exploring, the explorer only presses and writes, and it writes
-  only into an empty text field. The field's previous value is put back
-  right after the probe. If that fails, the probe is marked destructive in
-  the trace, so neither the compiler nor you treat it as clean.
+  only into a text field it has read as empty. A field that doesn't
+  answer the read counts as unknown, not empty, and isn't touched. The
+  field's previous value is put back right after the probe, even if the
+  app stops answering in between. If the restore fails, the probe is
+  marked destructive in the trace, so neither the compiler nor you treat
+  it as clean.
 - When compiling, each tool's risk comes from what its recorded steps did.
   A step the policy classed as destructive, or a press on a label with a
   destructive verb, makes the tool `high`. Any write, press or cumulative
@@ -70,15 +73,24 @@ Layered, because no single layer is enough:
 
 - An app is explored only when you name it: `vent explore <App>`.
 - Every probe the model suggests goes through `vent/policy.py` before it
-  runs. A label with a destructive verb is refused: delete, remove, send,
-  pay, buy, submit, publish, share, archive, quit, close and about 25
-  more, kept as a plain list (`DESTRUCTIVE_VERBS`) so it's easy to audit.
+  runs. A label with a destructive or committing verb is refused: delete,
+  remove, send, pay, buy, submit, publish, share, archive, quit, close,
+  accept, join, install, sign out, don't save and about 80 more, kept as a
+  plain list (`DESTRUCTIVE_VERBS`) so it's easy to audit.
+- Labels and window titles are compared the way they render: Unicode
+  look-alike forms are normalized, invisible characters dropped, and
+  accents and case folded, so a Delete in fullwidth letters or split by a
+  zero-width space still reads as delete, and "Log-Out" matches log out.
 - The list is incomplete, so its known gaps get rules of their own:
-  - An element with no label, or a label mostly in a non-Latin script, is
-    refused.
-  - The verb list is English. A label in another language written in
-    Latin letters, such as Löschen or Envoyer, isn't recognized and can
-    pass. Explore apps whose interface is in English.
+  - The verb lists are English, so the explorer reads the app's menu bar
+    first and refuses to probe an app whose menus aren't in English. That
+    check goes by the menus, so a single label in another language inside
+    an English app can still pass.
+  - An element with no label is refused, and so is a label that isn't
+    wholly in Latin script, including one that mixes in a look-alike
+    letter from another script, like a Cyrillic е inside Delete.
+  - Nothing inside a sheet or dialog is probed: its buttons answer
+    whatever it asks.
   - Verbs that are only sometimes risky (clear, reset, replace,
     overwrite, cancel, stop, hide) are judged with the rest of the label
     and the window title: "Clear Formatting" passes, "Clear All History"
@@ -92,10 +104,10 @@ Layered, because no single layer is enough:
     Cumulative ones (New Note, Add, Duplicate) are capped at three per
     session, so exploring can't leave forty empty notes synced to iCloud.
 - Dialog watchdog: when a probe opens a sheet or dialog, the explorer
-  presses that dialog's own cancel button, and it never touches the
-  element that opened it again that session. It presses nothing else: OK,
-  Yes and No answer whatever the dialog asks. A dialog with no cancel
-  button stops exploring until you close it.
+  presses the button the dialog itself names as its cancel button, and it
+  never touches the element that opened it again that session. It presses
+  nothing else: OK, Yes and No answer whatever the dialog asks. A dialog
+  with no cancel button stops exploring until you close it.
 - **Planned:** replaying each proposed tool once before you approve it,
   against a scratch document. Today `vent compile` replays nothing; the
   approval gate shows the recorded steps and you decide.
@@ -157,17 +169,24 @@ compiling. Password fields are never in it, and other field values are
 cut to 80-character previews. `vent explore --no-values` replaces every
 field value with a length marker (`<N chars redacted>`), so exploring
 sends no field contents; element structure and labels still go. Healing
-respects `--no-values` too. Without it, exploring sends up to 80
+can redact the same way: `--no-values` on `vent run --heal`, and
+`VENT_NO_VALUES=1` for `vent serve`. Without it, exploring sends up to 80
 characters of each field it sees (a note body, a draft), so `--no-values`
 is the switch for an app holding sensitive text. The cut is for privacy,
 not a defense against injection: a short payload survives it, and T5
 handles that.
 
-Traces and packs stay on your disk. There's no telemetry. Every network
-call lives in one file, `vent/llm.py`, including the fallback that runs
-the Claude Code CLI (`claude -p` in print mode, with its tools turned
-off): a different route to the same model, started from the same file,
-carrying the same text and nothing else.
+Traces and packs stay on your disk, and traces, which hold an app's
+labels and window titles, are readable by your user only. There's no
+telemetry. Every network call lives in one file, `vent/llm.py`, including
+the fallback that runs the Claude Code CLI when there's no API key: a
+different route to the same model, started from the same file, carrying
+the same text and nothing else. That call runs `claude -p` in print mode
+with its tools turned off and with `--safe-mode --strict-mcp-config
+--setting-sources "" --no-session-persistence`, in a fresh empty
+temporary directory, so none of your MCP servers, hooks, CLAUDE.md files,
+memory or settings come into it and no session is saved. A CLI too old
+for those flags is treated as unavailable, never run without them.
 
 Probing is reversible on the local field, not across a network the app
 owns. The explorer writes a short probe string into an empty field and
@@ -210,21 +229,29 @@ them, which means a hostile app state could steer a harmless tool's
 anchor onto a dangerous element. And "the replay worked" is no safety
 check, because destructive replays work too. The fences, in layers:
 
-- Healing that asks a model is opt-in: `VENT_HEAL=1` for `vent serve`,
-  `--heal` for `vent run`. With it off, serving never calls a model.
-- It looks only in the window the broken anchor was recorded in, and it
-  respects `--no-values` (T6).
+- Healing asks a model only when the caller turns it on: `VENT_HEAL=1`
+  for `vent serve`, `--heal` for `vent run`. With it off, serving never
+  calls a model.
+- It looks only at the anchor's own window: the one whose title the
+  anchor pinned, the focused window for an anchor with no title, or the
+  menu bar for a menu command. If that window isn't open, it refuses. It
+  can keep field values from the model (T6).
 - Given a cut-off snapshot, it refuses rather than guess at the nearest
   lookalike; it can't choose in a window it can't fully see.
-- A fix must land on the same kind of control (the same role). A step
-  that pressed a button can't heal onto a text field, or the other way
-  round.
+- A fix must land on the same kind of control (the same role), and in
+  the same kind of place: a step recorded in a sheet only heals onto an
+  element in one, and an anchor with no window title only heals into
+  another with none. A step that pressed a button can't heal onto a text
+  field, or the other way round.
 - Every fix is screened by the policy against its new target: destructive
-  and context-dependent verbs, confirm buttons in windows with a
-  destructive title, login windows and password fields.
+  and context-dependent verbs, labels that mix scripts, confirm buttons in
+  windows with a destructive title, login windows and password fields.
 - Matching a fix to the anchor it replaces includes the anchor's chain of
   ancestors, so two identical unlabeled twins in one window are never
   confused.
+- Saving a fix to the quarantine reads the pack from disk first, so it
+  never undoes what `vent compile` or `vent verify` saved in the
+  meantime.
 
 Fixes are never promoted on their own. A fix goes into the pack's
 quarantine (`healed_pending`), and only `vent verify` moves it into a
@@ -253,6 +280,14 @@ the pack's author, and the server acts on it:
   into chat, mail or a terminal are injection tools in their own right,
   and belong here.
 - `VENT_READ_ONLY=1` hides and refuses every tool that isn't `read_only`.
+
+A call that fails says what it already did. Once a press, write or pick
+has gone out, a later error in the same call names it, so a client
+doesn't take the failure to mean nothing happened and try again. The call
+also presses the cancel button of any sheet or dialog that opened while
+it ran (ones open before it are left alone), so the next call doesn't
+meet a half-finished dialog. A tool that needs its app in front fails
+without running a step if the app doesn't come forward.
 
 Tools also describe themselves to clients: `read_only` tools carry
 `readOnlyHint`, `high` ones `destructiveHint`, and every tool has a title

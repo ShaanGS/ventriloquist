@@ -107,15 +107,19 @@ Everything lives in the `vent/` package. One file per concern:
   element is provably the recorded one; lookalikes count as WRONG, and the
   design goal is zero wrong. Skips rounds honestly when the screen is locked
   or the app never comes back.
-- `explorer.py`. The model-driven part of compile time. The model nominates
-  elements worth probing; the policy screens every nomination; only
-  reversible or budgeted actions execute (a probe writes into an empty field
-  and restores the prior value immediately). A dialog a probe opens is
-  closed with its own cancel button and nothing else. Everything that ran is
-  recorded into a trace.
+- `explorer.py`. The model-driven part of compile time. It refuses an app
+  whose menus aren't in English, since the policy reads English. The model
+  nominates elements worth probing; the policy screens every nomination;
+  only reversible or budgeted actions execute (a probe writes into a field
+  it has read as empty and restores the prior value immediately). A dialog
+  a probe opens is closed with the cancel button it names and nothing
+  else. Everything that ran is recorded into a trace, readable by the
+  user only.
 - `policy.py`. The safety screen, applied after the model. Closed action
-  space, destructive-word detection (English only), per-session budgets for
-  cumulative actions like New Note, nothing probed in login windows.
+  space, destructive and committing verbs matched on labels normalized the
+  way they render, labels that aren't wholly Latin script refused, nothing
+  probed inside a sheet or dialog or in a login window, and per-session
+  budgets for cumulative actions like New Note.
 - `compiler.py`. Turns a trace into proposed tools. Composes only actions
   that actually executed, so compiled tools press and type; read and wait
   steps are written by hand with `vent inspect` and `vent anchor`, as every
@@ -124,12 +128,14 @@ Everything lives in the `vent/` package. One file per concern:
   steps. The steps are ground truth; the description is not. Nothing is
   written without approval, and approved tools join the app's existing pack.
 - `heal.py`. When resolution fails at runtime with healing enabled, the model
-  gets the broken anchor plus a fresh snapshot of the anchor's window and
-  proposes a re-grounding. It respects `--no-values`, and refuses truncated
-  snapshots, cross-role targets, and destructive targets. The fix goes into
-  the pack's `healed_pending` quarantine, is usable for the current call,
-  and is only promoted into the anchor of record when a human approves it in
-  `vent verify`.
+  gets the broken anchor plus a fresh snapshot of the anchor's own window
+  (healing refuses if that window isn't open) and proposes a re-grounding.
+  Field values can be redacted (`--no-values` on `vent run --heal`,
+  `VENT_NO_VALUES=1` for `vent serve`). It refuses truncated snapshots,
+  cross-role targets, and destructive targets. The fix goes into the pack's
+  `healed_pending` quarantine, saved onto the pack as it is on disk, is
+  usable for the current call, and is only promoted into the anchor of
+  record when a human approves it in `vent verify`.
 - `llm.py`. The single home for every model call, and the only file with
   network egress. Two backends, tried in order: the Anthropic SDK (needs
   `ANTHROPIC_API_KEY` or an `ant auth login` profile, uses the API's
@@ -137,8 +143,12 @@ Everything lives in the `vent/` package. One file per concern:
   CLI (`claude -p`, print mode, tools disabled, works with a subscription
   login and no API key; the schema travels in the prompt and responses are
   parsed strictly, with exactly one wrapping markdown fence tolerated as
-  transport framing). App-derived text is wrapped in nonce-delimited
-  untrusted-content markers before it reaches a prompt.
+  transport framing). The CLI runs with `--safe-mode --strict-mcp-config
+  --setting-sources "" --no-session-persistence` in a fresh temporary
+  directory, so none of the user's MCP servers, hooks, memory or settings
+  load, and a CLI too old for those flags counts as unavailable. App-derived
+  text is wrapped in nonce-delimited untrusted-content markers before it
+  reaches a prompt.
 - `cli.py`. Click-based CLI wiring all of the above together.
 
 ## The pack format, concretely
@@ -274,8 +284,9 @@ tab. The load-bearing invariants:
 
 Honest limits, also documented: probe reversibility is local (an app that
 syncs on every keystroke may transmit a probe string before the restore),
-the destructive-verb list is English only, and truncation of previews is a
-privacy measure, not an injection defense.
+the policy reads English only (so the explorer refuses apps whose menus are
+in another language), and truncation of previews is a privacy measure, not
+an injection defense.
 
 ## Durability numbers (the author's Mac, macOS 26)
 

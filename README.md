@@ -253,9 +253,12 @@ shows how.
 
 `vent explore`, `vent compile`, and `vent run --heal` call a model, and so
 does `vent serve` if you start it with `VENT_HEAL=1` to let it heal broken
-anchors. Nothing else does. The model comes from the Claude Code CLI if
-it's installed and signed in, with no API key needed, or from the
-Anthropic API: install with
+anchors. Nothing else does. Healing takes `--no-values` too
+(`VENT_NO_VALUES=1` for the server) to keep field contents from the
+model. The model comes from the Claude Code CLI if it's installed and
+signed in, with no API key needed, run apart from your own Claude Code
+setup (none of your MCP servers, hooks or memory), or from the Anthropic
+API: install with
 `uv tool install --with anthropic ventriloquist-mcp`
 and set `ANTHROPIC_API_KEY`.
 
@@ -332,7 +335,8 @@ does with caveats:
   under a policy, and probes are restored, but an app that syncs every
   keystroke may send a probe string before it's undone. Explore against
   a scratch document or a test account, and use `--no-values` to keep
-  field contents away from the model.
+  field contents away from the model. The policy reads English labels,
+  so the explorer refuses an app whose menus are in another language.
 - **Read tools hand app text to your client's model.** vent marks it as
   untrusted data (SECURITY.md T12); whether the client respects that is
   up to the client.

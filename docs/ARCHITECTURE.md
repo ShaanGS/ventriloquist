@@ -107,9 +107,10 @@ tree at one moment. The snapshot contract, revised after review:
   listed window would sit, and the snapshot says the window is on another
   Space. Anchor resolution, settle and the runtime's window checks walk
   the same children. A locked screen is left looking empty.
-- The snapshot reports whether a sheet (an `AXSheet` child of a window) or
-  a modal dialog window is open, because a modal changes what every other
-  element means.
+- The snapshot reports whether a sheet or a modal dialog is open, because
+  a modal changes what every other element means. A sheet is an `AXSheet`
+  child of its window; a modal dialog is a window whose subrole is
+  `AXDialog` or `AXSystemDialog`, or whose `AXModal` is true.
 - Every surfaced node records its full ancestor chain (role, label,
   `AXIdentifier`, same-role sibling ordinal, raw index) so anchors can be
   built without re-walking the tree. Container levels stay in the chain; they
@@ -296,10 +297,11 @@ the step acted inside it; it is most of a native app's tree, and anchor
 resolution skips it on the same terms. A write takes its first fingerprint
 before setting the value, so the new value counts as the change; a press
 takes it afterwards, because what it waits for is the app's reaction.
-`wait_for` polls until its anchor resolves, with an explicit timeout. The
-app's root element gets a one-second messaging timeout
-(`AXUIElementSetMessagingTimeout`), so a hung app fails in about a second
-instead of the six-second system default. Polling is the deliberate v1
+`wait_for` polls until its anchor resolves, with an explicit timeout. vent
+sets a one-second messaging timeout (`AXUIElementSetMessagingTimeout`) on
+the system-wide element, which makes it the default for every element the
+process touches, so a hung app fails in about a second instead of the
+six-second system default. Polling is the deliberate v1
 choice over `AXObserver` notifications; observers need a run loop and are a
 v2 upgrade with a clean seam (the settle loop is one function).
 
@@ -308,7 +310,10 @@ frontmost, and activating an app steals focus from whatever the user is
 doing, which can send their keystrokes somewhere they did not intend. So:
 each ToolSpec declares `requires_frontmost`; when true, the runtime activates
 the app, waits for it to report itself frontmost, runs the tool, and
-restores the previously frontmost app after.
+restores the previously frontmost app after. An app that doesn't come
+forward within two seconds fails the call before any step runs, since a
+press that reaches an app in the background can flip a button without
+doing anything.
 When the app's window is on another Space, activating it switches the
 display to that Space and restoring the previous app switches back. Only
 tools that need it declare it: the TextEdit tools and the Outlook example's
@@ -335,22 +340,28 @@ runs. There is no parallel execution against a single app, ever.
 way: a sheet on the window the step's element is in, or a modal dialog window
 in the app. Unless the step's own element was recorded inside that sheet or
 dialog, the step refuses and names it. The runtime never acts "through" an
-unexpected modal.
+unexpected modal. When a call fails, it presses the cancel button of any
+sheet or dialog that opened during the call, and leaves alone the ones that
+were open before it; its error also says which presses, writes or picks had
+already gone out.
 
 ## 8. The explorer
 
 Built last (section 10 explains the order). Two phases, then the gate:
 
-1. **Probe rounds.** Each round takes a snapshot (window contents; the menu
+1. **Probe rounds.** First the explorer reads the menu bar and refuses an
+   app whose menus aren't in English, since the policy's verb lists are
+   English. Then each round takes a snapshot (window contents; the menu
    bar is left out), and the model nominates up to four elements to press
    or type into. `policy.py` screens every nomination (SECURITY.md T2 and
    T3: op-type gating, default-deny for unlabeled or unreadable elements,
-   reversibility classes, a budget for cumulative actions), and approved
-   probes run while the settle protocol from section 7 attributes effects
-   to the right action. A probe that changes the tree ends the round, so
-   the next nomination works from a fresh snapshot. A dialog a probe opens
-   is closed with its own cancel button, and its trigger is marked risky.
-   Everything is recorded in a trace.
+   nothing inside a sheet or dialog, reversibility classes, a budget for
+   cumulative actions), and approved probes run while the settle protocol
+   from section 7 attributes effects to the right action. A probe that
+   changes the tree ends the round, so the next nomination works from a
+   fresh snapshot. A dialog a probe opens is closed with the cancel button
+   it names, and nothing else, and its trigger is marked risky. Everything
+   is recorded in a trace.
 2. **Synthesize.** `vent compile` sends the list of probes that ran to the
    model, which groups them into candidate tools and names them. The tools
    are built from the recorded steps and anchors only. **Planned:**
@@ -378,16 +389,20 @@ verifications against live reads. Structured result out. No retries inside
 a step.
 
 On `AnchorLost` or `AnchorAmbiguous` the runtime calls the heal callback, if
-it was given one, with the broken anchor. The healer takes a fresh snapshot,
-refuses if it was cut short, looks only in the window the anchor was
-recorded in, and proposes a re-grounding; the runtime replays the step
-against it once. The healed anchor goes to quarantine inside the pack
-(`healed_pending`), is policy-checked, and is only promoted to the anchor of
-record by the user (`vent verify` offers the promotion). Asking a model is
-opt-in (`VENT_HEAL=1` for the server, `--heal` for `vent run`); without it,
-only fixes already in quarantine are reused, with no model call. If healing
-fails, the tool call fails loudly, naming the app, tool, and step. Silent
-degradation is banned, and so is silent self-modification.
+it was given one, with the broken anchor. The healer looks only at the
+anchor's own window (the one whose title it pinned, the focused window for
+an anchor with no title, or the menu bar for a menu command) and refuses if
+that isn't open. It takes a fresh snapshot of that window, with field values
+redacted if the caller asked, refuses if it was cut short, and proposes a
+re-grounding; the runtime replays the step against it once. The healed
+anchor goes to quarantine inside the pack (`healed_pending`), saved onto the
+pack as it is on disk so nothing saved since is undone, is policy-checked,
+and is only promoted to the anchor of record by the user (`vent verify`
+offers the promotion). Asking a model is opt-in (`VENT_HEAL=1` for the
+server, `--heal` for `vent run`); without it, only fixes already in
+quarantine are reused, with no model call. If healing fails, the tool call
+fails loudly, naming the app, tool, and step. Silent degradation is banned,
+and so is silent self-modification.
 
 ## 10. Build order and milestones
 
