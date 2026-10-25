@@ -17,7 +17,8 @@ Design choices that came out of the security review (SECURITY.md T9, T10):
   approved each one when it was compiled. high risk tools ask the user to
   confirm every call through MCP elicitation, and a client that cannot ask
   is never shown them, unless the operator started the server with
-  VENT_ALLOW_HIGH=1, which runs them without asking.
+  VENT_ALLOW_HIGH=1, which runs them without asking. VENT_READ_ONLY=1
+  serves read_only tools and nothing else.
 
 Written against MCP SDK 2.3, which takes handlers as constructor arguments
 and serves both the initialize-handshake protocol (2025-11-25 and earlier)
@@ -178,10 +179,18 @@ def client_can_confirm(ctx: Any) -> bool:
     return elicitation is not None and (elicitation.form is not None or elicitation.url is None)
 
 
-def risk_refusal(spec: packs.ToolSpec, allow_high: bool, *, can_confirm: bool = False) -> str | None:
+def risk_refusal(
+    spec: packs.ToolSpec, allow_high: bool, *, read_only: bool = False, can_confirm: bool = False
+) -> str | None:
     """The refusal message for a tool call, or None if it may proceed.
     Split out of the handler so the gate is unit-testable. A tool this
     refuses is also left out of tools/list."""
+    if read_only and spec.risk != "read_only":
+        kind = "high risk" if spec.risk == "high" else spec.risk
+        return (
+            f"{spec.name} is a {kind} tool and this server was started with "
+            "VENT_READ_ONLY=1, which serves read_only tools only. Refusing."
+        )
     if spec.risk == "high" and not allow_high and not can_confirm:
         return (
             f"{spec.name} is a high risk tool. This client cannot ask the user to confirm "
@@ -342,6 +351,7 @@ def build_server(search_path: list[Path]) -> Server:
     tool_threads = anyio.CapacityLimiter(len(app_locks))
 
     allow_high = os.getenv("VENT_ALLOW_HIGH") == "1"
+    read_only = os.getenv("VENT_READ_ONLY") == "1"
     # Model-backed healing is opt-in: it spends model tokens and writes
     # quarantine entries to the pack. Off by default keeps the served path
     # fully deterministic. Deterministic reuse of an already-quarantined
@@ -352,7 +362,7 @@ def build_server(search_path: list[Path]) -> Server:
         can_confirm = client_can_confirm(ctx)
         tools = []
         for name, (pack, spec) in registry.items():
-            if risk_refusal(spec, allow_high, can_confirm=can_confirm) is not None:
+            if risk_refusal(spec, allow_high, read_only=read_only, can_confirm=can_confirm) is not None:
                 continue
             confirms = spec.risk == "high" and not allow_high
             tools.append(
@@ -375,7 +385,7 @@ def build_server(search_path: list[Path]) -> Server:
             return _error(f"Unknown tool {name!r}")
         pack, spec = registry[name]
 
-        refusal = risk_refusal(spec, allow_high, can_confirm=client_can_confirm(ctx))
+        refusal = risk_refusal(spec, allow_high, read_only=read_only, can_confirm=client_can_confirm(ctx))
         if refusal is not None:
             return _error(refusal)
         missing = [param for param in spec.params if param not in arguments]

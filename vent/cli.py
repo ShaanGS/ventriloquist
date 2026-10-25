@@ -640,7 +640,8 @@ SERVE_HELP = """Serve every compiled pack as MCP tools over stdio.
     Each call to a high risk tool asks the user to confirm it, through the
     client's MCP elicitation. A client without elicitation is not shown
     them, unless the server was started with VENT_ALLOW_HIGH=1, which runs
-    them without asking. See docs/SECURITY.md.
+    them without asking. VENT_READ_ONLY=1 serves read_only tools only. See
+    docs/SECURITY.md.
     """
 
 

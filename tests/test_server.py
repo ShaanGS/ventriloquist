@@ -365,6 +365,21 @@ def test_the_confirmation_shows_arguments_exactly(tmp_path):
     assert "more characters not shown" in long
 
 
+def test_read_only_mode_hides_and_refuses_everything_that_writes(tmp_path, monkeypatch, runs):
+    monkeypatch.setenv("VENT_READ_ONLY", "1")
+    monkeypatch.setenv("VENT_ALLOW_HIGH", "1")
+    pack = pack_with_a_read_tool()
+    pack.tools.append(replace(pack.tools[0], name="erase_document", risk="high"))
+    server = served(tmp_path, pack)
+    assert tool_names(server) == ["textedit_read_document"]
+    for name in ("textedit_write_document", "textedit_erase_document"):
+        result = call(server, name, {"text": "x"})
+        assert result.is_error
+        assert "VENT_READ_ONLY=1" in result.content[0].text
+    assert not call(server, "textedit_read_document", {}).is_error
+    assert runs == [("read_document", {})]
+
+
 def test_missing_arguments_are_refused_before_anything_queues(tmp_path, runs):
     result = call(served(tmp_path, sample_pack()), "textedit_write_document", {})
     assert result.is_error
