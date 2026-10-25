@@ -33,6 +33,7 @@ try:
         AXUIElementCopyAttributeNames,
         AXUIElementCopyAttributeValue,
         AXUIElementCreateApplication,
+        AXUIElementCreateSystemWide,
         AXUIElementPerformAction,
         AXUIElementSetAttributeValue,
         AXUIElementSetMessagingTimeout,
@@ -500,9 +501,27 @@ class Element:
         return f"<Element {self.role}{f' {label!r}' if label else ''}>"
 
 
+_timeout_set_globally = False
+
+
+def _set_global_timeout() -> None:
+    """Make MESSAGING_TIMEOUT_S the timeout for every element, once.
+
+    A timeout set on one element covers that ref alone, not even refs
+    equal to it, and every child a walk reads comes back as a new ref. Set
+    only on the app root, it covered the root's own calls, and every other
+    call to a hung app waited out the six-second system default. Set on
+    the system-wide element, it becomes this process's default."""
+    global _timeout_set_globally
+    if not _timeout_set_globally:
+        AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), MESSAGING_TIMEOUT_S)
+        _timeout_set_globally = True
+
+
 def app_element(app: RunningApp) -> Element:
     """Root accessibility element for a running application."""
     require_trusted()
+    _set_global_timeout()
     ref = AXUIElementCreateApplication(app.pid)
     AXUIElementSetMessagingTimeout(ref, MESSAGING_TIMEOUT_S)
     return Element(ref)
