@@ -109,3 +109,79 @@ def test_risky_element_never_pressed_again():
     assert pol.screen_press(n).allowed
     pol.mark_risky(n)
     assert not pol.screen_press(n).allowed
+
+
+def test_disguised_spellings_of_a_verb_are_still_caught():
+    """NFKC first, then invisible characters and accents out: each of these
+    renders as (or close to) Delete and used to match no verb."""
+    pol = policy_mod.Policy()
+    disguised = [
+        "Ｄｅｌｅｔｅ",  # fullwidth
+        "\U0001d403\U0001d41e\U0001d425\U0001d41e\U0001d42d\U0001d41e",  # mathematical bold
+        "Del​ete",  # zero-width space
+        "Dele­te",  # soft hyphen
+        "Déléte",  # accents
+    ]
+    for label in disguised:
+        verdict = pol.screen_press(node(label=label))
+        assert not verdict.allowed, ascii(label)
+        assert verdict.reason == "destructive verb 'delete'", ascii(label)
+
+
+def test_labels_that_mix_scripts_are_refused():
+    """A Cyrillic e (U+0435) or Greek o (U+03BF) inside a Latin word looks
+    the same and matches no verb, so the mix itself is refused."""
+    pol = policy_mod.Policy()
+    for label in ["Dеlete", "Sеnd", "Blοck"]:
+        verdict = pol.screen_press(node(label=label))
+        assert not verdict.allowed, ascii(label)
+        assert "mixes scripts" in verdict.reason
+    assert not policy_mod.screen_heal_target("AXButton", "Sеnd", "Main").allowed
+    # A label wholly in one other script is still "not classifiable" when
+    # probing, and left to the role fence when healing.
+    assert "not confidently classifiable" in pol.screen_press(node(label="削除")).reason
+    assert policy_mod.screen_heal_target("AXButton", "保存する", "Main").allowed
+
+
+def test_committing_verbs_are_refused():
+    pol = policy_mod.Policy()
+    for label in [
+        "Leave Channel", "Call", "Start Call", "Accept", "Decline", "Archive",
+        "Unsubscribe", "Sign Out", "Sign Out…", "Log Out", "Log-Out",
+        "Don’t Save", "Join Meeting", "Allow", "Install Update", "Approve",
+    ]:
+        assert not pol.screen_press(node(label=label)).allowed, label
+
+
+def test_everyday_labels_still_pass():
+    """Word matching keeps the longer list from catching verbs inside other
+    words: "Calendar" holds no "call", "Banner" no "ban"."""
+    pol = policy_mod.Policy()
+    for label in ["Bold", "Italic", "Calendar", "Banner", "Find", "Show Sidebar", "Zoom In", "Café Menu"]:
+        assert pol.screen_press(node(label=label)).allowed, label
+
+
+def test_nothing_inside_a_sheet_or_dialog_is_probed():
+    """Its buttons answer whatever it asks. The watchdog only cancels."""
+    from vent.snapshot import ChainLink
+
+    app = ChainLink(role="AXApplication", label="App", identifier="", ordinal=0, index=0)
+    window = ChainLink(role="AXWindow", label="", identifier="", ordinal=0, index=0, subrole="AXStandardWindow")
+    sheet = ChainLink(role="AXSheet", label="", identifier="", ordinal=0, index=3)
+    alert = ChainLink(role="AXWindow", label="", identifier="", ordinal=1, index=1, subrole="AXDialog")
+    pol = policy_mod.Policy()
+
+    in_sheet = node(label="Options")
+    in_sheet.chain = (app, window, sheet, ChainLink(role="AXButton", label="Options", identifier="", ordinal=0, index=0))
+    assert "inside a sheet or dialog" in pol.screen_press(in_sheet).reason
+    field = node(role="AXTextField", label="Name")
+    field.chain = in_sheet.chain[:-1] + (ChainLink(role="AXTextField", label="Name", identifier="", ordinal=0, index=1),)
+    assert not pol.screen_set_value(field, "").allowed
+
+    in_alert = node(label="Show Details")
+    in_alert.chain = (app, alert, ChainLink(role="AXButton", label="Show Details", identifier="", ordinal=0, index=0))
+    assert not pol.screen_press(in_alert).allowed
+
+    in_window = node(label="Options")
+    in_window.chain = (app, window, ChainLink(role="AXButton", label="Options", identifier="", ordinal=0, index=0))
+    assert pol.screen_press(in_window).allowed
