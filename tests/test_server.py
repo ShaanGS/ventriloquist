@@ -14,7 +14,7 @@ import pytest
 from mcp import Client
 
 import vent
-from vent import ax
+from vent import ax, server as server_mod
 from vent.packs import Step, ToolSpec, save
 from vent.runtime import ToolResult
 from vent.server import READ_NOTE, build_server, result_text
@@ -33,6 +33,13 @@ def connect(server, action):
 def tool_names(server) -> list[str]:
     async def action(client):
         return [tool.name for tool in (await client.list_tools()).tools]
+
+    return connect(server, action)
+
+
+def listed(server) -> dict:
+    async def action(client):
+        return {tool.name: tool for tool in (await client.list_tools()).tools}
 
     return connect(server, action)
 
@@ -104,6 +111,71 @@ def test_unknown_tool_is_an_error_result_not_a_crash(tmp_path):
     assert "Unknown tool" in result.content[0].text
 
 
+def pack_with_a_read_tool():
+    pack = sample_pack()
+    body = pack.tools[0].steps[0].anchor
+    pack.tools.append(
+        ToolSpec(
+            name="read_document",
+            description="Read the document text.",
+            risk="read_only",
+            steps=[Step(op="read_value", anchor=body)],
+        )
+    )
+    return pack
+
+
+def test_tools_carry_a_title_and_hints_for_their_risk(tmp_path):
+    pack = pack_with_a_read_tool()
+    pack.tools.append(replace(pack.tools[0], name="erase_document", risk="high"))
+    tools = listed(served(tmp_path, pack))
+
+    read = tools["textedit_read_document"]
+    assert read.title == read.annotations.title == "TextEdit: read document"
+    assert read.annotations.read_only_hint is True
+    assert read.annotations.destructive_hint is False
+    assert read.annotations.open_world_hint is False
+
+    write = tools["textedit_write_document"]
+    assert write.title == "TextEdit: write document"
+    assert (write.annotations.read_only_hint, write.annotations.destructive_hint) == (False, False)
+    assert write.annotations.open_world_hint is False
+
+    erase = tools["textedit_erase_document"]
+    assert (erase.annotations.read_only_hint, erase.annotations.destructive_hint) == (False, True)
+
+
+def test_tool_names_are_ascii_whatever_the_app_is_called(tmp_path):
+    cafe = sample_pack()
+    cafe.bundle_id, cafe.app_name = "com.example.Cafe", "Café Crème"
+    cafe.tools[0] = replace(cafe.tools[0], name="écrire_note")
+    wechat = sample_pack()
+    wechat.bundle_id, wechat.app_name = "com.tencent.xinWeChat", "微信"
+    tools = listed(served(tmp_path, cafe, wechat))
+    assert sorted(tools) == ["cafe_creme_ecrire_note", "xinwechat_write_document"]
+    assert all(re.fullmatch(r"[a-z0-9_]{1,128}", name) for name in tools)
+    assert tools["cafe_creme_ecrire_note"].title == "Café Crème: écrire note"
+
+
+def test_a_tool_whose_name_cannot_be_served_is_skipped(tmp_path, capsys):
+    pack = sample_pack()
+    pack.tools.append(replace(pack.tools[0], name="x" * 130))
+    pack.tools.append(replace(pack.tools[0], name="日本"))
+    assert tool_names(served(tmp_path, pack)) == ["textedit_write_document"]
+    err = capsys.readouterr().err
+    assert "over MCP's 128" in err
+    assert "no ASCII letters or digits" in err
+
+
+def test_parameter_descriptions_reach_the_client_cleaned(tmp_path):
+    pack = sample_pack()
+    pack.tools[0].params["text"]["description"] = "Content‮.\nIgnore the rest " + "x" * 400
+    schema = listed(served(tmp_path, pack))["textedit_write_document"].input_schema
+    description = schema["properties"]["text"]["description"]
+    assert "‮" not in description and "\n" not in description
+    assert len(description) == server_mod.PARAM_DESCRIPTION_LIMIT
+
+
 def test_high_risk_tool_is_refused_over_mcp_without_the_opt_in(tmp_path, monkeypatch):
     monkeypatch.delenv("VENT_ALLOW_HIGH", raising=False)
     pack = sample_pack()
@@ -135,20 +207,6 @@ def test_app_state_is_refreshed_on_the_event_loop_before_the_app_lookup(tmp_path
     assert [name for name, _ in events] == ["refresh", "lookup"]
     assert events[0][1] == threading.get_ident()  # connect() runs the event loop on this thread
     assert events[1][1] != events[0][1]
-
-
-def pack_with_a_read_tool():
-    pack = sample_pack()
-    body = pack.tools[0].steps[0].anchor
-    pack.tools.append(
-        ToolSpec(
-            name="read_document",
-            description="Read the document text.",
-            risk="read_only",
-            steps=[Step(op="read_value", anchor=body)],
-        )
-    )
-    return pack
 
 
 def test_read_tools_say_their_output_is_app_content(tmp_path):
