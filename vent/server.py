@@ -140,6 +140,15 @@ def result_text(pack: packs.Pack, spec: packs.ToolSpec, result: runtime.ToolResu
     return text
 
 
+def error_text(pack: packs.Pack, spec: packs.ToolSpec, message: str) -> str:
+    """The text a failed call returns. A failure can quote the app (the
+    label a resolved element wears, a sheet's title, a value read back), so
+    the message is wrapped as untrusted content, the same as a read's
+    values (SECURITY.md T12)."""
+    source = f"{pack.app_name}.{spec.name}"
+    return f"{source} failed:\n" + wrap_untrusted(f"{source} error", message)
+
+
 def risk_refusal(spec: packs.ToolSpec, allow_high: bool) -> str | None:
     """The refusal message for a tool call, or None if it may proceed.
     Split out of the handler so the gate is unit-testable."""
@@ -290,9 +299,9 @@ def build_server(search_path: list[Path]) -> Server:
         except (runtime.ToolExecutionError, ax.AXError, packs.PackError) as exc:
             # The message names the app, tool, and step, which is what
             # "fail loudly" means in SECURITY.md.
-            return _error(str(exc))
+            return _error(error_text(pack, spec, str(exc)))
         except Exception as exc:  # never leak a bare traceback to the client
-            return _error(f"{name}: internal error: {exc!r}")
+            return _error(error_text(pack, spec, f"internal error: {exc!r}"))
 
         text = result_text(pack, spec, result)
         return types.CallToolResult(content=[types.TextContent(type="text", text=text)])
