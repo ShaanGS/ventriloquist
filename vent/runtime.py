@@ -516,5 +516,10 @@ def execute(
         if previous_front is not None and previous_front.pid != (app.pid if app else -1):
             ax.activate(previous_front)
 
-    result.detail = f"{len(result.steps)} steps, {len(tool.verify)} checks passed"
+    checks = len(tool.verify)
+    result.detail = _count(len(result.steps), "step") + (f", {_count(checks, 'check')} passed" if checks else "")
     return result
+
+
+def _count(n: int, word: str) -> str:
+    return f"{n} {word}" if n == 1 else f"{n} {word}s"

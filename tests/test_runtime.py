@@ -62,6 +62,7 @@ def test_write_document_end_to_end():
     result = runtime.execute(pack, "write_document", {"text": "brand new text"}, tree)
     assert result.ok
     assert doc_body(tree).value == "brand new text"
+    assert result.detail == "1 step, 1 check passed"
 
 
 def test_read_value_returns_live_content():
@@ -69,6 +70,7 @@ def test_read_value_returns_live_content():
     pack = build_write_tool(tree)
     result = runtime.execute(pack, "read_document", {}, tree)
     assert result.values == ["hello"]
+    assert result.detail == "1 step"  # a read has no checks, so none are claimed
 
 
 def reading_pane_like(*pane_children) -> FakeElement:
