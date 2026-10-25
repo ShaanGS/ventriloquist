@@ -1762,7 +1762,7 @@
     },
     {
       "name": "search_workspace",
-      "description": "Type a query into the workspace search box. The Search view must already be open (call show_search first); results populate as VS Code's own search runs.",
+      "description": "Type a query into the workspace search box. The Search view must already be open (call code_show_search first); results populate as VS Code's own search runs.",
       "risk": "read_only",
       "requires_frontmost": true,
       "params": {

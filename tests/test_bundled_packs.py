@@ -98,3 +98,21 @@ def test_no_quarantined_heals_ship(path):
     heal landed on, so a shipped pack starts with an empty quarantine."""
     data = json.loads(path.read_text())
     assert data.get("healed_pending", []) == [], f"{_name(path)} ships quarantined heals"
+
+
+@pytest.mark.parametrize("path", SHIPPED, ids=_name)
+def test_descriptions_name_tools_as_clients_see_them(path):
+    """A description that points at another tool must use the name an MCP
+    client sees, which carries the app's prefix (code_show_search, not
+    show_search), or the client model looks for a tool that isn't there."""
+    data = json.loads(path.read_text())
+    prefix = re.sub(r"[^a-z0-9]+", "_", data["app_name"].lower()).strip("_")
+    names = [tool["name"] for tool in data["tools"]]
+    bare = []
+    for tool in data["tools"]:
+        for other in names:
+            if other == tool["name"]:
+                continue
+            for match in re.finditer(rf"(?<!\w){re.escape(other)}(?!\w)", tool.get("description", "")):
+                bare.append((tool["name"], match.group(0)))
+    assert not bare, f"{_name(path)} names tools without the {prefix}_ prefix: {bare}"
