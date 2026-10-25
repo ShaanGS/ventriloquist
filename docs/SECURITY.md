@@ -1,287 +1,341 @@
-# Security Model
+# Security
 
-Ventriloquist drives real applications on a real machine with real user data.
-That demands a written threat model, not vibes. This document lists what can
-go wrong and what the code does about it. It was red-teamed before
-implementation and rewritten from the findings; the review proved two of the
-original claims false, which is exactly why the review existed. If you find a
-gap, open an issue with the `security` label.
+## Reporting a vulnerability
 
-## Assets we are protecting
+Please report security problems privately. Open this repository's
+[Security tab](https://github.com/ShaanGS/ventriloquist/security) on
+GitHub and choose **Report a vulnerability**. Only the maintainer can see
+the report, so a fix can be ready before the problem is public. Please
+don't open a public issue for a security problem.
 
-1. The user's data inside apps (documents, messages, files, accounts).
-2. The user's machine state (nothing destructive runs unattended).
-3. The user's privacy (accessibility trees contain personal information).
-4. Credentials (Ventriloquist must never read or type secrets).
+## Threat model
 
-## Threats and mitigations
+Ventriloquist drives real apps on a real Mac, with real data in them. This
+document lists what can go wrong and what the code does about it. It was
+red-teamed before any code existed and rewritten from the findings; that
+review proved two of the first draft's claims false, which is why it
+existed. It was checked against the code again for 0.3.0. Anything not
+built yet is marked **Planned**.
+
+### Assets
+
+1. Your data inside apps: documents, messages, files, accounts.
+2. Your machine's state: nothing destructive runs unattended.
+3. Your privacy: accessibility trees are full of personal information.
+4. Your credentials: vent must never read or type a password.
 
 ### T1. Generated code execution
 
-Agent frameworks that `exec()` model output hand the model a shell. Our
-action space is a closed set of typed ops (`press`, `set_value`, `pick`,
-`reveal`, `raise_window`, `open_app`, `wait_for`, `read_value`) executed by
-our own runtime. `read_value` is the one op that moves data outward: it
-returns an element's live value to the tool caller or, for an element with
-no value of its own such as a web view, the static text inside it. It
-mutates nothing, but
-it is how app content reaches an MCP client, so T6's scrubbing rules apply
-to it and it is never valid against a secure field (T4 removes those before
-any op can see them). No op runs code, shell commands, or AppleScript.
-Adding an op is a breaking change to this threat model and requires
-updating it first. Model
-output is parsed against a JSON schema; anything outside it is rejected.
+Agent frameworks that `exec()` model output hand the model a shell. vent's
+action space is a closed set of typed ops that its own runtime carries
+out: `press`, `set_value`, `pick`, `reveal`, `raise_window`, `open_app`,
+`wait_for` and `read_value`. None of them runs code or AppleScript, or
+builds a command out of text. `open_app` runs macOS's `open -b` with the
+pack's bundle id as a fixed argument, never through a shell.
+
+`read_value` is the one op that moves data out. It returns an element's
+live value or, for an element with no value of its own such as a web view,
+the text inside it (up to 20,000 characters). It changes nothing, but it
+is how app content reaches an MCP client, so T6 and T12 apply to it, and
+it never reads a password field (T4).
+
+`vent/packs.py` rejects an unknown op when a pack loads, and model output
+is checked against a JSON schema and rejected on any mismatch, never
+repaired. Adding an op changes this threat model, so this document is
+updated first.
 
 ### T2. Destructive writes without a destructive verb
 
-Review made this its own threat instead of a bullet: `set_value` overwrites
-a field's contents with no button pressed and no verb for a blocklist to
-catch. Our own first demo emptied and rewrote a document this way.
-Mitigations gate on the op, not the label:
+`set_value` overwrites a field with no button pressed and no verb for a
+blocklist to catch. vent's own first demo emptied and rewrote a document
+this way. So these rules look at the op, not the label:
 
-- During autonomous probing, `set_value` is allowed only when the target's
-  current value is empty, or after the prior value is captured so it can be
-  restored. The same rule covers `pick` on multi-select controls.
-- Compound risk is assessed at the tool level, not just per step. A sequence
-  of individually bland steps (select all, then set value) can be
-  destructive as a unit. The compiler classifies each candidate tool's net
-  effect ("this replaces the entire contents of a document") and the
-  approval gate says so in those words.
+- While exploring, the explorer only presses and writes, and it writes
+  only into an empty text field. The field's previous value is put back
+  right after the probe. If that fails, the probe is marked destructive in
+  the trace, so neither the compiler nor you treat it as clean.
+- When compiling, each tool's risk comes from what its recorded steps did.
+  A step the policy classed as destructive, or a press on a label with a
+  destructive verb, makes the tool `high`. Any write, press or cumulative
+  action makes it at least `mutating`. You can raise a tool's risk by
+  editing its pack.
+- **Planned:** the approval gate saying what a tool does as a whole, in
+  words ("this replaces all the text in the document"). Today the gate
+  lists each step, and you have to see that a write into a document's
+  text area replaces what's there.
 
-### T3. Destructive actions during exploration
+### T3. Destructive actions while exploring
 
-Layered, because no single layer is sufficient:
+Layered, because no single layer is enough:
 
-- Apps are explored only when the user names them.
-- Probing actions pass through `vent/policy.py`. Labels matching a
-  destructive-verb list (delete, remove, empty, erase, send, pay, buy,
-  subscribe, sign, submit, post, publish, share, shut down, restart, log
-  out, format, uninstall, close-without-saving patterns) are blocked. The
-  list is data, easy to audit.
-- The blocklist is known to be insufficient on its own, so its gaps get
-  explicit rules rather than hope:
-  - Elements with empty labels, non-Latin labels, or labels the policy
-    cannot confidently classify are default-deny during autonomous probing.
-    Unclassifiable never means allowed.
-  - Context-dependent verbs (Clear, Reset, Replace, Overwrite) are judged
-    with their surroundings: the containing window or sheet title and
-    sibling labels. "Clear Formatting" and "Clear All Messages" are
-    different risks and a bare string match cannot tell them apart.
-  - Actions are classified reversible, cumulative, or destructive.
-    Cumulative actions (New Note, New Window) are budgeted per session, so
-    exploration cannot leave forty empty notes synced to iCloud.
-- Dialog watchdog: an unexpected sheet or dialog gets cancelled and its
-  trigger marked risky for the rest of the session.
-- Validation replay during synthesis mutates real app state. The approval
-  gate says so explicitly, and replay targets a user-designated scratch
-  document where the app supports one.
-- The final compile gate is human, and per T5 it shows ground truth, not
-  just model prose.
+- An app is explored only when you name it: `vent explore <App>`.
+- Every probe the model suggests goes through `vent/policy.py` before it
+  runs. A label with a destructive verb is refused: delete, remove, send,
+  pay, buy, submit, publish, share, archive, quit, close and about 25
+  more, kept as a plain list (`DESTRUCTIVE_VERBS`) so it's easy to audit.
+- The list is incomplete, so its known gaps get rules of their own:
+  - An element with no label, or a label mostly in a non-Latin script, is
+    refused.
+  - The verb list is English. A label in another language written in
+    Latin letters, such as Löschen or Envoyer, isn't recognized and can
+    pass. Explore apps whose interface is in English.
+  - Verbs that are only sometimes risky (clear, reset, replace,
+    overwrite, cancel, stop, hide) are judged with the rest of the label
+    and the window title: "Clear Formatting" passes, "Clear All History"
+    doesn't.
+  - A plain confirm button (OK, Yes, Continue, Apply) is refused when the
+    window's title has a destructive or risky verb in it, like OK in a
+    "Delete Report?" dialog.
+  - Nothing in a window whose title mentions a password, login, log in,
+    sign in, unlock or authenticate is probed.
+  - Probes are classed as reversible, cumulative or destructive.
+    Cumulative ones (New Note, Add, Duplicate) are capped at three per
+    session, so exploring can't leave forty empty notes synced to iCloud.
+- Dialog watchdog: when a probe opens a sheet or dialog, the explorer
+  presses that dialog's own cancel button, and it never touches the
+  element that opened it again that session. It presses nothing else: OK,
+  Yes and No answer whatever the dialog asks. A dialog with no cancel
+  button stops exploring until you close it.
+- **Planned:** replaying each proposed tool once before you approve it,
+  against a scratch document. Today `vent compile` replays nothing; the
+  approval gate shows the recorded steps and you decide.
+- The last gate is a person, and what it shows is ground truth (T5), not
+  just the model's own account.
 
-### T4. Credential exposure
+### T4. Credentials
 
-Secure text fields are untouchable: never read, never written, never sent to
-a model, never a valid anchor target. This is enforced in `snapshot.py`
-itself, the lowest level that surfaces elements, keying on the
-`AXSecureTextField` subrole. Honest caveat from review: this protection
-trusts the target app's own role reporting. A custom-drawn password field
-that presents as a plain text field is invisible to it, so policy adds
-heuristics (fields rendering bullet characters, fields inside windows whose
-titles match authentication keywords are treated as secure) and this
-document does not claim the guarantee is unconditional. Ventriloquist never
-asks for passwords, and login-form submission verbs sit on the destructive
-list.
+Password fields, the ones macOS marks `AXSecureTextField`, are never
+read, never written, never sent to a model and never a valid target:
 
-### T5. Prompt injection through app UI
+- Snapshots leave them out, so neither the explorer nor its model sees
+  one.
+- Anchor resolution skips them, so a tool can't land on one, and a read
+  that gathers the text inside a container skips them too.
+- A pack with an anchor on one fails to load.
 
-Anything an app renders becomes text in a snapshot, so a malicious page or
-message can address instructions to the explorer model. The original claim
-here was "an injection can waste a session but cannot mint a destructive
-tool call". Review proved that false: a poisoned model can honestly emit a
-tool named `save_document` whose steps press Send in Mail, and an approval
-gate showing only the model's own name and description would launder it.
+This trusts the app to mark its password fields. A custom-drawn password
+field that reports itself as a plain text field isn't caught. Exploring
+and healing refuse anything in a window whose title mentions a password,
+login, sign in, unlock or authenticate; at run time only the secure-field
+mark counts. **Planned:** treating a field that shows only bullet
+characters as a password field. vent never asks for a password, and Sign
+and Submit are on the destructive list.
 
-Containment therefore has one more layer than before:
+### T5. Prompt injection through the app's interface
 
-- Model output is schema-constrained and the action space is closed; policy
-  screening runs after the model and cannot be bypassed by it.
-- Snapshot text sent to models is wrapped in a delimiter carrying a
-  per-call random nonce and tagged as untrusted app content, so an app
-  cannot forge the closing tag to break out, and prompts distinguish data
-  from instructions instead of relying on the model to guess.
-- Model-authored tool names and descriptions are stripped of control and
-  bidirectional-override characters and length-capped before they reach the
-  approval gate, so they cannot forge structure or hide their true target in
-  the text shown to the human.
-- The approval gate renders a deterministic, non-model summary of every
-  step (app, window, element role and label, op) next to the model's
-  description. The steps are the ground truth; the description is marketing.
-  The gate emits a loud warning when a tool's steps act on a window its
-  description never mentions, and marks high risk tools in red.
+Anything an app shows ends up as text in a snapshot, so a malicious web
+page or message can address instructions to the explorer's model. The
+first draft of this document said an injection "can waste a session but
+cannot mint a destructive tool call". Review proved that false: a
+poisoned model can propose a tool named `save_document` whose steps press
+Send in Mail, and an approval gate showing only the model's name and
+description would wave it through. So containment has these layers:
+
+- Model output is held to a JSON schema, the action space is closed, and
+  the policy screens every probe after the model, where the model can't
+  skip it.
+- App text in a prompt is wrapped in delimiters that carry a fresh random
+  nonce and say it is untrusted app content. An app can't forge the
+  closing tag, and the prompt tells the model which text is data instead
+  of leaving it to guess.
+- The compiler builds tools only from probes that actually ran. The model
+  groups and names them; it can't add a step.
+- Tool names and descriptions the model writes have control characters
+  and bidirectional overrides removed and are cut to a fixed length before
+  the gate shows them, so they can't fake structure or hide text.
+- The gate prints every step from the steps themselves, not from the model
+  (app, window, element role and label, op), next to the model's
+  description. The steps are the ground truth; the description is
+  marketing. The gate warns when a tool's steps act in a window its
+  description never mentions, and flags high-risk tools in red.
 
 ### T6. Personal data leaving the machine
 
-Snapshots are the only thing ever sent to a model, scrubbed first: secure
-fields are dropped entirely, and other field values are truncated to short
-previews. `vent explore --no-values` replaces every value with a length
-marker (`<N chars redacted>`) so exploration can run without any field
-content leaving the machine; element structure and labels still go through.
-Truncation is a privacy measure, not an injection defense (short payloads
-survive truncation; T5 handles that). Honest limits: without `--no-values`,
-a probe session does send up to the preview length of non-secure field
-content (a note body, a draft) to the model, so `--no-values` is the switch
-to reach for on an app holding sensitive text. Traces and packs stay on
-local disk. No telemetry. All network calls live in `vent/llm.py`, one file
-to audit. That includes the fallback backend that shells out to the Claude
-Code CLI (`claude -p`, print mode, tools disabled): a different transport
-to the same model endpoint, initiated from the same one file, carrying the
-same scrubbed snapshot content and nothing else.
+What reaches a model is app text from the accessibility tree: snapshots
+while exploring and healing, and the list of probes that ran while
+compiling. Password fields are never in it, and other field values are
+cut to 80-character previews. `vent explore --no-values` replaces every
+field value with a length marker (`<N chars redacted>`), so exploring
+sends no field contents; element structure and labels still go. Healing
+respects `--no-values` too. Without it, exploring sends up to 80
+characters of each field it sees (a note body, a draft), so `--no-values`
+is the switch for an app holding sensitive text. The cut is for privacy,
+not a defense against injection: a short payload survives it, and T5
+handles that.
 
-Probe reversibility has an honest limit too: the explorer writes a short
-probe string into an empty field and restores the prior value immediately,
-but an app that transmits on every keystroke (iCloud-syncing Notes, a
-live-collaboration document, search-as-you-type) may have already sent that
-string before the restore. Probing is reversible on the local field, not
-across a network the app owns. When a restore fails outright, the trace
-action is reclassified destructive so neither the compiler nor a reviewer
-treats it as clean.
+Traces and packs stay on your disk. There's no telemetry. Every network
+call lives in one file, `vent/llm.py`, including the fallback that runs
+the Claude Code CLI (`claude -p` in print mode, with its tools turned
+off): a different route to the same model, started from the same file,
+carrying the same text and nothing else.
+
+Probing is reversible on the local field, not across a network the app
+owns. The explorer writes a short probe string into an empty field and
+puts the old value back at once, but an app that sends every keystroke
+(Notes syncing to iCloud, a shared document, search as you type) may have
+sent the string before it was removed.
 
 ### T7. Poisoned or stale packs
 
-Packs are JSON on disk. `vent/packs.py` validates schema and version on
-load and rejects unknown ops, so a tampered pack is confined to the same
-closed action space as a legitimate one. Packs shared between users should
-be reviewed like code; the format is human-readable to make that real.
+Packs are JSON on disk. `vent/packs.py` validates each one when it loads:
+the format version, the op set, risk levels, verify and precondition
+kinds, that every parameter a step uses is declared, and that no anchor
+is on a password field. A tampered pack is held to the same closed action
+space as an honest one. Review a pack someone else shares the way you'd
+review code; the format is readable so that you can.
 
-Staleness is the more common corruption: the app updated overnight and the
-pack is now wrong about the world. Packs record app version, macOS version,
-and locale at compile time. On mismatch, anchors load as low-confidence
-(raising the resolver's ambiguity bar, making it fail toward the healer
-rather than toward a plausible wrong element). The planned `vent verify`
-command will dry-resolve every anchor to report durability without
-executing anything.
+A pack that fails to load, or a tool whose name collides with another
+pack's, is skipped with a warning, and the rest keep serving. If your own
+pack for an app fails to load, the bundled pack for that app doesn't
+quietly take its place.
+
+Staleness is the more common problem: the app updated overnight, and the
+pack is now wrong about it. A pack records the app version and the macOS
+version it was recorded on. When the app version, or macOS's major.minor
+version, no longer matches, the pack's anchors load as low-confidence:
+the resolver raises the score a match needs, so a stale pack fails toward
+a refusal or the healer, not toward a plausible wrong element. Locale is
+recorded but not compared.
+
+`vent verify <App>` dry-resolves every anchor in a pack, steps and checks
+alike, without acting, and says how many still resolve. It calls no model.
+With `--report`, it writes a small JSON table meant to be run on another
+Mac and sent back; the only app content in it is each resolved element's
+live label.
 
 ### T8. The healer rewriting packs
 
-The healer exists to fix broken anchors, which means it can re-point them,
-which means a hostile UI state could steer a benign tool's anchor onto a
-dangerous element. And "the replay succeeded" is not a safety check, because
-destructive replays also succeed. The fences, in layers:
+The healer exists to fix broken anchors, which means it can re-point
+them, which means a hostile app state could steer a harmless tool's
+anchor onto a dangerous element. And "the replay worked" is no safety
+check, because destructive replays work too. The fences, in layers:
 
-- A healer handed a truncated snapshot refuses rather than guess at the
-  nearest lookalike; it cannot choose in a window it cannot fully see.
-- A re-grounding must land on the same kind of control the broken anchor
-  described (same role). A step that pressed a button cannot heal onto a
-  text field, and vice versa. This sharply narrows what a hostile UI can
-  steer the choice toward.
-- Every re-grounding is re-screened by policy against the new target,
-  including destructive and contextual verbs and authentication windows.
-- Anchor matching for reuse and promotion includes the chain signature, so
-  two structurally identical elements (unlabeled twins in one window) are
-  never confused for one another.
+- Healing that asks a model is opt-in: `VENT_HEAL=1` for `vent serve`,
+  `--heal` for `vent run`. With it off, serving never calls a model.
+- It looks only in the window the broken anchor was recorded in, and it
+  respects `--no-values` (T6).
+- Given a cut-off snapshot, it refuses rather than guess at the nearest
+  lookalike; it can't choose in a window it can't fully see.
+- A fix must land on the same kind of control (the same role). A step
+  that pressed a button can't heal onto a text field, or the other way
+  round.
+- Every fix is screened by the policy against its new target: destructive
+  and context-dependent verbs, confirm buttons in windows with a
+  destructive title, login windows and password fields.
+- Matching a fix to the anchor it replaces includes the anchor's chain of
+  ancestors, so two identical unlabeled twins in one window are never
+  confused.
 
-Honest scope of "never silently persisted": promotion into a tool's anchor
-of record happens only through `vent verify`, under a human who is shown
-the target window and the risk of every tool the promotion would rewrite.
-A quarantined fix that has not been promoted does not change any tool's
-stored anchor. It can, however, be reused to satisfy a live call while it
-sits in quarantine: on a repeat break the runtime reuses a matching
-quarantined fix deterministically (no model call), re-screening the live
-target every time. So an un-promoted fix affects behavior for the calls it
-rescues, but it never becomes the durable anchor and never escapes the
-per-call re-screen. Model-backed healing that mints new quarantine entries
-is opt-in (`VENT_HEAL=1` on the server, `--heal` on `vent run`); the served
-default neither calls a model nor writes quarantine entries.
+Fixes are never promoted on their own. A fix goes into the pack's
+quarantine (`healed_pending`), and only `vent verify` moves it into a
+tool's anchor of record, after showing you the target window and the risk
+of every tool it would rewrite. A quarantined fix can still rescue a live
+call while it waits: on a repeat break, the runtime reuses a matching fix
+with no model call and screens the live target again every time. So an
+unpromoted fix changes what the calls it rescues do, but it never becomes
+the anchor of record, and it never skips the per-call screen.
 
 ### T9. The MCP client side
 
-After compile-time approval, no human sits between an MCP client and a tool
-call. Clients are often themselves model-driven, so compile-time approval
-must not be treated as call-time consent. Mitigations:
+After a tool is approved, no person sits between an MCP client and a
+call, and clients are often models themselves. So approval at compile
+time is not taken as consent for every call. Each tool carries a risk
+level, `read_only`, `mutating` or `high`, set at the approval gate or by
+the pack's author, and the server acts on it:
 
-- Every ToolSpec carries a `risk` level (`read_only`, `mutating`, `high`)
-  assigned at the approval gate. The server executes `read_only` freely,
-  `mutating` per user-configured policy, and `high` only after a call-time
-  confirmation round trip (MCP elicitation), especially tools that pipe
-  free-text parameters into `set_value` against terminals, mail, or chat
-  apps, which are injection primitives in their own right.
-- The server speaks stdio only, launched by the client. No network port, no
-  LAN surface. If an HTTP transport is ever added it must bind 127.0.0.1
-  with a bearer token, and this document must change first.
+- `read_only` tools run freely.
+- `mutating` tools run without asking each time. The approval gate is
+  the control: you approved the tool, its steps and its risk.
+- `high` tools are hidden from the client and refused, unless the server
+  was started with `VENT_ALLOW_HIGH=1`, in which case they run without
+  asking, or the client supports MCP elicitation, in which case every call
+  asks you first and runs only if you accept. Tools that pipe free text
+  into chat, mail or a terminal are injection tools in their own right,
+  and belong here.
+- `VENT_READ_ONLY=1` hides and refuses every tool that isn't `read_only`.
+
+Tools also describe themselves to clients: `read_only` tools carry
+`readOnlyHint`, `high` ones `destructiveHint`, and every tool has a title
+written for people and an ASCII name of at most 128 characters. The hints
+help a client decide what to ask you about; the server enforces the rules
+above whatever the client does.
+
+The server speaks stdio only, started by the client. There's no network
+port and nothing on the LAN. If an HTTP transport is ever added, it must
+bind 127.0.0.1 with a bearer token, and this document changes first.
 
 ### T10. Blast radius of the Accessibility grant
 
-macOS grants Accessibility to the host process, not per target app, and not
-per pack. Once the user's terminal is trusted, anything running in it can
-drive every app on the system; Ventriloquist's own scoping (named apps,
-policy, risk levels) is self-discipline within that grant, not an OS
-boundary. This document says so plainly instead of implying otherwise.
-Practical guidance: grant the permission to a dedicated terminal profile
-used for Ventriloquist, review packs before serving them, and treat
-`vent serve` as giving the connected MCP client exactly the capabilities the
-approved packs describe, unattended.
+macOS grants Accessibility to the host process, not per target app and
+not per pack. Once your terminal is trusted, anything running in it can
+drive every app on the system. vent's own scoping (named apps, a policy,
+risk levels) is self-discipline inside that grant, not an OS boundary.
+This document says so plainly rather than imply otherwise. In practice:
+grant the permission to a terminal profile you keep for vent, review
+packs before serving them, and treat `vent serve` as handing the
+connected client exactly what the approved packs describe, unattended.
 
 Claude Desktop moves the grant somewhere else. It starts each MCP server
 through a helper that makes the server responsible for itself, so macOS
-checks the program the helper ran: vent's Python interpreter for the entry
-`vent mcp-config` prints, or uv when the config runs vent through `uvx`.
-The grant then belongs to that binary, and other tools can share it: any
-program that runs on the same interpreter as its own process, such as
-another MCP server Claude Desktop starts on that Python, gets the same
-reach. vent's "not trusted" message names the exact binary so the user
-grants that file rather than something broader, and the README steers
+checks the program the helper ran: vent's Python interpreter for the
+entry `vent mcp-config` prints, or uv when the config runs vent through
+`uvx`. The grant then belongs to that binary, and other programs can
+share it: anything that runs on the same interpreter as its own process,
+such as another MCP server Claude Desktop starts on that Python, gets the
+same reach. vent's "not trusted" message names the exact binary, so you
+grant that file rather than something broader, and the README steers
 Claude Desktop users to the interpreter over uv, since less runs on it.
 
 ### T11. Semantic drift under a stable anchor
 
 Anchor durability and semantic safety pull in opposite directions, and
-the resolver deliberately optimizes the first. An anchor is built to keep
-resolving through relabels, moves, and rebuilds; that same strength means
-an app update can change what a control does while the anchor still binds
-confidently. Verify checks assert values and existence, not intent. A
-tool named archive_note keeps working after the button underneath it
-becomes delete, and every durability number in the README celebrates
-exactly the property that makes this possible.
+the resolver is built for the first. An anchor is designed to keep
+resolving through relabels, moves and rebuilds, and that same strength
+means an app update can change what a control does while the anchor
+still binds confidently. A tool named `archive_note` keeps working after
+the button under it becomes Delete, and every durability number in
+[BENCHMARKS.md](BENCHMARKS.md) measures exactly the property that makes
+this possible.
 
-Mitigation: anchors record every label they have been observed under, and
-`vent verify` flags any resolution onto a label outside that set as a
-semantic drift suspect requiring human re-confirmation, rather than
-counting it as survival. The trigger is the label mismatch itself, not an
-app version change: Electron apps relabel server-side and behind feature
-flags with no version bump at all, so gating on versions would miss the
-apps most likely to drift. A version change is an aggravating factor
-(stale packs already resolve low-confidence), never the trigger. The
-residual risk is a control whose meaning changed while its label did not;
-no anchor-side check can see that, which is one more reason risk levels
-and the high-risk server gate exist.
+Anchors record every label they have been seen with. At run time, a
+press, write or pick refuses an element wearing a label its anchor has
+never been recorded under, and names the element it declined.
+`vent verify` lists the same resolutions as drift suspects for a person
+to re-confirm. The trigger is the label mismatch itself, not an app
+version change: Electron apps relabel from their servers and behind
+feature flags with no version bump, so gating on versions would miss the
+apps most likely to drift. The risk left over is a control whose meaning
+changed while its label didn't. No anchor-side check can see that, which
+is one more reason risk levels and the high-risk gate exist.
 
-### T12. Read tools feeding the client model
+### T12. Read tools feeding the client's model
 
-Written before read tools shipped, and they have now
-(`textedit_read_document`, `notes_read_open_note`). A tool that reads
-(list rows, read a document, dump search results) changes the shape of
-the trust picture. App content is attacker-influenced text, and a read
-tool hands it directly to the client model, which also holds this
-server's mutating tool handles. The structural invariant that
-`server.py` never imports `llm.py` still holds, but the protection it
-provided is gone: the injection no longer needs our model because the
-caller brought their own.
+This section was written before read tools shipped, and they have now
+(`textedit_read_document`, `notes_read_open_note`, and
+`outlook_read_selected_message` in the example pack). A tool that reads
+changes the trust picture. App content is text an attacker can
+influence, and a read tool hands it straight to the client's model, which
+also holds this server's tools that write. vent's own model is out of the
+loop here: the injection doesn't need it, because the client brings its
+own.
 
-The client's defenses are not ours to assume. The server marks every
-value a read step returns as untrusted app content at the MCP boundary,
-with the same nonce-delimited wrapping `llm.py` uses for its own prompts
-(the wrapper lives in `untrusted.py`, so the server uses it without
-importing `llm.py`), and every tool with a read step says in its
-description that its output is app-controlled data, not instructions.
-A well-behaved client can quarantine it. This does not make injection
-impossible; it makes the boundary visible to the party who can act on
-it. Tests pin both, including that app text cannot close the wrapper
-early.
+The client's defenses aren't vent's to assume. The server wraps every
+value a read returns as untrusted app content, with the same
+nonce-delimited wrapper `llm.py` uses for its own prompts (it lives in
+`untrusted.py`, so the server uses it without importing `llm.py`). App
+text quoted in an error message, such as a window title or a label, is
+wrapped the same way. Every tool with a read step says in its description
+that its output is app data, not instructions. A well-behaved client can
+quarantine it. This doesn't make injection impossible; it makes the
+boundary visible to the party that can act on it. Tests pin both,
+including that app text can't close the wrapper early.
 
 ## Standing rules for contributors
 
-- New step ops require an update to this document and a policy review.
-- `runtime.py` and `server.py` must never import `llm.py`.
-- Healed anchors are never auto-promoted. No exceptions for "obvious" fixes.
-- No screenshots, no pixel coordinates, no `exec`, no AppleScript built from
-  model output. These are load-bearing absences.
+- A new step op needs this document updated and a policy review first.
+- `runtime.py` and `server.py` don't import `llm.py`. The server reaches
+  a model only through the healer, and only with `VENT_HEAL=1`.
+- Healed anchors are never promoted automatically. No exceptions for
+  "obvious" fixes.
+- No screenshots, no pixel coordinates, no `exec`, no AppleScript built
+  from model output. These absences are load-bearing.
