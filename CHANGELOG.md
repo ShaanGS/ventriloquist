@@ -30,7 +30,8 @@ Serving:
 - High-risk tools are hidden unless the client can ask you to confirm
   each call (MCP elicitation, #4) or the server runs with `VENT_ALLOW_HIGH=1`.
   `VENT_READ_ONLY=1` serves read-only tools only.
-- Tools carry `readOnlyHint` or `destructiveHint` and a title, and their
+- Tools carry `readOnlyHint` (read-only tools) or `destructiveHint` (all
+  others) and a title, and their
   names are ASCII, at most 128 characters.
 - App text in error messages is marked as untrusted data, like read
   values.

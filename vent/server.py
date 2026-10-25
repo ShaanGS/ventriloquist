@@ -140,13 +140,15 @@ def tool_description(spec: packs.ToolSpec, confirms: bool = False) -> str:
 
 
 def tool_annotations(pack: packs.Pack, spec: packs.ToolSpec) -> types.ToolAnnotations:
-    """MCP's hints for the risk level. Only a high risk tool is destructive:
-    a mutating one was approved to change its app. No tool reaches past the
-    app it drives, so none is open-world."""
+    """MCP's hints for the risk level. MCP reads destructiveHint=false as
+    "only additive updates", which a mutating tool can't promise (TextEdit's
+    write_document replaces the whole text), so every tool that isn't
+    read_only is marked destructive. No tool reaches past the app it drives,
+    so none is open-world."""
     return types.ToolAnnotations(
         title=tool_title(pack, spec),
         read_only_hint=spec.risk == "read_only",
-        destructive_hint=spec.risk == "high",
+        destructive_hint=spec.risk != "read_only",
         open_world_hint=False,
     )
 

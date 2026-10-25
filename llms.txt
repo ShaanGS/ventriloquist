@@ -91,7 +91,7 @@ Everything lives in the `vent/` package. One file per concern:
   imports `llm.py`.
 - `server.py`. The MCP stdio server. Loads every pack and exposes each tool
   as `<app>_<tool>`, with an ASCII name of at most 128 characters, a title,
-  and `readOnlyHint` or `destructiveHint` from its risk. Calls to one app run
+  and `readOnlyHint` (read_only tools) or `destructiveHint` (all others). Calls to one app run
   one at a time, tools that need the front take turns across apps, and a
   cancelled call that is still queued never runs. `read_only` and `mutating`
   tools run when called. `high` tools are hidden and refused unless the

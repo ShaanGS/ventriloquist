@@ -300,7 +300,8 @@ meet a half-finished dialog. A tool that needs its app in front fails
 without running a step if the app doesn't come forward.
 
 Tools also describe themselves to clients: `read_only` tools carry
-`readOnlyHint`, `high` ones `destructiveHint`, and every tool has a title
+`readOnlyHint`, every other tool `destructiveHint` (MCP reads its absence
+as "only additive changes", which a write can't promise), and every tool has a title
 written for people and an ASCII name of at most 128 characters. The hints
 help a client decide what to ask you about; the server enforces the rules
 above whatever the client does.

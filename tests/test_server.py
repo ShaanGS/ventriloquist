@@ -163,7 +163,8 @@ def test_tools_carry_a_title_and_hints_for_their_risk(tmp_path):
 
     write = tools["textedit_write_document"]
     assert write.title == "TextEdit: write document"
-    assert (write.annotations.read_only_hint, write.annotations.destructive_hint) == (False, False)
+    # a write can replace what's there, so it isn't "only additive"
+    assert (write.annotations.read_only_hint, write.annotations.destructive_hint) == (False, True)
     assert write.annotations.open_world_hint is False
 
     erase = tools["textedit_erase_document"]
