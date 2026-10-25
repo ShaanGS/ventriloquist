@@ -27,6 +27,8 @@ jobs:
         with:
           python-version: "3.13"
       - name: Check the tag matches the package version
+        # A manual dry run from a branch has no tag to check.
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           version=$(python -c "import pathlib, re; print(re.search(r'__version__ = \"(.+?)\"', pathlib.Path('vent/__init__.py').read_text()).group(1))")
           test "v$version" = "$GITHUB_REF_NAME" || { echo "Tag $GITHUB_REF_NAME does not match version $version"; exit 1; }
