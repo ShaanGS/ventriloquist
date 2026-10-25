@@ -36,8 +36,9 @@ System Settings, Privacy & Security, Accessibility.
 
 An editable install reads files straight from the checkout, so it cannot
 show a packaging mistake. CI also builds the wheel, installs it into a
-clean environment, and runs `tests/install_smoke.py` against it. To do
-the same locally:
+clean environment, and runs `tests/install_smoke.py` against it, and the
+release workflow runs the whole suite against the built wheel before it
+publishes anything. To do the same locally:
 
 ```bash
 python3 -m venv --clear /tmp/vent-env

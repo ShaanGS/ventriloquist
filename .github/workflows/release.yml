@@ -28,6 +28,32 @@ jobs:
           test "v$version" = "$GITHUB_REF_NAME" || { echo "Tag $GITHUB_REF_NAME does not match version $version"; exit 1; }
       - run: python -m pip install --upgrade build
       - run: python -m build
+
+      # Test what is about to be published, not the checkout: the built wheel
+      # in a clean environment. Nothing below runs unless these pass, so a
+      # broken wheel never reaches PyPI.
+      - name: Install the built wheel into a clean environment
+        run: |
+          python -m venv "$RUNNER_TEMP/env"
+          "$RUNNER_TEMP/env/bin/pip" install dist/*.whl pytest
+      - name: Serve the bundled packs from the installed wheel
+        working-directory: ${{ runner.temp }}
+        run: '"$RUNNER_TEMP/env/bin/python" "$GITHUB_WORKSPACE/tests/install_smoke.py" "$RUNNER_TEMP/env/bin"'
+      - name: Copy the tests to a folder with no vent source in it
+        run: |
+          cp -R "$GITHUB_WORKSPACE" "$RUNNER_TEMP/check"
+          rm -rf "$RUNNER_TEMP/check/vent"
+      - name: Check vent is imported from the wheel
+        working-directory: ${{ runner.temp }}/check
+        run: |
+          "$RUNNER_TEMP/env/bin/python" -c 'import sys, vent; print(vent.__file__); sys.exit("/site-packages/" not in vent.__file__)'
+      - name: Check the release metadata the MCP registry reads
+        working-directory: ${{ runner.temp }}/check
+        run: '"$RUNNER_TEMP/env/bin/python" -m pytest -q -p no:cacheprovider tests/test_release.py'
+      - name: Run the offline test suite against the wheel
+        working-directory: ${{ runner.temp }}/check
+        run: '"$RUNNER_TEMP/env/bin/python" -m pytest -q -p no:cacheprovider tests/'
+
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist
