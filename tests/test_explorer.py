@@ -75,6 +75,59 @@ def test_probe_executes_safe_nomination_and_restores_field(monkeypatch):
     assert body.value == ""
 
 
+def probe_the_body(monkeypatch, body_class=FakeElement):
+    """textedit_like with an empty body field of the given class, and a
+    scripted model that nominates writing into it."""
+    app_version_stub(monkeypatch)
+    tree = textedit_like()
+    scroll = tree.children()[0].children()[2]
+    body = body_class("AXTextArea", value="", identifier="doc-body")
+    scroll._children[0] = body
+    body_id = next(n.id for n in snapshot(tree).nodes if n.identifier == "doc-body")
+    scripted([{"targets": [{"id": body_id, "op": "set_value", "why": "text field"}]}])
+    return tree, body
+
+
+def test_probe_text_is_taken_out_when_settling_fails(monkeypatch):
+    """The restore used to run only after a clean settle, so an app that
+    stopped answering right after the probe kept "vent probe" in the field."""
+    tree, body = probe_the_body(monkeypatch)
+    from vent import explorer as explorer_mod
+
+    calls = []
+
+    def settle_once_busy(root, deadline_s, *args, **kwargs):
+        calls.append(deadline_s)
+        if len(calls) == 1:
+            raise explorer_mod.ax.AXTransientError("App is not answering accessibility queries (AXError -25204).")
+        return "settled"
+
+    monkeypatch.setattr(explorer_mod, "settle", settle_once_busy)
+    trace = explore(FakeApp(), tree, policy_mod.Policy(), rounds=1)
+
+    assert body.value == ""
+    action = trace.actions[0]
+    assert not action.executed
+    assert "stopped answering" in action.reason
+
+
+def test_a_probe_write_the_app_did_not_answer_is_still_taken_out(monkeypatch):
+    """A timed-out write is delivered and may land later, so it is
+    restored like one that succeeded."""
+    from vent import ax
+
+    class SlowField(FakeElement):
+        def set_value(self, value):
+            super().set_value(value)
+            if value == PROBE_TEXT:
+                raise ax.AXTransientError("Setting AXValue got no answer within 1s (AXError -25204).")
+
+    tree, body = probe_the_body(monkeypatch, SlowField)
+    trace = explore(FakeApp(), tree, policy_mod.Policy(), rounds=1)
+    assert body.value == ""
+    assert not trace.actions[0].executed
+
+
 def test_policy_refusals_are_recorded_not_executed(monkeypatch):
     app_version_stub(monkeypatch)
     tree = textedit_like()

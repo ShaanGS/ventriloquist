@@ -285,36 +285,65 @@ def _execute_probe(
         nodes_before=len(before.nodes),
     )
 
+    # Whether the probe text may be in the field, and so must be taken out
+    # again whatever happens next. The restore used to run only after a
+    # clean settle and snapshot, so a busy app left "vent probe" behind.
+    wrote = op == "set_value"
     try:
-        if op == "press":
-            node.element.perform("AXPress")
-        else:
-            node.element.set_value(PROBE_TEXT)
-        action.settle_detail = settle(root, 5.0)
-    except ax.AXError as exc:
-        action.executed = False
-        action.reason = f"action failed: {exc}"
-        return action
-
-    after = snapshot(root)
-    action.nodes_after = len(after.nodes)
-    action.modal_appeared = after.modal_present and not before.modal_present
-    notify(
-        f"probed {op} on {node.role} {node.label!r}: {action.settle_detail}, "
-        f"{action.nodes_before} -> {action.nodes_after} nodes"
-    )
-
-    if op == "set_value":
-        # Restore the field to exactly what it held before the probe,
-        # read live rather than assumed empty. If the restore fails, the
-        # probe text was left behind: mark the action non-reversible so
-        # neither the compiler nor a human reviewer treats it as clean.
         try:
-            node.element.set_value(original_value)
-            settle(root, 2.0)
-        except ax.AXError:
-            notify(f"could not restore probed field {node.label!r}; marking destructive")
-            action.classification = "destructive"
-            action.reason = "probe text could not be restored"
+            if op == "press":
+                node.element.perform("AXPress")
+            else:
+                node.element.set_value(PROBE_TEXT)
+        except ax.AXError as exc:
+            # A write the app didn't answer in time may still land; one it
+            # refused outright never touched the field.
+            wrote = wrote and isinstance(exc, ax.AXTransientError)
+            action.executed = False
+            action.reason = f"action failed: {exc}"
+            return action
 
-    return action
+        try:
+            action.settle_detail = settle(root, 5.0)
+            after = snapshot(root)
+        except ax.AXTransientError as exc:
+            # The probe went out, but what it did is unknown, so it is kept
+            # out of the tools the compiler may build.
+            action.executed = False
+            action.reason = f"sent, but the app stopped answering before its effect could be seen: {exc}"
+            return action
+
+        action.nodes_after = len(after.nodes)
+        action.modal_appeared = after.modal_present and not before.modal_present
+        notify(
+            f"probed {op} on {node.role} {node.label!r}: {action.settle_detail}, "
+            f"{action.nodes_before} -> {action.nodes_after} nodes"
+        )
+        return action
+    finally:
+        if wrote:
+            _restore_probed_field(root, node, original_value, action, notify)
+
+
+def _restore_probed_field(
+    root: ax.Element,
+    node: Node,
+    original_value: str,
+    action: TraceAction,
+    notify: Callable[[str], None],
+) -> None:
+    """Put back exactly what the field held before the probe, read live
+    rather than assumed empty. If that fails, the probe text was left
+    behind: the action is marked non-reversible so neither the compiler
+    nor a human reviewer treats it as clean."""
+    try:
+        node.element.set_value(original_value)
+    except ax.AXError:
+        notify(f"could not restore probed field {node.label!r}; marking destructive")
+        action.classification = "destructive"
+        action.reason = "probe text could not be restored"
+        return
+    try:
+        settle(root, 2.0)
+    except ax.AXTransientError:
+        pass
