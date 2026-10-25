@@ -96,32 +96,41 @@ def _error(text: str) -> types.CallToolResult:
     )
 
 
-def build_server(search_path: list[Path]) -> Server:
-    """Serve every pack found on the search path. The first directory is the
-    writable one: healing saves its quarantine entries there, so a healed
-    bundled pack becomes the user's own copy (see paths.py)."""
-    try:
-        loaded = packs.load_search_path(search_path)
-    except packs.PackError as exc:
-        raise SystemExit(f"Pack failed to load: {exc}") from exc
-    if not loaded:
-        searched = ", ".join(str(d) for d in search_path)
-        raise SystemExit(f"No packs found under {searched}. Author or compile one first.")
-    writable_dir = search_path[0]
-
-    # (mcp tool name) -> (pack, spec). Names use the app name for
-    # readability; collisions are an error, never a silent overwrite.
+def _registry(loaded: list[packs.Pack]) -> dict[str, tuple[packs.Pack, packs.ToolSpec]]:
+    """(mcp tool name) -> (pack, spec). Names use the app name for
+    readability. A tool whose name is taken by a tool registered before it
+    is skipped with a warning on stderr, never a silent overwrite: one bad
+    tool must not stop the rest from serving."""
     registry: dict[str, tuple[packs.Pack, packs.ToolSpec]] = {}
     for pack in loaded:
         for spec in pack.tools:
             key = f"{_slug(pack.app_name)}_{spec.name}"
             if key in registry:
-                other = registry[key][0]
-                raise SystemExit(
-                    f"Tool name collision: {key} is defined by both "
-                    f"{other.bundle_id} and {pack.bundle_id}. Rename one tool."
+                other, other_spec = registry[key]
+                print(
+                    f"warning: skipping {pack.app_name}'s tool {spec.name} ({pack.bundle_id}): "
+                    f"its MCP name {key} is taken by {other.app_name}'s tool {other_spec.name} "
+                    f"({other.bundle_id}). Rename one of them.",
+                    file=sys.stderr,
                 )
+                continue
             registry[key] = (pack, spec)
+    return registry
+
+
+def build_server(search_path: list[Path]) -> Server:
+    """Serve every pack found on the search path. The first directory is the
+    writable one: healing saves its quarantine entries there, so a healed
+    bundled pack becomes the user's own copy (see paths.py)."""
+    loaded = packs.load_search_path(search_path)
+    if not loaded:
+        searched = ", ".join(str(d) for d in search_path)
+        raise SystemExit(f"No packs found under {searched}. Author or compile one first.")
+    writable_dir = search_path[0]
+
+    registry = _registry(loaded)
+    if not registry:
+        raise SystemExit("No tool in the packs found could be served; see the warnings above.")
 
     locks: dict[str, threading.Lock] = {pack.bundle_id: threading.Lock() for pack in loaded}
     allow_high = os.getenv("VENT_ALLOW_HIGH") == "1"

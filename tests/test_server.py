@@ -3,6 +3,7 @@ packs, and which calls are refused before any app is touched. The client
 connects in-process, so no app, permission, or subprocess is involved."""
 
 import ast
+import json
 import re
 import threading
 from dataclasses import replace
@@ -43,6 +44,12 @@ def call(server, name: str, arguments: dict):
     return connect(server, action)
 
 
+def served(tmp_path, *pack_list):
+    for pack in pack_list:
+        save(pack, tmp_path / pack.bundle_id / "pack.json")
+    return build_server([tmp_path])
+
+
 def test_lists_user_and_bundled_tools_with_user_copy_winning(tmp_path):
     bundled = sample_pack()
     save(bundled, tmp_path / "bundled" / bundled.bundle_id / "pack.json")
@@ -62,6 +69,31 @@ def test_no_packs_anywhere_names_every_directory_searched(tmp_path):
         build_server([tmp_path / "user", tmp_path / "bundled"])
     assert str(tmp_path / "user") in str(raised.value)
     assert str(tmp_path / "bundled") in str(raised.value)
+
+
+def test_a_broken_pack_is_skipped_and_the_rest_still_serve(tmp_path, capsys):
+    """One malformed pack used to raise out of build_server and take every
+    other pack down with it."""
+    save(sample_pack(), tmp_path / "com.apple.TextEdit" / "pack.json")
+    broken = tmp_path / "com.example.Broken" / "pack.json"
+    broken.parent.mkdir()
+    broken.write_text(json.dumps([{"format_version": 2}]))
+    names = tool_names(build_server([tmp_path]))
+    assert names == ["textedit_write_document"]
+    assert f"warning: skipping {broken}" in capsys.readouterr().err
+
+
+def test_a_tool_name_collision_skips_the_later_tool_with_a_warning(tmp_path, capsys):
+    """Two apps named alike map their tools to one MCP name. This used to
+    stop the server; now the first one registered keeps the name."""
+    clone = sample_pack()
+    clone.bundle_id = "com.example.TextEditClone"
+    clone.tools.append(replace(clone.tools[0], name="clone_only"))
+    server = served(tmp_path, sample_pack(), clone)
+    assert sorted(tool_names(server)) == ["textedit_clone_only", "textedit_write_document"]
+    err = capsys.readouterr().err
+    assert "skipping TextEdit's tool write_document (com.example.TextEditClone)" in err
+    assert "taken by TextEdit's tool write_document (com.apple.TextEdit)" in err
 
 
 def test_unknown_tool_is_an_error_result_not_a_crash(tmp_path):
