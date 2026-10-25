@@ -483,9 +483,19 @@ def _run_step(
         raise ToolExecutionError(f"{where}: {failure}")
 
     if step.op == "open_app":
-        # Fixed argv, bundle id from the validated pack. Not a shell.
+        # Fixed argv, bundle id from the validated pack. Not a shell. Under
+        # vent serve, stdin and stdout are the MCP connection, so the child
+        # gets none of the server's streams: a byte it read or wrote there
+        # would corrupt the protocol.
         try:
-            subprocess.run(["open", "-b", pack.bundle_id], check=True, timeout=15)
+            subprocess.run(
+                ["open", "-b", pack.bundle_id],
+                check=True,
+                timeout=15,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
             raise ToolExecutionError(f"{where}: could not open {pack.bundle_id}: {exc}") from exc
         detail = settle(root, step.timeout_s, include_menus=False)

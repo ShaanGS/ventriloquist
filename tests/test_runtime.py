@@ -1003,6 +1003,19 @@ def test_a_sheet_the_call_opened_without_a_cancel_button_is_left_for_a_human():
     assert doc_body(tree).value == "hello"
 
 
+def test_open_app_keeps_off_the_servers_stdio(monkeypatch):
+    """Under vent serve, stdin and stdout carry MCP. A child that inherits
+    them can read the client's next request or write into a response."""
+    seen = {}
+    monkeypatch.setattr(runtime.subprocess, "run", lambda cmd, **kwargs: seen.update(cmd=cmd, **kwargs))
+    tool = ToolSpec(name="open", description="Open TextEdit.", risk="read_only",
+                    steps=[Step(op="open_app", timeout_s=0.2)])
+    pack = Pack(bundle_id="com.apple.TextEdit", app_name="TextEdit", tools=[tool])
+    assert runtime.execute(pack, "open", {}, textedit_like()).ok
+    assert seen["cmd"] == ["open", "-b", "com.apple.TextEdit"]
+    assert seen["stdin"] == seen["stdout"] == seen["stderr"] == runtime.subprocess.DEVNULL
+
+
 def test_a_healed_anchor_that_does_not_resolve_is_a_tool_error():
     """The second resolve after a heal let AnchorLost escape as a
     traceback instead of a message naming the step."""
