@@ -357,6 +357,28 @@ def test_a_good_user_pack_shadows_without_a_warning(tmp_path, capsys):
     assert capsys.readouterr().err == ""
 
 
+def test_staleness_compares_macos_major_minor(monkeypatch):
+    """Comparing the full version made every pack stale after a point
+    update such as 26.3 to 26.3.1."""
+    pack = sample_pack()
+    pack.os_version = "26.3"
+    for live, stale in [("26.3", False), ("26.3.1", False), ("26.3.2", False), ("26.4", True), ("27.0", True)]:
+        monkeypatch.setattr(packs.platform, "mac_ver", lambda live=live: (live, ("", "", ""), "arm64"))
+        assert packs.is_stale(pack, "1.19") is stale, live
+    pack.os_version = "26"
+    monkeypatch.setattr(packs.platform, "mac_ver", lambda: ("26.0", ("", "", ""), "arm64"))
+    assert not packs.is_stale(pack, "1.19")
+
+
+def test_staleness_still_compares_the_app_version_and_ignores_locale(monkeypatch):
+    monkeypatch.setattr(packs.platform, "mac_ver", lambda: ("26.3.1", ("", "", ""), "arm64"))
+    pack = sample_pack()
+    pack.os_version, pack.locale = "26.3.1", "en_US"
+    assert not packs.is_stale(pack, "1.19")
+    assert packs.is_stale(pack, "1.20")
+    assert not packs.is_stale(pack, "")  # an unreadable live version proves nothing
+
+
 def test_shipped_packs_pin_no_window_titles():
     """A recorded window title names one person's document (the TextEdit
     pack once shipped with "vent-demo.txt"). In a shipped pack it steers

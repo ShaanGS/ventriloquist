@@ -569,15 +569,33 @@ def load_search_path(dirs: list[Path]) -> list[Pack]:
     return loaded
 
 
+def os_release(version: str) -> str:
+    """A macOS version's major.minor, "26.3" for "26.3.1"."""
+    parts = version.strip().split(".")
+    if not parts[0]:
+        return ""
+    return ".".join((parts + ["0"])[:2])
+
+
+def environment_differs(pack: Pack, app_version: str, os_version: str) -> bool:
+    """Whether a pack was recorded on another app or macOS version than the
+    one given, judged the way is_stale judges the live machine."""
+    if pack.app_version and app_version and pack.app_version != app_version:
+        return True
+    if pack.os_version and os_release(pack.os_version) != os_release(os_version):
+        return True
+    return False
+
+
 def is_stale(pack: Pack, app_version: str) -> bool:
     """True when the environment no longer matches what the pack recorded.
 
     A stale pack is not rejected; its anchors load as low-confidence, which
     raises the resolver's accept threshold so failures go to the healer
     instead of to a plausible wrong element (SECURITY.md T7).
+
+    macOS counts by major.minor: comparing the full string made every pack
+    stale after a point update such as 26.3 to 26.3.1. Locale is recorded
+    but not compared.
     """
-    if pack.app_version and app_version and pack.app_version != app_version:
-        return True
-    if pack.os_version and pack.os_version != platform.mac_ver()[0]:
-        return True
-    return False
+    return environment_differs(pack, app_version, platform.mac_ver()[0])
