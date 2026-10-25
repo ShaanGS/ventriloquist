@@ -499,6 +499,25 @@ def compile_cmd(app_name: str) -> None:
         click.secho(str(exc), fg="red")
         sys.exit(1)
 
+    # New tools join the pack already there, so a pack can grow over several
+    # explore runs. With no pack of the user's own, the bundled one is the
+    # start: the user's pack shadows it, so leaving it out would hide its
+    # tools. A user pack that can't be read is only replaced on a yes.
+    pack_path = _user_pack_path(app.bundle_id)
+    bundled_path = paths.BUNDLED_PACKS_DIR / app.bundle_id / "pack.json"
+    existing = None
+    if pack_path.exists():
+        try:
+            existing = packs.load(pack_path)
+        except packs.PackError as exc:
+            click.secho(f"✗ {exc}", fg="red")
+            if not click.confirm(f"Replace your {app.name} pack with only the tools you approve now?", default=False):
+                sys.exit(1)
+    elif bundled_path.exists():
+        existing = packs.load(bundled_path)
+        click.echo(f"Starting from the bundled {app.name} pack, so its tools stay available.")
+    have = {tool.name for tool in existing.tools} if existing else set()
+
     try:
         proposals = compiler.propose(trace)
     except llm.ModelError as exc:
@@ -525,6 +544,10 @@ def compile_cmd(app_name: str) -> None:
         if spec.risk == "high":
             click.secho("  ⚠ high risk tool", fg="red")
         if click.confirm("Approve this tool?", default=False):
+            if spec.name in have and not click.confirm(
+                f"Your pack already has {spec.name}. Replace it with this one?", default=False
+            ):
+                continue
             approved.append(spec)
 
     if not approved:
@@ -537,9 +560,18 @@ def compile_cmd(app_name: str) -> None:
         os_version=platform_mod.mac_ver()[0],
         locale=(locale_mod.getlocale()[0] or ""),
     )
-    pack_path = _user_pack_path(pack.bundle_id)
+    if existing:
+        merged = packs.merge(existing, pack)
+        if merged.app_version != pack.app_version or merged.os_version != pack.os_version:
+            click.secho(
+                f"  The tools already in the pack were recorded on a different {app.name} or macOS "
+                "version, so the pack keeps that version and its anchors load cautiously. "
+                "Re-record those tools to clear it.",
+                fg="yellow",
+            )
+        pack = merged
     packs.save(pack, pack_path)
-    click.secho(f"✓ Wrote {len(approved)} tool(s) to {pack_path}", fg="green")
+    click.secho(f"✓ Wrote {len(approved)} tool(s) to {pack_path} ({len(pack.tools)} in the pack)", fg="green")
 
 
 @main.command()

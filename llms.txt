@@ -176,7 +176,7 @@ vent apps              list running apps vent can attach to
 vent inspect APP       print the semantic snapshot (node ids, roles, labels, actions)
 vent anchor APP NODE   print the durable anchor for a node, for hand-authoring packs
 vent explore APP       model probes under the policy, records a trace (--no-values redacts field content)
-vent compile APP       propose tools from the trace, human approves each against literal steps
+vent compile APP       propose tools from the trace, human approves each against literal steps; approved tools join the app's existing pack
 vent run APP TOOL      execute one compiled tool directly (--arg key=value, --heal to enable re-grounding)
 vent serve             serve every pack as MCP tools over stdio
 vent mcp-config        print a ready-to-paste MCP client entry with vent's absolute path

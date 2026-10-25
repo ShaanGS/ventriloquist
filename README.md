@@ -221,6 +221,11 @@ vent run Spotify <tool> --arg k=v   # call one tool directly
 vent verify Spotify                 # dry-resolve anchors; promote quarantined heals
 ```
 
+Approved tools join the app's pack, so a pack can grow over several
+explore runs. A tool with the same name as one already there is replaced
+only if you say yes, and an app with a bundled pack starts from it, so
+its tools stay.
+
 `vent explore`, `vent compile`, and `vent run --heal` call a model, and so
 does `vent serve` if you start it with `VENT_HEAL=1` to let it heal broken
 anchors. Nothing else does. The model comes from the Claude Code CLI if
@@ -278,7 +283,6 @@ does with caveats:
   keystroke may send a probe string before it's undone. Explore against
   a scratch document or a test account, and use `--no-values` to keep
   field contents away from the model.
-- **`vent compile` replaces a pack instead of merging into it.**
 - **Read tools hand app text to your client's model.** vent marks it as
   untrusted data (SECURITY.md T12); whether the client respects that is
   up to the client.

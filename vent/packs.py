@@ -265,6 +265,31 @@ def save(pack: Pack, path: Path) -> None:
         raise
 
 
+def merge(base: Pack, added: Pack) -> Pack:
+    """Add newly compiled tools to an existing pack for the same app.
+
+    Tools in `added` replace same-name tools in `base` in place (the caller
+    asks before that) and the rest are appended, so earlier approvals
+    survive a second compile. Quarantined heals carry over. When the two
+    were recorded on different app or macOS versions, the pack keeps
+    `base`'s versions: its older tools still date from there, and a stale
+    pack loads its anchors cautiously (SECURITY.md T7).
+    """
+    if base.bundle_id != added.bundle_id:
+        raise PackError(f"cannot merge a {added.bundle_id} pack into a {base.bundle_id} pack")
+    incoming = {tool.name: tool for tool in added.tools}
+    tools = [incoming.pop(tool.name, tool) for tool in base.tools] + list(incoming.values())
+    return Pack(
+        bundle_id=base.bundle_id,
+        app_name=added.app_name or base.app_name,
+        tools=tools,
+        app_version=base.app_version or added.app_version,
+        os_version=base.os_version or added.os_version,
+        locale=added.locale or base.locale,
+        healed_pending=list(base.healed_pending),
+    )
+
+
 def load_all(packs_dir: Path) -> list[Pack]:
     """Load every pack, skipping invalid ones with a warning on stderr.
     One broken pack should not take down the server for the rest."""
