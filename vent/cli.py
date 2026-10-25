@@ -181,18 +181,22 @@ def inspect(app_name: str, depth: int, max_nodes: int, menus: bool) -> None:
     click.echo(render(snap))
 
 
+MAX_NODES_HELP = "Cap on surfaced elements. Give the value you gave vent inspect, so the ids match."
+
+
 @main.command()
 @click.argument("app_name")
 @click.argument("node_id", type=int)
 @click.option("--action", "action_name", default="AXPress", show_default=True)
 @click.option("--menus", is_flag=True, help="Include the menu bar when resolving ids.")
+@click.option("--max-nodes", default=800, show_default=True, help=MAX_NODES_HELP)
 @click.option("--text", default=None, help="Set this text as the element's value instead of performing an action.")
-def act(app_name: str, node_id: int, action_name: str, menus: bool, text: str | None) -> None:
+def act(app_name: str, node_id: int, action_name: str, menus: bool, max_nodes: int, text: str | None) -> None:
     """Perform an action on element NODE_ID from a fresh `inspect` snapshot."""
     try:
         app = ax.find_app(app_name)
         root = ax.app_element(app)
-        snap = snapshot(root, include_menus=menus)
+        snap = snapshot(root, max_nodes=max_nodes, include_menus=menus)
         if node_id >= len(snap.nodes):
             click.secho(f"No element #{node_id} (snapshot has {len(snap.nodes)}).", fg="red")
             sys.exit(1)
@@ -213,12 +217,13 @@ def act(app_name: str, node_id: int, action_name: str, menus: bool, text: str | 
 @click.argument("app_name")
 @click.argument("node_id", type=int)
 @click.option("--menus", is_flag=True, help="Include the menu bar when resolving ids.")
-def anchor(app_name: str, node_id: int, menus: bool) -> None:
+@click.option("--max-nodes", default=800, show_default=True, help=MAX_NODES_HELP)
+def anchor(app_name: str, node_id: int, menus: bool, max_nodes: int) -> None:
     """Print the durable anchor for element NODE_ID, for authoring packs."""
     try:
         app = ax.find_app(app_name)
         root = ax.app_element(app)
-        snap = snapshot(root, include_menus=menus)
+        snap = snapshot(root, max_nodes=max_nodes, include_menus=menus)
         if node_id >= len(snap.nodes):
             click.secho(f"No element #{node_id} (snapshot has {len(snap.nodes)}).", fg="red")
             sys.exit(1)

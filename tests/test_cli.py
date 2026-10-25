@@ -4,9 +4,11 @@ the printed command must be an absolute path that survives being pasted."""
 
 import json
 
+import pytest
 from click.testing import CliRunner
 
 from vent import __version__, cli, harness
+from vent.snapshot import snapshot
 
 from .fakes import on_another_space, textedit_like
 
@@ -15,6 +17,30 @@ def test_version_flag_reports_the_package_version():
     result = CliRunner().invoke(cli.main, ["--version"])
     assert result.exit_code == 0
     assert __version__ in result.output
+
+
+@pytest.mark.parametrize(
+    "command",
+    [["anchor", "TextEdit", "3"], ["act", "TextEdit", "3", "--text", "hello"]],
+    ids=["anchor", "act"],
+)
+def test_anchor_and_act_take_the_same_max_nodes_as_inspect(monkeypatch, command):
+    """Node ids count from one walk. Past 800 elements, an id from
+    `vent inspect --max-nodes 2000` named nothing in anchor or act."""
+    walks = []
+
+    def counting_snapshot(root, **options):
+        walks.append(options.get("max_nodes"))
+        return snapshot(root, **options)
+
+    tree = textedit_like()
+    monkeypatch.setattr(cli, "snapshot", counting_snapshot)
+    monkeypatch.setattr(cli.ax, "find_app", lambda name: cli.ax.RunningApp("TextEdit", "com.apple.TextEdit", 1))
+    monkeypatch.setattr(cli.ax, "app_element", lambda app: tree)
+    assert CliRunner().invoke(cli.main, command).exit_code == 0
+    result = CliRunner().invoke(cli.main, [*command, "--max-nodes", "2000"])
+    assert result.exit_code == 0, result.output
+    assert walks == [800, 2000]
 
 
 def test_explore_refuses_a_bundle_id_that_would_leave_its_directory(monkeypatch):
