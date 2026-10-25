@@ -635,22 +635,30 @@ def _say_which_version(base: packs.Pack, added: packs.Pack, merged: packs.Pack, 
         click.echo(f"  {replaced_all} was replaced, so the pack now records {_recorded_on(added, app_name)}.")
 
 
-@main.command()
-def serve() -> None:
-    """Serve every compiled pack as MCP tools over stdio.
+SERVE_HELP = """Serve every compiled pack as MCP tools over stdio.
 
     High risk tools are refused unless the server was started with
     VENT_ALLOW_HIGH=1 in the environment. See docs/SECURITY.md.
     """
+
+
+@main.command(help=SERVE_HELP)
+def serve() -> None:
     from .server import serve_stdio
 
     serve_stdio(paths.pack_search_path())
 
 
+@click.command("ventriloquist-mcp", help=SERVE_HELP)
+@click.version_option(__version__, prog_name="ventriloquist-mcp")
 def serve_entry() -> None:
     """The `ventriloquist-mcp` command: the MCP server on its own, for
-    launchers that run a package by its name (`uvx ventriloquist-mcp`)."""
-    serve()
+    launchers that run a package by its name (`uvx ventriloquist-mcp`).
+    A command of its own rather than a call into `vent serve`, which parsed
+    `ventriloquist-mcp --version` as an unknown option."""
+    from .server import serve_stdio
+
+    serve_stdio(paths.pack_search_path())
 
 
 def _vent_executable() -> str:

@@ -19,6 +19,13 @@ def test_version_flag_reports_the_package_version():
     assert __version__ in result.output
 
 
+def test_ventriloquist_mcp_reports_its_version_too():
+    """`ventriloquist-mcp --version` used to answer "No such option"."""
+    result = CliRunner().invoke(cli.serve_entry, ["--version"])
+    assert result.exit_code == 0, result.output
+    assert result.output.strip() == f"ventriloquist-mcp, version {__version__}"
+
+
 @pytest.mark.parametrize(
     "command",
     [["anchor", "TextEdit", "3"], ["act", "TextEdit", "3", "--text", "hello"]],
