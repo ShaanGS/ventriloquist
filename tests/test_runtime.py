@@ -13,8 +13,11 @@ from vent.snapshot import VALUE_PREVIEW_LIMIT, snapshot
 from .fakes import (
     FakeElement,
     GuardedElement,
+    PressRecorder,
     TickingElement,
     on_another_space,
+    save_changes_sheet,
+    sheet,
     textedit_like,
     textedit_with_menus,
 )
@@ -282,14 +285,14 @@ def test_a_field_that_turns_secure_after_resolution_is_refused(monkeypatch):
     subrole again, live, so a field that turned secure in between is
     still refused."""
     tree, field, pack = account_form()
-    real_resolve = anchors.resolve
+    real_locate = anchors.locate
 
-    def resolve_then_turn_secure(root, anchor, low_confidence=False):
-        element = real_resolve(root, anchor, low_confidence=low_confidence)
+    def locate_then_turn_secure(root, anchor, low_confidence=False):
+        found = real_locate(root, anchor, low_confidence=low_confidence)
         field.subrole = "AXSecureTextField"
-        return element
+        return found
 
-    monkeypatch.setattr(runtime.anchors, "resolve", resolve_then_turn_secure)
+    monkeypatch.setattr(runtime.anchors, "locate", locate_then_turn_secure)
     with pytest.raises(runtime.ToolExecutionError, match="secure text field"):
         runtime.execute(pack, "type_account", {"text": "typed"}, tree)
     assert field.value == ""
@@ -315,29 +318,208 @@ def test_settle_detects_change_then_quiet():
     assert runtime.settle(tree, deadline_s=2.0) == "settled"
 
 
-def test_modal_sheet_blocks_execution():
+def test_a_write_behind_a_sheet_is_refused():
+    """The old guard read an AXSheets attribute macOS doesn't have, so it
+    never fired. A sheet is an AXSheet child of its window."""
     tree = textedit_like()
     pack = build_write_tool(tree)
     window = tree.children()[0]
-    sheet = FakeElement("AXSheet", "Save changes?")
-    window_attr = window.attribute
+    tree.attribute = lambda name, attr=tree.attribute: [window] if name == "AXWindows" else attr(name)
+    save_changes = save_changes_sheet()
+    window._children.append(save_changes)
 
-    def attribute(name):
-        if name == "AXSheets":
-            return [sheet]
-        return window_attr(name)
-
-    window.attribute = attribute
-    tree_attr = tree.attribute
-
-    def root_attribute(name):
-        if name == "AXWindows":
-            return [window]
-        return tree_attr(name)
-
-    tree.attribute = root_attribute
-    with pytest.raises(runtime.ToolExecutionError, match="modal sheet is open"):
+    with pytest.raises(runtime.ToolExecutionError, match="a sheet is open on 'untitled.txt'"):
         runtime.execute(pack, "write_document", {"text": "hi"}, tree)
+    assert doc_body(tree).value == "hello"
+    with pytest.raises(runtime.ToolExecutionError, match="a sheet is open"):
+        runtime.execute(pack, "read_document", {}, tree)
+    assert not any(button.presses for button in save_changes.children())
+
+
+def outlook_like():
+    """Outlook's main window with its Choose Folder sheet open over it. The
+    window has a lookalike search field of its own."""
+    main_search = FakeElement("AXTextField", "search box", subrole="AXSearchField", value="")
+    folder_search = FakeElement("AXTextField", "search box", subrole="AXSearchField", value="")
+    move = PressRecorder("AXButton", "Move")
+    cancel = PressRecorder("AXButton", "Cancel")
+    choose_folder = sheet(folder_search, move, cancel, cancel=cancel)
+    window = FakeElement(
+        "AXWindow",
+        "Inbox",
+        subrole="AXStandardWindow",
+        children=[FakeElement("AXToolbar", children=[main_search]), choose_folder],
+    )
+    return FakeElement("AXApplication", "Outlook", children=[window]), window, choose_folder
+
+
+def file_to_folder_pack(tree) -> Pack:
+    """The example pack's filing steps after its menu press: wait for the
+    sheet's search box, type the folder, press Move."""
+    nodes = snapshot(tree).nodes
+    field = anchors.build(next(n for n in nodes if n.role == "AXTextField" and anchors.in_sheet(n.chain)))
+    move = anchors.build(next(n for n in nodes if n.label == "Move"))
+    tool = ToolSpec(
+        name="file_to_folder",
+        description="File the selected message.",
+        risk="mutating",
+        params={"folder": {"type": "string", "description": "Folder name."}},
+        steps=[
+            Step(op="wait_for", anchor=field, timeout_s=0.4),
+            Step(op="set_value", anchor=field, value={"param": "folder"}, timeout_s=0.2),
+            Step(op="press", anchor=move, timeout_s=0.2),
+        ],
+    )
+    return Pack(bundle_id="com.microsoft.Outlook", app_name="Outlook", tools=[tool])
+
+
+def test_steps_recorded_inside_the_sheet_act_in_it():
+    tree, window, choose_folder = outlook_like()
+    pack = file_to_folder_pack(tree)
+    main_search = window.children()[0].children()[0]
+    folder_search, move, cancel = choose_folder.children()
+
+    assert runtime.execute(pack, "file_to_folder", {"folder": "Receipts"}, tree).ok
+    assert folder_search.value == "Receipts"
+    assert move.presses == 1
+    assert main_search.value == ""
+    assert cancel.presses == 0
+
+
+def test_a_sheet_step_never_binds_the_windows_lookalike():
+    """Before the sheet opens, the window's own search box matches the
+    sheet's in everything but the sheet. Typing the folder name into it
+    would search the mailbox instead of filing the message."""
+    tree, window, choose_folder = outlook_like()
+    pack = file_to_folder_pack(tree)
+    window._children.remove(choose_folder)
+    with pytest.raises(runtime.ToolExecutionError, match="did not appear"):
+        runtime.execute(pack, "file_to_folder", {"folder": "Receipts"}, tree)
+    assert window.children()[0].children()[0].value == ""
+
+
+def test_a_modal_dialog_blocks_every_step_outside_it():
+    dialogs = [
+        FakeElement("AXWindow", "", subrole="AXDialog"),
+        FakeElement("AXWindow", "", subrole="AXSystemDialog"),
+        FakeElement("AXWindow", "Export", subrole="AXStandardWindow", modal=True),
+    ]
+    for dialog in dialogs:
+        tree = textedit_like()
+        pack = build_write_tool(tree)
+        tree._children.append(dialog)
+        with pytest.raises(runtime.ToolExecutionError, match="TextEdit has a dialog open"):
+            runtime.execute(pack, "write_document", {"text": "hi"}, tree)
+        assert doc_body(tree).value == "hello"
+
+
+def test_a_step_recorded_inside_a_dialog_may_act_in_it():
+    export = PressRecorder("AXButton", "Export")
+    alert = FakeElement("AXWindow", "", subrole="AXDialog", children=[export])
+    tree = textedit_like()
+    tree._children.append(alert)
+    node = next(n for n in snapshot(tree).nodes if n.label == "Export")
+    tool = ToolSpec(
+        name="export",
+        description="Confirm the export.",
+        risk="mutating",
+        steps=[Step(op="press", anchor=anchors.build(node), timeout_s=0.2)],
+    )
+    pack = Pack(bundle_id="com.apple.TextEdit", app_name="TextEdit", tools=[tool])
+    assert runtime.execute(pack, "export", {}, tree).ok
+    assert export.presses == 1
+
+
+def test_a_window_modal_only_by_axmodal_needs_a_pinned_title():
+    """A window the app runs modally keeps a standard subrole, so only an
+    anchor that pinned its title can show it was recorded there."""
+    export = PressRecorder("AXButton", "Export")
+    panel = FakeElement("AXWindow", "Export", subrole="AXStandardWindow", modal=True, children=[export])
+    tree = FakeElement("AXApplication", "TextEdit", children=[panel])
+    anchor = anchors.build(next(n for n in snapshot(tree).nodes if n.role == "AXButton"))
+    assert anchor.window_title == "Export"
+    tool = ToolSpec(
+        name="export",
+        description="Confirm the export.",
+        risk="mutating",
+        steps=[Step(op="press", anchor=anchor, timeout_s=0.2)],
+    )
+    pack = Pack(bundle_id="com.apple.TextEdit", app_name="TextEdit", tools=[tool])
+    assert runtime.execute(pack, "export", {}, tree).ok
+
+    anchor.window_title = ""
+    with pytest.raises(runtime.ToolExecutionError, match="was recorded there"):
+        runtime.execute(pack, "export", {}, tree)
+    assert export.presses == 1
+
+
+def test_a_menu_command_is_refused_while_the_focused_window_has_a_sheet():
+    tree = textedit_with_menus()
+    menu_node = next(n for n in snapshot(tree, include_menus=True).nodes if n.label == "New")
+    new_document = ToolSpec(
+        name="new_document",
+        description="Open a new document.",
+        risk="mutating",
+        steps=[Step(op="press", anchor=anchors.build(menu_node), timeout_s=0.2)],
+    )
+    pack = Pack(bundle_id="com.apple.TextEdit", app_name="TextEdit", tools=[new_document])
+    window = tree.children()[0]
+    other = FakeElement("AXWindow", "notes.txt", children=[save_changes_sheet()])
+    tree._children.insert(1, other)
+
+    # A sheet on a window the command doesn't land on is not in the way...
+    tree.focused_window = window
+    assert runtime.execute(pack, "new_document", {}, tree).ok
+    # ...but one on the focused window is.
+    tree.focused_window = other
+    with pytest.raises(runtime.ToolExecutionError, match="a sheet is open on 'notes.txt'"):
+        runtime.execute(pack, "new_document", {}, tree)
+
+
+class ClosingSheetWindow(FakeElement):
+    """A window whose sheet stays in the tree for its first few child
+    reads, the way a sheet animating closed does."""
+
+    def __init__(self, *args, reads_open: int, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.reads_open = reads_open
+
+    def children(self):
+        if self.reads_open > 0:
+            self.reads_open -= 1
+            return self._children
+        return [child for child in self._children if child.role != "AXSheet"]
+
+
+def wait_for_body_pack(tree, timeout_s):
+    body = anchors.build(next(n for n in snapshot(tree).nodes if n.identifier == "doc-body"))
+    tool = ToolSpec(
+        name="wait_for_body",
+        description="Wait for the document body.",
+        risk="read_only",
+        steps=[Step(op="wait_for", anchor=body, timeout_s=timeout_s)],
+    )
+    return Pack(bundle_id="com.apple.TextEdit", app_name="TextEdit", tools=[tool])
+
+
+def test_wait_for_outlasts_a_sheet_that_is_closing():
+    body = FakeElement("AXTextArea", value="hello", identifier="doc-body")
+    window = ClosingSheetWindow(
+        "AXWindow", "untitled.txt", reads_open=0, children=[FakeElement("AXScrollArea", children=[body])]
+    )
+    tree = FakeElement("AXApplication", "TextEdit", children=[window])
+    pack = wait_for_body_pack(tree, timeout_s=2.0)
+    window._children.append(save_changes_sheet())
+    window.reads_open = 3
+    assert runtime.execute(pack, "wait_for_body", {}, tree).ok
+
+
+def test_wait_for_names_a_sheet_that_never_closes():
+    tree = textedit_like()
+    pack = wait_for_body_pack(tree, timeout_s=0.4)
+    tree.children()[0]._children.append(save_changes_sheet())
+    with pytest.raises(runtime.ToolExecutionError, match="the element appeared, but a sheet is open"):
+        runtime.execute(pack, "wait_for_body", {}, tree)
 
 
 def test_high_risk_tool_refused_without_opt_in():
@@ -537,21 +719,13 @@ def test_settle_watches_a_window_on_another_space():
     assert result.steps[0].detail == "settled"
 
 
-def test_modal_sheet_on_another_space_still_blocks_execution():
+def test_a_sheet_on_another_space_still_blocks_a_write():
     tree = textedit_like()
     pack = build_write_tool(tree)
     window = tree.children()[0]
-    sheet = FakeElement("AXSheet", "Save changes?")
-    window_attr = window.attribute
-
-    def attribute(name):
-        if name == "AXSheets":
-            return [sheet]
-        return window_attr(name)
-
-    window.attribute = attribute
+    window._children.append(save_changes_sheet())
     on_another_space(tree)
-    with pytest.raises(runtime.ToolExecutionError, match="modal sheet is open"):
+    with pytest.raises(runtime.ToolExecutionError, match="a sheet is open on 'untitled.txt'"):
         runtime.execute(pack, "write_document", {"text": "hi"}, tree)
     assert window.children()[2].children()[0].value == "hello"
 

@@ -9,10 +9,19 @@ actually executed.
 import pytest
 
 from vent import compiler, llm, policy as policy_mod
-from vent.explorer import PROBE_TEXT, Trace, TraceAction, explore, load_trace, save_trace
+from vent.explorer import (
+    PROBE_TEXT,
+    ExplorationBlocked,
+    Trace,
+    TraceAction,
+    explore,
+    load_trace,
+    save_trace,
+)
 from vent.packs import Pack
+from vent.snapshot import snapshot
 
-from .fakes import FakeElement, textedit_like
+from .fakes import FakeElement, PressRecorder, save_changes_sheet, sheet, textedit_like
 
 
 class FakeApp:
@@ -99,6 +108,59 @@ def test_unlabeled_nominations_are_denied(monkeypatch):
     trace = explore(FakeApp(), tree, policy_mod.Policy(), rounds=1)
     assert not trace.actions[0].executed
     assert "default deny" in trace.actions[0].reason
+
+
+def probe_that_opens(alert):
+    """textedit_like with an Options button whose press opens `alert` as a
+    sheet on the window, and a scripted model that nominates it."""
+    tree = textedit_like()
+    window = tree.children()[0]
+    options = PressRecorder("AXButton", "Options", on_press=lambda: window._children.append(alert))
+    window._children.append(options)
+    options_id = next(n.id for n in snapshot(tree).nodes if n.label == "Options")
+    scripted([{"targets": [{"id": options_id, "op": "press", "why": "opens settings"}]}])
+    return tree, window, options
+
+
+def test_watchdog_presses_only_the_sheets_own_cancel_button(monkeypatch):
+    """OK is listed first and its label was on the old watchdog's list.
+    Only the button the sheet names as AXCancelButton may be pressed."""
+    app_version_stub(monkeypatch)
+    ok = PressRecorder("AXButton", "OK")
+    cancel = PressRecorder("AXButton", "Cancel")
+    alert = sheet(ok, cancel, cancel=cancel)
+    tree, window, options = probe_that_opens(alert)
+    cancel._on_press = lambda: window._children.remove(alert)
+    pol = policy_mod.Policy()
+
+    trace = explore(FakeApp(), tree, pol, rounds=1)
+
+    assert options.presses == 1 and trace.actions[0].modal_appeared
+    assert cancel.presses == 1
+    assert ok.presses == 0
+    assert alert not in window.children()
+    # The trigger is marked risky for the rest of the session.
+    assert not pol.screen_press(next(n for n in snapshot(tree).nodes if n.label == "Options")).allowed
+
+
+def test_watchdog_never_presses_a_button_that_only_reads_cancel(monkeypatch):
+    """A sheet that names no cancel button stays up, untouched, and
+    exploration stops for a human to close it."""
+    app_version_stub(monkeypatch)
+    buttons = [PressRecorder("AXButton", label) for label in ("OK", "Cancel", "Done", "No")]
+    tree, window, options = probe_that_opens(sheet(*buttons))
+    with pytest.raises(ExplorationBlocked, match="no cancel button"):
+        explore(FakeApp(), tree, policy_mod.Policy(), rounds=1)
+    assert [button.presses for button in buttons] == [0, 0, 0, 0]
+
+
+def test_exploration_does_not_start_behind_an_open_sheet(monkeypatch):
+    app_version_stub(monkeypatch)
+    tree = textedit_like()
+    tree.children()[0]._children.append(save_changes_sheet())
+    scripted([])
+    with pytest.raises(ExplorationBlocked, match="sheet or dialog open"):
+        explore(FakeApp(), tree, policy_mod.Policy(), rounds=1)
 
 
 def test_trace_round_trips_through_disk(tmp_path, monkeypatch):

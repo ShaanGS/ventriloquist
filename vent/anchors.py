@@ -31,6 +31,10 @@ the contract; the short version:
   sit in different windows, the one in the app's focused window wins,
   because that is the document the user is looking at. Ties inside one
   window, and ties for title-pinned anchors, still refuse.
+- Being inside a sheet is part of the address too. A sheet's controls and
+  its window's can look alike (a search field in a Choose Folder sheet and
+  one in the window behind it), so an anchor recorded in a sheet binds
+  only inside one, and an anchor recorded outside never binds inside one.
 
 Scoring reads only the chain links captured during the walk, never the
 live element again; every attribute read is a cross-process call and the
@@ -41,10 +45,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
-from typing import Iterator, Optional
+from typing import Iterator, Optional, Sequence
 
 from .ax import Element
-from .snapshot import MAX_TREE_DEPTH, SECURE_SUBROLE, ChainLink, Node, app_children
+from .snapshot import MAX_TREE_DEPTH, SECURE_SUBROLE, SHEET_ROLE, ChainLink, Node, app_children
 
 
 class AnchorLost(RuntimeError):
@@ -155,17 +159,24 @@ def build(node: Node) -> Anchor:
 
 
 @dataclass
-class _Candidate:
+class Candidate:
+    """One element an anchor could mean, with the chain it was found under
+    and the child of the app root it sits in (its window, or the menu
+    bar), which is what the runtime's dialog guard and the healer's window
+    scope check against."""
+
     element: Element
     chain: tuple[ChainLink, ...]
     score: float = 0.0
     breakdown: dict = field(default_factory=dict)
+    top: Optional[Element] = None
 
 
 def _walk_with_chains(
     root: Element, max_depth: int, include_menus: bool = True
-) -> Iterator[tuple[Element, tuple[ChainLink, ...]]]:
-    """Yield every element with its ancestor chain, same shape as snapshot.
+) -> Iterator[tuple[Element, tuple[ChainLink, ...], Optional[Element]]]:
+    """Yield every element with its ancestor chain, same shape as snapshot,
+    and the child of the root it sits under (None for the root itself).
 
     With include_menus off, menu bar subtrees are skipped wherever they
     appear, the rule snapshot applies by default. Indices still count the
@@ -181,14 +192,14 @@ def _walk_with_chains(
     # paths. Only a true ancestor cycle (an element inside itself) is cut.
     path_keys: set[int] = set()
 
-    def visit(element: Element, chain: tuple[ChainLink, ...], depth: int):
+    def visit(element: Element, chain: tuple[ChainLink, ...], depth: int, top: Optional[Element]):
         key = element.ref_key()
         if key is not None and key in path_keys:
             return
         if key is not None:
             path_keys.add(key)
         try:
-            yield element, chain
+            yield element, chain, top
             if depth >= max_depth:
                 return
             role_counts: dict[str, int] = {}
@@ -210,7 +221,7 @@ def _walk_with_chains(
                     index=index,
                     subrole=subrole,
                 )
-                yield from visit(child, chain + (link,), depth + 1)
+                yield from visit(child, chain + (link,), depth + 1, child if depth == 0 else top)
         finally:
             if key is not None:
                 path_keys.discard(key)
@@ -222,7 +233,7 @@ def _walk_with_chains(
         ordinal=0,
         index=0,
     )
-    yield from visit(root, (root_link,), 0)
+    yield from visit(root, (root_link,), 0, None)
 
 
 def _ancestry_similarity(
@@ -262,6 +273,11 @@ def _candidate_window_title(chain: tuple[ChainLink, ...]) -> str:
     return ""
 
 
+def in_sheet(chain: Sequence[ChainLink]) -> bool:
+    """Whether a chain passes through a sheet on its way to the element."""
+    return any(link.role == SHEET_ROLE for link in chain[:-1])
+
+
 def _score(anchor: Anchor, chain: tuple[ChainLink, ...]) -> tuple[float, dict]:
     """Score one candidate from its recorded chain links alone."""
     leaf = chain[-1]
@@ -297,6 +313,13 @@ def _score(anchor: Anchor, chain: tuple[ChainLink, ...]) -> tuple[float, dict]:
         # Another document, not a degraded match (see the module docstring).
         # An untitled window is still searched, as before.
         return -1.0, {"disqualified": "window title mismatch"}
+
+    if anchor.chain and in_sheet(anchor.chain) != in_sheet(chain):
+        # A sheet's search box is not the window's search box. Without
+        # this, a step waiting for a sheet to open could bind the window's
+        # lookalike before the sheet appeared. An anchor with no chain
+        # can't say where it lives; the runtime's dialog guard covers it.
+        return -1.0, {"disqualified": "sheet mismatch"}
 
     breakdown: dict[str, float] = {"role": W_ROLE}
     score = W_ROLE
@@ -372,17 +395,23 @@ def resolve(root: Element, anchor: Anchor, low_confidence: bool = False) -> Elem
     so a stale pack fails toward the healer instead of toward a plausible
     wrong element.
     """
+    return locate(root, anchor, low_confidence).element
+
+
+def locate(root: Element, anchor: Anchor, low_confidence: bool = False) -> Candidate:
+    """resolve, returning the winning candidate: the element, the chain it
+    was found under, and the window (or menu bar) it sits in."""
     threshold = ACCEPT_THRESHOLD + (2.0 if low_confidence else 0.0)
 
     # The menu bar is most of a native app's tree (about 365 of TextEdit's
     # roughly 410 elements), and walking it was most of every tool call, so
     # it is walked only for anchors that can live there.
-    candidates: list[_Candidate] = []
+    candidates: list[Candidate] = []
     ruled_out: dict[str, int] = {}
-    for element, chain in _walk_with_chains(root, MAX_TREE_DEPTH, in_menu_bar(anchor)):
+    for element, chain, top in _walk_with_chains(root, MAX_TREE_DEPTH, in_menu_bar(anchor)):
         score, breakdown = _score(anchor, chain)
         if score >= 0:
-            candidates.append(_Candidate(element=element, chain=chain, score=score, breakdown=breakdown))
+            candidates.append(Candidate(element=element, chain=chain, score=score, breakdown=breakdown, top=top))
         elif breakdown["disqualified"] != "role mismatch":
             reason = breakdown["disqualified"]
             ruled_out[reason] = ruled_out.get(reason, 0) + 1
@@ -411,14 +440,14 @@ def resolve(root: Element, anchor: Anchor, low_confidence: bool = False) -> Elem
                 f"Two candidates for {anchor.role} scored {best.score:.1f} and "
                 f"{candidates[1].score:.1f}, within the ambiguity margin. Refusing to guess."
             )
-        return settled.element
+        return settled
 
-    return best.element
+    return best
 
 
 def _settle_by_focused_window(
-    root: Element, candidates: list[_Candidate], threshold: float
-) -> Optional[_Candidate]:
+    root: Element, candidates: list[Candidate], threshold: float
+) -> Optional[Candidate]:
     """The one close candidate inside the app's focused window, or None.
 
     Only called for window-agnostic anchors. Returns None, so the caller

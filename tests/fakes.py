@@ -23,6 +23,7 @@ class FakeElement:
         actions: Optional[list[str]] = None,
         children: Optional[list["FakeElement"]] = None,
         enabled: bool = True,
+        modal: bool = False,
     ):
         self.role = role
         self.subrole = subrole
@@ -30,12 +31,17 @@ class FakeElement:
         self.label = label
         self.value = value
         self.enabled = enabled
+        self.modal = modal  # AXModal, on a window the app runs modally
         self._identifier = identifier
         self._actions = actions or []
         self._children = children or []
         # Set on an app root to mark one of its windows focused or main.
         self.focused_window: Optional["FakeElement"] = None
         self.main_window: Optional["FakeElement"] = None
+        # Set on a sheet or dialog: the button it names as its cancel and
+        # default buttons, the way AppKit reports them.
+        self.cancel_button: Optional["FakeElement"] = None
+        self.default_button: Optional["FakeElement"] = None
 
     def attribute(self, name: str) -> Any:
         if name == "AXIdentifier":
@@ -44,6 +50,12 @@ class FakeElement:
             return self.focused_window
         if name == "AXMainWindow":
             return self.main_window
+        if name == "AXModal":
+            return self.modal if self.role == "AXWindow" else None
+        if name == "AXCancelButton":
+            return self.cancel_button
+        if name == "AXDefaultButton":
+            return self.default_button
         return None
 
     def actions(self) -> list[str]:
@@ -159,6 +171,41 @@ def textedit_with_menus() -> FakeElement:
         )
     )
     return tree
+
+
+class PressRecorder(FakeElement):
+    """A button that remembers being pressed, and can run a callback when
+    it is, to open or close a sheet the way the real button would."""
+
+    def __init__(self, *args, on_press=None, **kwargs):
+        kwargs.setdefault("actions", ["AXPress"])
+        super().__init__(*args, **kwargs)
+        self.presses = 0
+        self._on_press = on_press
+
+    def perform(self, action: str = "AXPress") -> None:
+        super().perform(action)
+        self.presses += 1
+        if self._on_press is not None:
+            self._on_press()
+
+
+def sheet(*children: FakeElement, cancel: Optional[FakeElement] = None) -> FakeElement:
+    """A sheet, which macOS shows as an AXSheet child of its window. There
+    is no AXSheets attribute; the old guard read one and never fired."""
+    found = FakeElement("AXSheet", children=list(children))
+    found.cancel_button = cancel
+    return found
+
+
+def save_changes_sheet() -> FakeElement:
+    """TextEdit's "Do you want to save the changes" sheet. Its buttons are
+    listed with the default one first, as AppKit lists them."""
+    save = PressRecorder("AXButton", "Save")
+    cancel = PressRecorder("AXButton", "Cancel")
+    found = sheet(save, PressRecorder("AXButton", "Don't Save"), cancel, cancel=cancel)
+    found.default_button = save
+    return found
 
 
 def on_another_space(tree: FakeElement) -> FakeElement:

@@ -23,12 +23,14 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from . import anchors, ax, llm, policy as policy_mod
-from .runtime import settle
-from .snapshot import Node, Snapshot, render, snapshot
+from .runtime import cancel_dialog, settle
+from .snapshot import Node, Snapshot, open_dialogs, render, snapshot
 
 PROBE_TEXT = "vent probe"
 MAX_TARGETS_PER_ROUND = 4
-CANCEL_LABELS = {"cancel", "close", "dismiss", "not now", "no", "done", "ok"}
+# How many sheets or dialogs the watchdog cancels in a row before giving
+# up, in case cancelling one only uncovers another.
+MAX_DISMISSALS = 3
 
 NOMINATE_SCHEMA = {
     "type": "object",
@@ -154,19 +156,24 @@ def _record_refusal(trace: Trace, node: Node, op: str, verdict: policy_mod.Verdi
 
 
 def _dismiss_modal(root: ax.Element, pol: policy_mod.Policy, trigger: Node) -> bool:
-    """Dialog watchdog (SECURITY.md T3): cancel the unexpected dialog and
-    mark its trigger risky for the rest of the session."""
+    """Dialog watchdog (SECURITY.md T3): cancel the unexpected sheet or
+    dialog and mark its trigger risky for the rest of the session.
+
+    Only the cancel button the sheet or dialog names itself is pressed
+    (runtime.cancel_dialog). The old watchdog pressed the first button
+    labelled cancel, close, no, done or ok, and on an alert asking
+    "Delete this note?" with OK listed first, OK is the one that deletes.
+    Returns False, so the caller stops, when one has no cancel button or
+    stays open."""
     pol.mark_risky(trigger)
-    snap = snapshot(root)
-    for node in snap.nodes:
-        if node.role == "AXButton" and node.label.strip().lower() in CANCEL_LABELS:
-            try:
-                node.element.perform("AXPress")
-                settle(root, 3.0)
-                return True
-            except ax.AXError:
-                continue
-    return False
+    for _ in range(MAX_DISMISSALS):
+        dialogs = open_dialogs(root)
+        if not dialogs:
+            return True
+        if not cancel_dialog(dialogs[0]):
+            return False
+        settle(root, 3.0)
+    return not open_dialogs(root)
 
 
 def explore(
@@ -188,7 +195,7 @@ def explore(
         snap = snapshot(root)
         if snap.modal_present:
             raise ExplorationBlocked(
-                f"{app.name} has a modal sheet open; dismiss it and rerun."
+                f"{app.name} has a sheet or dialog open; dismiss it and rerun."
             )
         if not snap.nodes:
             notify("Snapshot is empty; stopping this round.")
@@ -231,9 +238,9 @@ def explore(
             if action.modal_appeared:
                 if not _dismiss_modal(root, pol, node):
                     raise ExplorationBlocked(
-                        f"An unexpected dialog appeared after pressing "
-                        f"{node.label!r} and could not be dismissed. Close it "
-                        "manually; the element is marked risky."
+                        f"An unexpected sheet or dialog appeared after probing "
+                        f"{node.label!r} and has no cancel button vent may press, "
+                        "or stayed open. Close it manually; the element is marked risky."
                     )
 
             if action.executed and action.nodes_after != action.nodes_before:

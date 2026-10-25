@@ -19,7 +19,7 @@ Design notes worth knowing before editing:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Optional
 
 from .ax import Element, session_locked
 
@@ -51,6 +51,14 @@ ALWAYS_SHOW_ROLES = {
 }
 
 SECURE_SUBROLE = "AXSecureTextField"
+
+# macOS has no attribute listing a window's sheets. A sheet is a child of
+# the window it hangs from, with this role.
+SHEET_ROLE = "AXSheet"
+
+# Window subroles of modal dialogs. A window can also be modal with an
+# ordinary subrole, which its AXModal attribute reports.
+DIALOG_SUBROLES = {"AXDialog", "AXSystemDialog"}
 
 # One depth limit shared by snapshot walks and anchor resolution. If the
 # two disagreed, an anchor minted from a deep inspect could describe an
@@ -195,8 +203,45 @@ def app_windows(root: Element) -> list[Element]:
     return listed or _unlisted_windows(root)
 
 
-def _has_sheet(window: Element) -> bool:
-    return bool(window.attribute("AXSheets"))
+def same_element(a: Element, b: Element) -> bool:
+    """Whether two wrappers hold the same AX element. Real refs compare by
+    CFEqual through wraps; a fake is its own ref."""
+    return a.wraps(getattr(b, "_ref", b))
+
+
+def is_dialog_window(window: Element) -> bool:
+    """Whether a window is a modal dialog, which holds up the whole app
+    until it is answered: an alert or dialog by subrole, or any window the
+    app runs modally."""
+    if window.role != "AXWindow":
+        return False
+    return window.subrole in DIALOG_SUBROLES or bool(window.attribute("AXModal"))
+
+
+def window_sheets(window: Element) -> list[Element]:
+    """The sheets hanging from a window."""
+    return [child for child in window.children() if child.role == SHEET_ROLE]
+
+
+@dataclass
+class OpenDialog:
+    """A sheet or modal dialog that is open now."""
+
+    element: Element  # the AXSheet, or the dialog's own AXWindow
+    window: Element  # the window a sheet hangs from; a dialog is its own
+    kind: str  # "sheet" or "dialog"
+
+
+def open_dialogs(root: Element, windows: Optional[list[Element]] = None) -> list[OpenDialog]:
+    """Every sheet and modal dialog the app has open, among `windows` when
+    given (the app's windows otherwise)."""
+    found = []
+    for window in app_windows(root) if windows is None else windows:
+        if is_dialog_window(window):
+            found.append(OpenDialog(element=window, window=window, kind="dialog"))
+        for sheet in window_sheets(window):
+            found.append(OpenDialog(element=sheet, window=window, kind="sheet"))
+    return found
 
 
 def snapshot(
@@ -305,7 +350,7 @@ def snapshot(
         # wrapping a fake afresh would make it call the live AX API.
         match = next((w for w in windows if w.wraps(focused)), None)
         focused_title = str((match or _as_element(focused)).title)
-    modal = any(_has_sheet(w) for w in windows)
+    modal = bool(open_dialogs(root, windows))
 
     return Snapshot(
         nodes=nodes,
@@ -341,7 +386,7 @@ def render(snap: Snapshot, redact_values: bool = False) -> str:
     if snap.off_space:
         lines.append("(the window is on another Space, reached through the app's main window)")
     if snap.modal_present:
-        lines.append("(a modal sheet is open)")
+        lines.append("(a sheet or dialog is open)")
     if snap.truncated:
         lines.append(f"(truncated: walk stopped at {len(snap.nodes)} elements)")
     return "\n".join(lines)

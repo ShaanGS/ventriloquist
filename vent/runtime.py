@@ -5,12 +5,12 @@ dependency rule from ARCHITECTURE.md section 6 applies: importing llm.py
 here is a design violation, not a style nit. The healer participates only
 through the heal callback passed into execute().
 
-Execution order per tool call: preconditions (including the modal guard),
-then per step (resolve the anchor by scoring, check the expect assertion,
-perform the op, settle), then verifications against live reads. AX actions
-return when dispatched, not when the UI has finished reacting, so the
-settle loop after every mutating op is what makes step N+1 see the world
-step N created.
+Execution order per tool call: preconditions, then per step (resolve the
+anchor by scoring, refuse if a sheet or dialog is in the way, check the
+expect assertion, perform the op, settle), then verifications against
+live reads. AX actions return when dispatched, not when the UI has
+finished reacting, so the settle loop after every mutating op is what
+makes step N+1 see the world step N created.
 """
 
 from __future__ import annotations
@@ -23,7 +23,19 @@ from typing import Any, Callable, Optional
 from . import anchors, ax
 from .ax import Element
 from .packs import Pack, Step, ToolSpec, Verify
-from .snapshot import MAX_TREE_DEPTH, SECURE_SUBROLE, app_children, app_windows
+from .snapshot import (
+    DIALOG_SUBROLES,
+    MAX_TREE_DEPTH,
+    SECURE_SUBROLE,
+    SHEET_ROLE,
+    OpenDialog,
+    _as_element,
+    app_children,
+    app_windows,
+    is_dialog_window,
+    same_element,
+    window_sheets,
+)
 
 # Settle tuning. After a mutating op the loop waits for the tree to change
 # and then go quiet. An op whose effect never appears is reported, not
@@ -173,9 +185,12 @@ def _resolve(
     low_confidence: bool,
     heal: Optional[HealFn],
     where: str,
-) -> Element:
+) -> tuple[anchors.Candidate, anchors.Anchor]:
+    """Find a step's element, healing the anchor once if a healer is set.
+    Returns what was found and the anchor that found it."""
+    used = step_anchor
     try:
-        element = anchors.resolve(root, step_anchor, low_confidence=low_confidence)
+        found = anchors.locate(root, step_anchor, low_confidence=low_confidence)
     except (anchors.AnchorLost, anchors.AnchorAmbiguous) as exc:
         if heal is None:
             raise ToolExecutionError(f"{where}: {exc}") from exc
@@ -184,9 +199,97 @@ def _resolve(
             raise ToolExecutionError(f"{where}: {exc} (healing declined)") from exc
         # The healed anchor is used for this one call. Persisting it is the
         # healer's job and goes through quarantine, never through here.
-        element = anchors.resolve(root, healed, low_confidence=False)
-    _refuse_secure(element, where)
-    return element
+        found = anchors.locate(root, healed, low_confidence=False)
+        used = healed
+    _refuse_secure(found.element, where)
+    return found, used
+
+
+def cancel_dialog(dialog: OpenDialog) -> bool:
+    """Press the cancel button a sheet or dialog names as its own
+    (AXCancelButton, the button Escape presses). Returns False when it
+    names none or the press fails. Nothing else is ever pressed: OK, Done,
+    Yes and No answer whatever the dialog asks, and a button that only
+    reads "Cancel" says so in the app's words, not the dialog's."""
+    ref = dialog.element.attribute("AXCancelButton")
+    if ref is None:
+        return False
+    try:
+        _as_element(ref).perform("AXPress")
+    except ax.AXError:
+        return False
+    return True
+
+
+def _recorded_in_dialog(anchor: anchors.Anchor, dialog: Element) -> bool:
+    """Whether an anchor was recorded inside this dialog. An anchor that
+    pinned a window title must name the dialog's; one that pinned none
+    needs the dialog's subrole on its window link. A window that is modal
+    only by AXModal has an ordinary subrole, so for it only a pinned title
+    counts."""
+    chain = anchor.chain
+    if len(chain) < 2 or chain[1].role != "AXWindow":
+        return False
+    if anchor.window_title:
+        return anchor.window_title == dialog.label
+    return dialog.subrole in DIALOG_SUBROLES and chain[1].subrole == dialog.subrole
+
+
+def _command_windows(root: Element) -> list[Element]:
+    """The windows a step outside any window acts on, such as a menu
+    command: the focused and main windows, or every window when the app
+    names neither."""
+    found: list[Element] = []
+    for name in ("AXFocusedWindow", "AXMainWindow"):
+        ref = root.attribute(name)
+        if ref is None:
+            continue
+        window = _as_element(ref)
+        if not any(same_element(window, other) for other in found):
+            found.append(window)
+    return found or app_windows(root)
+
+
+def _dialog_in_the_way(
+    root: Element, step_anchor: anchors.Anchor, found: anchors.Candidate, app_name: str
+) -> str:
+    """Why an open sheet or modal dialog stops this step, or "" if none does.
+
+    AX presses a button or rewrites a field behind a sheet as readily as
+    anywhere, while the user may be halfway through answering it. So a
+    step acts inside a sheet or dialog only when its anchor was recorded
+    there and its element was found there. A modal dialog holds up the
+    whole app. A sheet holds up the window it hangs from, and for a step
+    outside any window, such as a menu command, the focused and main
+    windows, since that is where the command lands.
+    """
+    top = found.top
+    in_window = top is not None and top.role == "AXWindow"
+    for window in app_windows(root):
+        if not is_dialog_window(window):
+            continue
+        title = window.label
+        dialog = f"{app_name} has a dialog open{f' ({title!r})' if title else ''}"
+        if not (in_window and same_element(top, window)):
+            return f"{dialog}. Refusing to act behind it; dismiss it and retry."
+        if not _recorded_in_dialog(step_anchor, window):
+            return (
+                f"{dialog}, and this step's element is in it, but nothing in its anchor "
+                "says it was recorded there. Refusing to act on it; dismiss the dialog and retry."
+            )
+    for window in [top] if in_window else _command_windows(root):
+        if window.role == SHEET_ROLE:
+            return "a sheet is open. Refusing to act behind it; dismiss it and retry."
+        if not window_sheets(window):
+            continue
+        if in_window and anchors.in_sheet(found.chain) and anchors.in_sheet(step_anchor.chain):
+            continue
+        title = window.label
+        return (
+            f"a sheet is open on {repr(title) if title else 'an untitled window'}. "
+            "Refusing to act behind it; dismiss it and retry."
+        )
+    return ""
 
 
 def _check_expect(element: Element, expect: Optional[dict], where: str) -> None:
@@ -312,14 +415,6 @@ def _wait_frontmost(root: Element) -> None:
         time.sleep(SETTLE_POLL_S)
 
 
-def _modal_open(root: Element) -> str:
-    """Return the title of an open modal sheet, or empty if none."""
-    for window in app_windows(root):
-        if window.attribute("AXSheets"):
-            return window.title or "an untitled window"
-    return ""
-
-
 def _run_step(
     step: Step,
     root: Element,
@@ -334,18 +429,26 @@ def _run_step(
 
     if step.op == "wait_for":
         deadline = time.monotonic() + step.timeout_s
+        failure = f"element did not appear within {step.timeout_s}s"
         while time.monotonic() < deadline:
             try:
-                _refuse_secure(anchors.resolve(root, step.anchor, low_confidence=low_confidence), where)
-                return StepReport(op=step.op, ok=True)
+                found = anchors.locate(root, step.anchor, low_confidence=low_confidence)
+                _refuse_secure(found.element, where)
+                blocked = _dialog_in_the_way(root, step.anchor, found, pack.app_name)
+                if not blocked:
+                    return StepReport(op=step.op, ok=True)
+                # Found, but behind a sheet or dialog. One that is closing
+                # stays in the tree for a moment, so keep polling.
+                failure = f"the element appeared, but {blocked}"
             except (anchors.AnchorLost, anchors.AnchorAmbiguous):
-                # Resolution only reads, and reads never flush a Chromium
-                # host's lazily-published tree: content that rendered after
-                # the last action stays invisible to every poll, however
-                # long we wait. Nudge with a benign action between polls.
-                _pump_anywhere(root)
-                time.sleep(WAIT_FOR_POLL_S)
-        raise ToolExecutionError(f"{where}: element did not appear within {step.timeout_s}s")
+                pass
+            # Resolution only reads, and reads never flush a Chromium
+            # host's lazily-published tree: content that rendered after
+            # the last action stays invisible to every poll, however
+            # long we wait. Nudge with a benign action between polls.
+            _pump_anywhere(root)
+            time.sleep(WAIT_FOR_POLL_S)
+        raise ToolExecutionError(f"{where}: {failure}")
 
     if step.op == "open_app":
         # Fixed argv, bundle id from the validated pack. Not a shell.
@@ -366,7 +469,11 @@ def _run_step(
 
     if step.anchor is None:
         raise ToolExecutionError(f"{where}: step has no anchor; the pack should not have loaded")
-    element = _resolve(step.anchor, root, low_confidence, heal, where)
+    found, used = _resolve(step.anchor, root, low_confidence, heal, where)
+    blocked = _dialog_in_the_way(root, used, found, pack.app_name)
+    if blocked:
+        raise ToolExecutionError(f"{where}: {blocked}")
+    element = found.element
     _check_expect(element, step.expect, where)
 
     # Semantic drift guard (SECURITY.md T11), acting ops only. When the
@@ -439,7 +546,10 @@ def _run_verify(
     index: int,
 ) -> None:
     where = f"{tool.name} verify {index} ({check.kind})"
-    element = _resolve(check.anchor, root, low_confidence, heal, where)
+    # A verify only reads, to check what the steps did, so the dialog
+    # guard doesn't apply: a tool whose last step opens a sheet can still
+    # check the window behind it.
+    element = _resolve(check.anchor, root, low_confidence, heal, where)[0].element
 
     if check.kind == "element_exists":
         return
@@ -494,13 +604,8 @@ def execute(
                     raise ToolExecutionError(
                         f"{tool_name}: precondition failed, {pack.app_name} has no open window"
                     )
-
-        modal_title = _modal_open(root)
-        if modal_title:
-            raise ToolExecutionError(
-                f"{tool_name}: a modal sheet is open on {modal_title!r}. Refusing to act "
-                "through it; dismiss it and retry."
-            )
+        # Open sheets and dialogs are judged per step (_dialog_in_the_way),
+        # because a tool may open one and then act inside it.
     except ax.AXTransientError as exc:
         raise ToolExecutionError(f"{tool_name}: {exc}") from exc
 
