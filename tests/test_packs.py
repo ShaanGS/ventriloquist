@@ -272,6 +272,34 @@ def test_other_press_actions_are_refused(action):
         Pack.from_dict(press_pack(action))
 
 
+SECURE_LINK = {"role": "AXTextField", "label": "", "identifier": "", "ordinal": 0, "index": 0, "subrole": "AXSecureTextField"}
+
+
+def onto_a_password_field(anchor):
+    anchor["chain"] = anchor["chain"] + [SECURE_LINK]
+
+
+@pytest.mark.parametrize(
+    "where",
+    [
+        lambda data: onto_a_password_field(first_step(data)["anchor"]),
+        lambda data: onto_a_password_field(data["tools"][0]["verify"][0]["anchor"]),
+        lambda data: set_in(
+            data,
+            "healed_pending",
+            [{"original": {"role": "AXTextArea"}, "healed": {"role": "AXTextField", "chain": [SECURE_LINK]}}],
+        ),
+        lambda data: set_in(first_step(data)["anchor"], "subrole", "AXSecureTextField"),
+    ],
+    ids=["step", "verify", "quarantined heal", "anchor subrole"],
+)
+def test_anchors_onto_secure_text_fields_do_not_load(where):
+    """SECURITY.md T4: a password field is never a valid target. The
+    snapshot never surfaces one, so only an edited pack can name it."""
+    with pytest.raises(PackError, match="secure text field"):
+        Pack.from_dict(edited(where))
+
+
 def test_shipped_packs_pin_no_window_titles():
     """A recorded window title names one person's document (the TextEdit
     pack once shipped with "vent-demo.txt"). In a shipped pack it steers

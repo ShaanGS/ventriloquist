@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from .anchors import Anchor
+from .snapshot import SECURE_SUBROLE
 
 OPS = {"press", "set_value", "pick", "reveal", "raise_window", "open_app", "wait_for", "read_value"}
 RISK_LEVELS = {"read_only", "mutating", "high"}
@@ -104,7 +105,9 @@ LINK_NUMBERS = ("ordinal", "index")
 
 
 def _anchor(data: Any, where: str) -> Anchor:
-    """Check an anchor's shape, then build it."""
+    """Check an anchor's shape, then build it. A secure text field is never
+    a valid target, wherever in the chain it sits (SECURITY.md T4): the
+    snapshot never surfaces one, so only a hand-edited pack can name it."""
     data = _object(data, f"{where} anchor")
     if not isinstance(data.get("role"), str) or not data["role"]:
         raise PackError(f"{where} anchor needs a role")
@@ -113,6 +116,7 @@ def _anchor(data: Any, where: str) -> Anchor:
             _text(data[key], f"{where} anchor {key}")
     for index, label in enumerate(_array(data.get("labels", []), f"{where} anchor labels")):
         _text(label, f"{where} anchor label {index}")
+    subroles = [data.get("subrole", "")]
     for index, link in enumerate(_array(data.get("chain", []), f"{where} anchor chain")):
         link_where = f"{where} anchor chain link {index}"
         link = _object(link, link_where)
@@ -122,7 +126,12 @@ def _anchor(data: Any, where: str) -> Anchor:
             if isinstance(link.get(key), bool) or not isinstance(link.get(key), int):
                 raise PackError(f"{link_where} {key} must be a whole number, not {_kind(link.get(key))}")
         if "subrole" in link:
-            _text(link["subrole"], f"{link_where} subrole")
+            subroles.append(_text(link["subrole"], f"{link_where} subrole"))
+    if SECURE_SUBROLE in subroles:
+        raise PackError(
+            f"{where} anchor targets a secure text field ({SECURE_SUBROLE}). vent never reads "
+            "or writes password fields (SECURITY.md T4)"
+        )
     return Anchor.from_dict(data)
 
 
