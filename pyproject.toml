@@ -45,7 +45,7 @@ vent = "vent.cli:main"
 ventriloquist-mcp = "vent.cli:serve_entry"
 
 [dependency-groups]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=9.1.1"]
 
 [build-system]
 requires = ["hatchling>=1.27"]
