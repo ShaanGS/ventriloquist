@@ -28,7 +28,7 @@ Running tools:
 Serving:
 
 - High-risk tools are hidden unless the client can ask you to confirm
-  each call (MCP elicitation) or the server runs with `VENT_ALLOW_HIGH=1`.
+  each call (MCP elicitation, #4) or the server runs with `VENT_ALLOW_HIGH=1`.
   `VENT_READ_ONLY=1` serves read-only tools only.
 - Tools carry `readOnlyHint` or `destructiveHint` and a title, and their
   names are ASCII, at most 128 characters.
@@ -39,6 +39,11 @@ Serving:
   longer brings back the bundled one in its place.
 - A pack counts as stale when macOS's major.minor version changes, not on
   every point release.
+- `vent serve` runs MCP on a thread of its own and keeps AppKit's run loop
+  turning on its main thread, so apps opened after it started are seen
+  without stalling the client.
+- `ventriloquist-mcp --version` works.
+- Requires `mcp` 2.3 or later.
 
 Exploring, compiling and healing:
 
@@ -57,7 +62,13 @@ Exploring, compiling and healing:
 - The Claude Code CLI fallback runs outside your own Claude Code setup:
   no MCP servers, hooks, CLAUDE.md, memory, settings or saved session.
 - `vent compile` adds approved tools to the app's existing pack instead
-  of replacing it.
+  of replacing it (#3), and asks before a second tool of the same name in
+  one run replaces the first.
+- The approval gate shows every literal value a tool writes and every
+  argument with its description. Writes the compiler can't tie to an
+  argument are dropped instead of becoming a write of an empty string, and
+  argument names and descriptions written by the model are checked,
+  cleaned and capped.
 - Explore traces are readable by your user only.
 
 Packs and docs:
@@ -67,6 +78,11 @@ Packs and docs:
   the title of the tab that was open. Two descriptions now name other
   tools the way clients see them.
 - `vent run` and tool results say "1 step" rather than "1 steps".
+- Packs are checked more strictly when they load: standard accessibility
+  press actions only, step timeouts between 0 and 120 seconds, and bundle
+  ids that are plain reverse-DNS names.
+- `vent anchor` and `vent act` take `--max-nodes`, like `vent inspect`, for
+  apps with big trees.
 - SECURITY.md matches the code, with what isn't built marked Planned, and
   security problems can be reported privately.
 - Releases run the test suite against the built wheel before publishing,

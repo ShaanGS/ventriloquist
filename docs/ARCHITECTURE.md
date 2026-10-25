@@ -321,11 +321,13 @@ read tool work from the background.
 
 **Running-app state.** AppKit updates NSWorkspace's app list and front app,
 and every NSRunningApplication, only while the main run loop runs. The CLI
-pumps that loop before it reads. `vent serve` runs each tool call on a
-worker thread while its main thread runs the asyncio loop, so the server
-pumps the main run loop (`refresh_app_state`), and packs find their app by
-asking LaunchServices for the bundle id, skipping processes that have
-already exited. Without both, the server kept the state from its first
+pumps that loop before it reads. `vent serve` runs the MCP event loop on a
+thread of its own and keeps its main thread turning AppKit's run loop
+(`serve_beside_run_loop`), so tool calls, which run on worker threads, see
+apps opened, quit or brought forward after the server started, and the
+client's messages never wait on a pump. Packs find their app by asking
+LaunchServices for the bundle id, skipping processes that have already
+exited. Without both, the server kept the state from its first
 call: apps opened later never appeared, and a relaunched app kept its dead
 pid.
 

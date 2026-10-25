@@ -39,7 +39,10 @@ the text inside it (up to 20,000 characters). It changes nothing, but it
 is how app content reaches an MCP client, so T6 and T12 apply to it, and
 it never reads a password field (T4).
 
-`vent/packs.py` rejects an unknown op when a pack loads, and model output
+`vent/packs.py` rejects an unknown op when a pack loads, along with a
+press action other than the standard accessibility actions (`AXPress`,
+`AXConfirm`, `AXShowMenu`, `AXIncrement`, `AXDecrement`, `AXPick`,
+`AXCancel`, `AXRaise`) and a step timeout outside 0 to 120 seconds. Model output
 is checked against a JSON schema and rejected on any mismatch, never
 repaired. Adding an op changes this threat model, so this document is
 updated first.
@@ -62,6 +65,12 @@ this way. So these rules look at the op, not the label:
   destructive verb, makes the tool `high`. Any write, press or cumulative
   action makes it at least `mutating`. You can raise a tool's risk by
   editing its pack.
+- At the approval gate, each tool's summary lists its steps with every
+  literal value it writes, and every argument with its description. A
+  write the compiler can't tie to an argument is dropped, not turned into
+  a write of an empty string. Argument names written by the model must be
+  plain identifiers, and their descriptions are cleaned of control
+  characters and capped at 200 characters before you or a client see them.
 - **Planned:** the approval gate saying what a tool does as a whole, in
   words ("this replaces all the text in the document"). Today the gate
   lists each step, and you have to see that a write into a document's
@@ -198,8 +207,9 @@ sent the string before it was removed.
 
 Packs are JSON on disk. `vent/packs.py` validates each one when it loads:
 the format version, the op set, risk levels, verify and precondition
-kinds, that every parameter a step uses is declared, and that no anchor
-is on a password field. A tampered pack is held to the same closed action
+kinds, that every parameter a step uses is declared, that no anchor is on
+a password field, and that the bundle id is a plain reverse-DNS name, since
+vent builds file paths from it. A tampered pack is held to the same closed action
 space as an honest one. Review a pack someone else shares the way you'd
 review code; the format is readable so that you can.
 
