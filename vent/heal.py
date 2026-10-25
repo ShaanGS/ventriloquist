@@ -5,7 +5,14 @@ heal callback this module builds. The healer's job is narrow and its powers
 are fenced (ARCHITECTURE.md section 9, SECURITY.md T8):
 
 - It only ever runs on a real break. runtime.py invokes it after
-  AnchorLost or AnchorAmbiguous, never speculatively.
+  AnchorLost or AnchorAmbiguous, never speculatively. Asking the model is
+  opt-in (VENT_HEAL=1 on the server, --heal on vent run); without it only
+  the deterministic quarantine reuse below runs.
+- It stays inside the anchor's own window: the window whose title the
+  anchor pinned, or for a window-agnostic anchor the focused window, or
+  the menu bar for a menu anchor. Nothing outside it is shown to the model
+  or accepted from quarantine, and a step recorded in a sheet only heals
+  onto an element in one.
 - It refuses a truncated snapshot rather than guessing at the nearest
   lookalike. A healer that cannot see the whole window has no business
   choosing an element in it.
@@ -16,6 +23,8 @@ are fenced (ARCHITECTURE.md section 9, SECURITY.md T8):
   for the one call in flight and written to the pack's quarantine
   (`healed_pending`), where it stays until a human promotes it with
   `vent verify`. The tool's anchor of record does not change on its own.
+  The pack is read again from disk before the entry is saved, so a
+  promotion or recompile made since the pack was loaded isn't undone.
 
 Efficiency without trust: on a break, the healer first looks in quarantine
 for a prior fix for the same broken anchor. If one is there, still
@@ -31,11 +40,14 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from . import anchors, ax, llm, packs, policy as policy_mod
-from .snapshot import Node, Snapshot, render, snapshot
+from .snapshot import Node, Snapshot, app_children, render, snapshot
 
-# The window the anchor lived in is the search scope. Healing does not roam
-# the whole app looking for a plausible match; it re-grounds within the
-# window the tool was recorded against.
+# Cap on the elements shown to the model. The healer's snapshot covers one
+# window, not the whole app, and the cap sits above the general snapshot's
+# 800 so that one large window still fits. A window bigger than this is
+# refused as truncated, as before.
+HEAL_MAX_NODES = 2000
+
 HEAL_SCHEMA = {
     "type": "object",
     "properties": {
@@ -113,24 +125,60 @@ def _screen_element(element: ax.Element, window_title: str) -> policy_mod.Verdic
     )
 
 
+def _anchor_scope(root: ax.Element, anchor: anchors.Anchor) -> Optional[tuple[int, ax.Element]]:
+    """The child of the app root a broken anchor lived in, with its index
+    as app_children counts it: the menu bar for a menu anchor, the window
+    whose title the anchor pinned, or for a window-agnostic anchor the
+    focused window (the one its tie-break would pick), else the main
+    window, else the only window. None when none of those is open."""
+    children = list(enumerate(app_children(root)))
+    if any(link.role == "AXMenuBar" for link in anchor.chain):
+        return next(((i, c) for i, c in children if c.role == "AXMenuBar"), None)
+    windows = [(i, c) for i, c in children if c.role == "AXWindow"]
+    if anchor.window_title:
+        pinned = [(i, c) for i, c in windows if c.label == anchor.window_title]
+        return pinned[0] if len(pinned) == 1 else None
+    for name in ("AXFocusedWindow", "AXMainWindow"):
+        ref = root.attribute(name)
+        if ref is not None:
+            found = next(((i, c) for i, c in windows if c.wraps(ref)), None)
+            if found is not None:
+                return found
+    return windows[0] if len(windows) == 1 else None
+
+
 def make_heal_callback(
     pack: packs.Pack,
     pack_path: Path,
     notify: Callable[[str], None] = lambda message: None,
-    ask_model: bool = True,
+    ask_model: bool = False,
     low_confidence: bool = False,
+    redact_values: bool = False,
 ) -> Callable[[anchors.Anchor, ax.Element], Optional[anchors.Anchor]]:
     """Build the heal callback runtime.execute() calls on a broken anchor.
 
-    ask_model=False disables the model step, so healing then relies only on
+    Asking the model is opt-in: with ask_model off, healing relies only on
     the deterministic quarantine reuse. low_confidence propagates the
     caller's stale-pack bar into the reuse resolve, so a fix from an older
     state is accepted at the raised threshold (SECURITY.md T7).
+    redact_values withholds field contents from the snapshot the model
+    sees, as `vent explore --no-values` does (SECURITY.md T6).
     """
 
     def heal(broken: anchors.Anchor, root: ax.Element) -> Optional[anchors.Anchor]:
         try:
-            snap = snapshot(root)
+            scope = _anchor_scope(root, broken)
+            if scope is None:
+                where = f"its window, {broken.window_title!r}," if broken.window_title else "its window"
+                notify(f"heal: {where} is not open; refusing to look elsewhere")
+                return None
+            index, top = scope
+            snap = snapshot(
+                root,
+                max_nodes=HEAL_MAX_NODES,
+                include_menus=top.role == "AXMenuBar",
+                only_top=index,
+            )
         except ax.AXTransientError:
             notify("heal: app is not answering; refusing to guess")
             return None
@@ -141,14 +189,14 @@ def make_heal_callback(
             notify("heal: snapshot is truncated; refusing to guess")
             return None
 
-        reused = _reuse_from_quarantine(pack, broken, root, low_confidence, notify)
+        reused = _reuse_from_quarantine(pack, broken, root, index, low_confidence, notify)
         if reused is not None:
             return reused
 
         if not ask_model:
             return None
 
-        node = _ask_model_for_target(broken, snap, notify)
+        node = _ask_model_for_target(broken, snap, notify, redact_values)
         if node is None:
             return None
 
@@ -161,6 +209,12 @@ def make_heal_callback(
             notify(f"heal: model picked a {node.role}, but the broken anchor was a {broken.role}; refusing")
             return None
 
+        # A step recorded answering a sheet must not heal onto the window
+        # behind it, nor a window step onto a sheet.
+        if broken.chain and anchors.in_sheet(node.chain) != anchors.in_sheet(broken.chain):
+            notify("heal: model picked an element on the other side of a sheet; refusing")
+            return None
+
         verdict = policy_mod.screen_heal_target(
             node.role, node.label, node.window_title, node.subrole
         )
@@ -169,13 +223,22 @@ def make_heal_callback(
             return None
 
         healed = anchors.build(node)
-        # Confirm the fresh anchor actually resolves before trusting it for
-        # the call. If it does not, the model picked something we cannot
-        # re-address; refuse rather than hand back a second broken anchor.
+        if not broken.window_title:
+            # A window-agnostic tool stays window-agnostic. Pinning the
+            # healed anchor to whichever document happened to be open would
+            # break the tool for every other one once promoted.
+            healed.window_title = ""
+        # Confirm the fresh anchor resolves, and to the element the model
+        # picked, before trusting it for the call. Otherwise the model
+        # picked something we cannot re-address, and what the anchor does
+        # find was never screened.
         try:
-            anchors.resolve(root, healed)
+            found = anchors.locate(root, healed)
         except (anchors.AnchorLost, anchors.AnchorAmbiguous):
             notify("heal: re-grounded anchor did not resolve; refusing")
+            return None
+        if found.element.ref_key() != node.element.ref_key():
+            notify("heal: re-grounded anchor resolves to a different element; refusing")
             return None
 
         _quarantine(pack, pack_path, broken, healed, node, notify)
@@ -188,13 +251,16 @@ def _reuse_from_quarantine(
     pack: packs.Pack,
     broken: anchors.Anchor,
     root: ax.Element,
+    scope_index: int,
     low_confidence: bool,
     notify: Callable[[str], None],
 ) -> Optional[anchors.Anchor]:
     """Deterministically reuse a prior fix, re-screened, with no model call.
 
-    The re-screen reads the target live from the resolved element rather
-    than looking it up in a snapshot node, so it does not depend on ref_key
+    The fix must still resolve inside the broken anchor's own window
+    (scope_index, the window's place among the app root's children). The
+    re-screen reads the target live from the resolved element rather than
+    looking it up in a snapshot node, so it does not depend on ref_key
     matching across two separate tree walks (a fragile round-trip the review
     flagged). The window title comes from the candidate anchor, which is
     stable."""
@@ -207,10 +273,13 @@ def _reuse_from_quarantine(
         if broken.role and candidate.role != broken.role:
             continue
         try:
-            element = anchors.resolve(root, candidate, low_confidence=low_confidence)
+            found = anchors.locate(root, candidate, low_confidence=low_confidence)
         except (anchors.AnchorLost, anchors.AnchorAmbiguous):
             continue
-        verdict = _screen_element(element, candidate.window_title)
+        if len(found.chain) < 2 or found.chain[1].index != scope_index:
+            notify("heal: a quarantined fix resolves outside the anchor's window; not using it")
+            continue
+        verdict = _screen_element(found.element, candidate.window_title)
         if not verdict.allowed:
             notify(f"heal: quarantined fix no longer safe, {verdict.reason}")
             continue
@@ -220,12 +289,12 @@ def _reuse_from_quarantine(
 
 
 def _ask_model_for_target(
-    broken: anchors.Anchor, snap: Snapshot, notify: Callable[[str], None]
+    broken: anchors.Anchor, snap: Snapshot, notify: Callable[[str], None], redact_values: bool = False
 ) -> Optional[Node]:
     prompt = (
         "Broken anchor:\n"
         f"{_describe_anchor(broken)}\n\n"
-        + llm.wrap_untrusted("app snapshot", render(snap))
+        + llm.wrap_untrusted("app snapshot", render(snap, redact_values=redact_values))
     )
     try:
         result = llm.complete_json(
@@ -262,20 +331,39 @@ def _quarantine(
         "target_role": node.role,
         "target_window": node.window_title,
     }
-    # Coalesce: one pending fix per broken anchor. A recurring break that
-    # heals onto varying targets must not grow the quarantine without bound
-    # (review finding). The newest re-grounding replaces any prior pending
-    # one for the same broken anchor.
-    pack.healed_pending = [
-        e for e in pack.healed_pending if not _same_broken(e.get("original", {}), broken)
-    ]
-    pack.healed_pending.append(entry)
+
+    def with_entry(pending: list[dict]) -> list[dict]:
+        # Coalesce: one pending fix per broken anchor. A recurring break
+        # that heals onto varying targets must not grow the quarantine
+        # without bound (review finding). The newest re-grounding replaces
+        # any prior pending one for the same broken anchor.
+        return [e for e in pending if not _same_broken(e.get("original", {}), broken)] + [entry]
+
+    pack.healed_pending = with_entry(pack.healed_pending)
+
+    # Save onto the pack as it is on disk now, not as this process loaded
+    # it: `vent verify` may have promoted a fix, or `vent compile` added
+    # tools, since the server started, and saving the stale copy would undo
+    # them. With no file yet (a bundled pack's first heal), this copy
+    # becomes the user's.
+    target = pack
+    if Path(pack_path).exists():
+        try:
+            target = packs.load(pack_path)
+        except (packs.PackError, OSError) as exc:
+            notify(f"heal: {pack_path} could not be read ({exc}); left as it is, fix used for this call only")
+            return
+        if target.bundle_id != pack.bundle_id:
+            notify(f"heal: {pack_path} holds a pack for {target.bundle_id}; left as it is, fix used for this call only")
+            return
+        target.healed_pending = with_entry(target.healed_pending)
     try:
-        packs.save(pack, pack_path)
+        packs.save(target, pack_path)
     except OSError as exc:
         # Persistence failing must not fail a re-grounding that otherwise
         # succeeded; the fix is still valid for this call, just not durable.
         notify(f"heal: could not persist quarantine ({exc}); fix used for this call only")
+        return
     notify(f"heal: quarantined a re-grounding onto {node.role} {node.label!r} (approve with vent verify)")
 
 

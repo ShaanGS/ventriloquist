@@ -256,12 +256,19 @@ def snapshot(
     max_depth: int = MAX_TREE_DEPTH,
     max_nodes: int = 800,
     include_menus: bool = False,
+    only_top: Optional[int] = None,
 ) -> Snapshot:
     """Walk an app and return its snapshot.
 
     The menu bar is skipped by default. It dwarfs window content (a plain
     Finder walk yields about 75 menu items before the first window element)
     and gets its own targeted pass during exploration instead.
+
+    only_top walks just one child of the app root (a window, or the menu
+    bar with include_menus), given by its index among the root's children
+    as app_children lists them. The healer looks at one window this way.
+    Chains still start at the app root, so anchors built from the nodes
+    resolve as usual.
     """
     nodes: list[Node] = []
     truncated = False
@@ -323,6 +330,8 @@ def snapshot(
             if not include_menus and child_role == "AXMenuBar":
                 # Menu bars can appear at any depth (and duplicated) in
                 # some app states; skip them everywhere unless asked.
+                continue
+            if depth == 0 and only_top is not None and index != only_top:
                 continue
 
             link = ChainLink(

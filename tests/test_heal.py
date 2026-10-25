@@ -229,6 +229,163 @@ def test_quarantine_coalesces_per_broken_anchor(tmp_path):
     assert len(pack.healed_pending) == 1
 
 
+def two_documents(other_children=None):
+    """TextEdit with notes.txt holding the body the tool writes, and a
+    second document behind it."""
+    notes = textedit_like().children()[0]
+    notes.title = notes.label = "notes.txt"
+    other = FakeElement(
+        "AXWindow",
+        "other.txt",
+        children=other_children
+        or [FakeElement("AXScrollArea", children=[FakeElement("AXTextArea", value="other document text")])],
+    )
+    return FakeElement("AXApplication", "TextEdit", children=[notes, other])
+
+
+def capturing(response):
+    """A scripted model that also records each prompt it was sent."""
+    prompts = []
+
+    def completer(**kwargs):
+        prompts.append(kwargs["user_text"])
+        return response
+
+    llm.set_completer_for_tests(completer)
+    return prompts
+
+
+def scoped_id(tree, window_index, identifier):
+    """A node's id in the healer's view of one window."""
+    return next(n.id for n in snapshot(tree, only_top=window_index).nodes if n.identifier == identifier)
+
+
+def test_heal_shows_the_model_only_the_anchors_window(tmp_path):
+    tree = two_documents()
+    pack, path, anchor = pack_with_step(tree, tmp_path)
+    assert anchor.window_title == "notes.txt"
+    break_body(tree)
+    prompts = capturing({"node_id": scoped_id(tree, 0, "renamed-after-update"), "confident": True})
+
+    healed = heal.make_heal_callback(pack, path, ask_model=True)(anchor, tree)
+
+    assert healed is not None and healed.identifier == "renamed-after-update"
+    assert "other document text" not in prompts[0]
+    assert "other.txt" not in prompts[0]
+
+
+def test_heal_refuses_when_the_anchors_window_is_not_open(tmp_path):
+    tree = two_documents()
+    pack, path, anchor = pack_with_step(tree, tmp_path)
+    tree._children.pop(0)  # notes.txt closed; only other.txt is left
+    prompts = capturing({"node_id": 0, "confident": True})
+    assert heal.make_heal_callback(pack, path, ask_model=True)(anchor, tree) is None
+    assert prompts == []
+
+
+def test_heal_works_in_an_app_too_big_for_one_snapshot(tmp_path):
+    """The healer took an 800-element snapshot of the whole app and refused
+    whenever it was truncated, so it never ran on a big app. It looks at
+    the anchor's window only."""
+    buttons = [FakeElement("AXButton", f"Item {i}", actions=["AXPress"]) for i in range(900)]
+    tree = two_documents(other_children=buttons)
+    assert snapshot(tree).truncated
+    pack, path, anchor = pack_with_step(tree, tmp_path)
+    break_body(tree)
+    capturing({"node_id": scoped_id(tree, 0, "renamed-after-update"), "confident": True})
+    assert heal.make_heal_callback(pack, path, ask_model=True)(anchor, tree) is not None
+
+
+def test_heal_withholds_field_values_when_asked(tmp_path):
+    tree = textedit_like()
+    pack, path, anchor = pack_with_step(tree, tmp_path)
+    break_body(tree)
+    prompts = capturing({"node_id": None, "confident": False})
+    heal.make_heal_callback(pack, path, ask_model=True, redact_values=True)(anchor, tree)
+    assert "hello" not in prompts[0]
+    assert "<5 chars redacted>" in prompts[0]
+
+
+def test_heal_never_asks_the_model_unless_asked(tmp_path):
+    tree = textedit_like()
+    pack, path, anchor = pack_with_step(tree, tmp_path)
+    break_body(tree)
+    prompts = capturing({"node_id": 0, "confident": True})
+    assert heal.make_heal_callback(pack, path)(anchor, tree) is None
+    assert prompts == []
+
+
+def test_heal_keeps_a_sheet_step_in_its_sheet(tmp_path):
+    """The window's own field looks like the sheet's, but a step that
+    answered the sheet must not heal onto the window behind it."""
+    from .fakes import sheet
+
+    tree = textedit_like()
+    window = tree.children()[0]
+    in_sheet = FakeElement("AXTextField", "Name", identifier="sheet-name", value="")
+    window._children.append(sheet(in_sheet))
+    anchor = anchors.build(next(n for n in snapshot(tree).nodes if n.identifier == "sheet-name"))
+    tool = packs.ToolSpec(name="name_it", description="Type a name.", risk="mutating",
+                          steps=[packs.Step(op="press", anchor=anchor)])
+    pack = packs.Pack(bundle_id="com.apple.TextEdit", app_name="TextEdit", tools=[tool])
+    in_sheet._identifier = "renamed"
+    window._children.insert(0, FakeElement("AXTextField", "Name", identifier="window-name", value=""))
+    capturing({"node_id": scoped_id(tree, 0, "window-name"), "confident": True})
+    assert heal.make_heal_callback(pack, tmp_path / "pack.json", ask_model=True)(anchor, tree) is None
+
+
+def test_a_window_agnostic_anchor_heals_window_agnostic(tmp_path):
+    """Pinning the healed anchor to whichever document was open would break
+    a shared tool for every other document once promoted."""
+    tree = textedit_like()
+    pack, path, anchor = pack_with_step(tree, tmp_path)
+    anchor.window_title = ""
+    break_body(tree)
+    capturing({"node_id": scoped_id(tree, 0, "renamed-after-update"), "confident": True})
+    healed = heal.make_heal_callback(pack, path, ask_model=True)(anchor, tree)
+    assert healed is not None and healed.window_title == ""
+
+
+def test_a_quarantined_fix_outside_the_anchors_window_is_not_reused(tmp_path):
+    tree = two_documents()
+    pack, path, anchor = pack_with_step(tree, tmp_path)
+    break_body(tree)
+    elsewhere = anchors.build(next(n for n in snapshot(tree).nodes if n.value_preview == "other document text"))
+    pack.healed_pending.append({"original": anchor.to_dict(), "healed": elsewhere.to_dict()})
+    assert heal.make_heal_callback(pack, path, ask_model=False)(anchor, tree) is None
+
+
+def test_quarantine_is_saved_onto_the_pack_as_it_is_on_disk(tmp_path):
+    """The server holds the pack it loaded at start. Saving that copy
+    undid whatever `vent compile` or `vent verify` had written since."""
+    tree = textedit_like()
+    pack, path, anchor = pack_with_step(tree, tmp_path)
+    packs.save(pack, path)
+    on_disk = packs.load(path)
+    on_disk.tools.append(packs.ToolSpec(name="added_later", description="", risk="read_only",
+                                        steps=[packs.Step(op="read_value", anchor=anchor)]))
+    packs.save(on_disk, path)
+    break_body(tree)
+    capturing({"node_id": scoped_id(tree, 0, "renamed-after-update"), "confident": True})
+
+    assert heal.make_heal_callback(pack, path, ask_model=True)(anchor, tree) is not None
+    saved = packs.load(path)
+    assert [t.name for t in saved.tools] == ["touch_body", "added_later"]
+    assert len(saved.healed_pending) == 1
+
+
+def test_quarantine_never_overwrites_a_pack_it_cannot_read(tmp_path):
+    tree = textedit_like()
+    pack, path, anchor = pack_with_step(tree, tmp_path)
+    path.parent.mkdir(parents=True)
+    path.write_text("{ hand-edited, not json")
+    break_body(tree)
+    capturing({"node_id": scoped_id(tree, 0, "renamed-after-update"), "confident": True})
+    healed = heal.make_heal_callback(pack, path, ask_model=True)(anchor, tree)
+    assert healed is not None  # still used for this call
+    assert path.read_text() == "{ hand-edited, not json"
+
+
 def test_promote_no_match_keeps_entry(tmp_path):
     tree = textedit_like()
     pack, path, anchor = pack_with_step(tree, tmp_path)
