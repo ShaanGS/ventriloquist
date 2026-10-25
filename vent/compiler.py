@@ -15,13 +15,19 @@ then only ever raised by the human at the gate, never lowered.
 from __future__ import annotations
 
 import re
-import unicodedata
 from dataclasses import dataclass
 
 from . import llm
 from .anchors import Anchor
 from .explorer import Trace, TraceAction
-from .packs import Pack, Step, ToolSpec, Verify
+from .packs import Pack, PackError, Step, ToolSpec, Verify, clean_text
+
+# Names the model proposes. MCP tool names are ASCII [a-z0-9_], and so are
+# the parameter names every client accepts; holding the model to that here
+# means a compiled pack never needs its names folded to be served.
+TOOL_NAME = re.compile(r"[a-z][a-z0-9_]{0,63}")
+PARAM_NAME = re.compile(r"[a-z][a-z0-9_]{0,63}")
+PARAM_DESCRIPTION_LIMIT = 200
 
 PROPOSE_SCHEMA = {
     "type": "object",
@@ -171,14 +177,7 @@ def _clean_text(text: str, limit: int) -> str:
     """Strip control and bidi-override characters and cap length. Model
     text is shown next to the deterministic summary; it must not be able to
     forge structure or hide characters there (review findings)."""
-    out = []
-    for ch in text:
-        category = unicodedata.category(ch)
-        if category.startswith("C"):  # control, format, surrogate, etc.
-            continue
-        out.append(ch)
-    cleaned = " ".join("".join(out).split())
-    return cleaned[:limit]
+    return clean_text(text, limit)
 
 
 class CompileError(ValueError):
@@ -186,10 +185,26 @@ class CompileError(ValueError):
 
 
 def build_spec(proposal: Proposal) -> ToolSpec:
-    """Turn a proposal into a ToolSpec using only recorded anchors."""
+    """Turn a proposal into a ToolSpec using only recorded anchors.
+
+    A recorded write becomes a step only when the proposal binds it to a
+    parameter. One left unbound has no text to write, and it used to
+    compile to a write of the empty string: a step that clears the field,
+    which the approval gate showed as a plain set_value. It is dropped.
+    """
     name = _clean_text(proposal.name, 64)
-    if not name.replace("_", "").isalnum():
-        raise CompileError(f"proposed tool name {proposal.name!r} is not snake_case alphanumeric")
+    if not TOOL_NAME.fullmatch(name):
+        raise CompileError(
+            f"proposed tool name {proposal.name!r} is not snake_case (lowercase ASCII letters, digits and '_')"
+        )
+    param_name = ""
+    if proposal.param_action is not None and proposal.param_name:
+        param_name = proposal.param_name
+        if not PARAM_NAME.fullmatch(param_name):
+            raise CompileError(
+                f"tool {name}: proposed parameter name {param_name!r} is not snake_case "
+                "(lowercase ASCII letters, digits and '_')"
+            )
 
     steps = []
     params: dict[str, dict] = {}
@@ -203,30 +218,26 @@ def build_spec(proposal: Proposal) -> ToolSpec:
         anchor = Anchor.from_dict(action.anchor)
         if action.op == "press":
             steps.append(Step(op="press", anchor=anchor, expect={"role": action.role}))
-        elif action.op == "set_value":
-            if proposal.param_action is action and proposal.param_name:
-                params[proposal.param_name] = {
-                    "type": "string",
-                    "description": proposal.param_description or "Text to enter.",
-                }
-                steps.append(
-                    Step(
-                        op="set_value",
-                        anchor=anchor,
-                        expect={"role": action.role},
-                        value={"param": proposal.param_name},
-                    )
+        elif action.op == "set_value" and param_name and proposal.param_action is action:
+            params[param_name] = {
+                "type": "string",
+                "description": _clean_text(proposal.param_description, PARAM_DESCRIPTION_LIMIT)
+                or "Text to enter.",
+            }
+            steps.append(
+                Step(
+                    op="set_value",
+                    anchor=anchor,
+                    expect={"role": action.role},
+                    value={"param": param_name},
                 )
-                verify.append(Verify(kind="value_contains", anchor=anchor, param=proposal.param_name))
-            else:
-                steps.append(
-                    Step(op="set_value", anchor=anchor, expect={"role": action.role}, value={"literal": ""})
-                )
+            )
+            verify.append(Verify(kind="value_contains", anchor=anchor, param=param_name))
 
     if not steps:
         raise CompileError(f"proposal {name!r} had no replayable steps")
 
-    return ToolSpec(
+    spec = ToolSpec(
         name=name,
         description=_clean_text(proposal.description, 300),
         risk=_risk_for(proposal.actions),
@@ -236,11 +247,22 @@ def build_spec(proposal: Proposal) -> ToolSpec:
         steps=steps,
         verify=verify,
     )
+    # A compiled tool is held to the loader's rules, so the gate never
+    # offers a tool the server would refuse to load (a trace edited by hand
+    # can carry an anchor onto a secure field, for one).
+    try:
+        ToolSpec.from_dict(spec.to_dict())
+    except PackError as exc:
+        raise CompileError(f"tool {name}: {exc}") from exc
+    return spec
 
 
 def deterministic_summary(spec: ToolSpec, app_name: str) -> str:
     """The ground-truth rendering shown at the approval gate. Built from the
-    steps themselves, never from model text (SECURITY.md T5)."""
+    steps themselves, never from model text (SECURITY.md T5). Every value a
+    step writes is shown: the argument it is bound to, or the literal text.
+    The one model text included is each argument's description, labelled as
+    the model's, since it is what the client will be told to pass."""
     lines = [f"{spec.name!r} (risk: {spec.risk}) does exactly this to {app_name!r}:"]
     for index, step in enumerate(spec.steps):
         target = ""
@@ -253,10 +275,20 @@ def deterministic_summary(spec: ToolSpec, app_name: str) -> str:
                 target += f" id={step.anchor.identifier}"
             if step.anchor.window_title:
                 target += f" in window {step.anchor.window_title!r}"
+        if step.op == "press" and step.action != "AXPress":
+            target += f" with {step.action}"
         value = ""
         if step.value and "param" in step.value:
             value = f" with argument {step.value['param']!r}"
+        elif step.value and "literal" in step.value:
+            value = f" with the literal text {str(step.value['literal'])!r}"
         lines.append(f"  step {index}: {step.op}{target}{value}")
+    if not spec.params:
+        lines.append("It takes no arguments.")
+    else:
+        lines.append(f"It takes {len(spec.params)} argument(s), described by the model as:")
+        for param, meta in spec.params.items():
+            lines.append(f"  {param} ({meta.get('type', 'string')}): {meta.get('description', '')!r}")
     return "\n".join(lines)
 
 

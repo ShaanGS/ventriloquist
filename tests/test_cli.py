@@ -4,9 +4,11 @@ the printed command must be an absolute path that survives being pasted."""
 
 import json
 
+import pytest
 from click.testing import CliRunner
 
 from vent import __version__, cli, harness
+from vent.snapshot import snapshot
 
 from .fakes import on_another_space, textedit_like
 
@@ -15,6 +17,79 @@ def test_version_flag_reports_the_package_version():
     result = CliRunner().invoke(cli.main, ["--version"])
     assert result.exit_code == 0
     assert __version__ in result.output
+
+
+def test_ventriloquist_mcp_reports_its_version_too():
+    """`ventriloquist-mcp --version` used to answer "No such option"."""
+    result = CliRunner().invoke(cli.serve_entry, ["--version"])
+    assert result.exit_code == 0, result.output
+    assert result.output.strip() == f"ventriloquist-mcp, version {__version__}"
+
+
+@pytest.mark.parametrize(
+    "command",
+    [["anchor", "TextEdit", "3"], ["act", "TextEdit", "3", "--text", "hello"]],
+    ids=["anchor", "act"],
+)
+def test_anchor_and_act_take_the_same_max_nodes_as_inspect(monkeypatch, command):
+    """Node ids count from one walk. Past 800 elements, an id from
+    `vent inspect --max-nodes 2000` named nothing in anchor or act."""
+    walks = []
+
+    def counting_snapshot(root, **options):
+        walks.append(options.get("max_nodes"))
+        return snapshot(root, **options)
+
+    tree = textedit_like()
+    monkeypatch.setattr(cli, "snapshot", counting_snapshot)
+    monkeypatch.setattr(cli.ax, "find_app", lambda name: cli.ax.RunningApp("TextEdit", "com.apple.TextEdit", 1))
+    monkeypatch.setattr(cli.ax, "app_element", lambda app: tree)
+    assert CliRunner().invoke(cli.main, command).exit_code == 0
+    result = CliRunner().invoke(cli.main, [*command, "--max-nodes", "2000"])
+    assert result.exit_code == 0, result.output
+    assert walks == [800, 2000]
+
+
+@pytest.mark.parametrize(
+    "flags, redact_values",
+    [(["--heal"], False), (["--heal", "--no-values"], True)],
+    ids=["--heal", "--heal --no-values"],
+)
+def test_run_heal_can_keep_field_values_from_the_model(monkeypatch, tmp_path, flags, redact_values):
+    from vent import heal, runtime
+    from vent.runtime import ToolResult
+
+    from .test_packs import sample_pack
+
+    built = []
+
+    def make_heal_callback(pack, pack_path, **options):
+        built.append(options)
+        return lambda broken, root: None
+
+    monkeypatch.setenv("VENT_HOME", str(tmp_path))
+    monkeypatch.setattr(cli, "_find_pack", lambda name: sample_pack())
+    monkeypatch.setattr(heal, "make_heal_callback", make_heal_callback)
+    monkeypatch.setattr(cli.ax, "find_app_by_bundle", lambda bundle_id: cli.ax.RunningApp("TextEdit", bundle_id, 1))
+    monkeypatch.setattr(cli.ax, "app_element", lambda app: textedit_like())
+    monkeypatch.setattr(cli.ax, "app_version", lambda app: "1.19")
+    monkeypatch.setattr(runtime, "execute", lambda *args, **kwargs: ToolResult(ok=True, tool="write_document", detail="1 step"))
+    result = CliRunner().invoke(cli.main, ["run", "TextEdit", "write_document", "--arg", "text=hi", *flags])
+    assert result.exit_code == 0, result.output
+    assert [(options["ask_model"], options["redact_values"]) for options in built] == [(True, redact_values)]
+
+
+def test_explore_refuses_a_bundle_id_that_would_leave_its_directory(monkeypatch):
+    """The trace is saved under the app's bundle id, which the app sets."""
+    monkeypatch.setattr(cli.ax, "find_app", lambda name: cli.ax.RunningApp("Evil", "../../evil", 1))
+
+    def never(app):
+        raise AssertionError("explore went on to read the app")
+
+    monkeypatch.setattr(cli.ax, "app_element", never)
+    result = CliRunner().invoke(cli.main, ["explore", "Evil"])
+    assert result.exit_code == 1
+    assert "not reverse-DNS" in result.output
 
 
 def test_mcp_config_names_the_running_vent_by_absolute_path(monkeypatch):

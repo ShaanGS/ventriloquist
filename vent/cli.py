@@ -23,8 +23,23 @@ from .snapshot import MAX_TREE_DEPTH, app_windows, render, snapshot
 
 def _user_pack_path(bundle_id: str) -> Path:
     """Where a pack is saved. Always the user's directory, even when the pack
-    was loaded from the bundled set (see paths.py)."""
-    return paths.user_packs_dir() / bundle_id / "pack.json"
+    was loaded from the bundled set (see paths.py). Raises PackError for a
+    bundle id that could point outside it."""
+    return packs.pack_file(paths.user_packs_dir(), bundle_id)
+
+
+def _bundle_id(app: ax.RunningApp) -> str:
+    """A running app's bundle id, checked before any path is built from it.
+    The id comes from the app's own Info.plist, so an app could name itself
+    "../../somewhere" and have vent write there."""
+    if not app.bundle_id:
+        raise ax.AXError(f"{app.name} has no bundle id, so vent cannot keep a pack or a trace for it.")
+    if not packs.valid_bundle_id(app.bundle_id):
+        raise ax.AXError(
+            f"{app.name}'s bundle id {app.bundle_id!r} is not reverse-DNS letters, digits, '-' and '_', "
+            "so vent will not build a path from it."
+        )
+    return app.bundle_id
 
 
 @click.group()
@@ -166,18 +181,22 @@ def inspect(app_name: str, depth: int, max_nodes: int, menus: bool) -> None:
     click.echo(render(snap))
 
 
+MAX_NODES_HELP = "Cap on surfaced elements. Give the value you gave vent inspect, so the ids match."
+
+
 @main.command()
 @click.argument("app_name")
 @click.argument("node_id", type=int)
 @click.option("--action", "action_name", default="AXPress", show_default=True)
 @click.option("--menus", is_flag=True, help="Include the menu bar when resolving ids.")
+@click.option("--max-nodes", default=800, show_default=True, help=MAX_NODES_HELP)
 @click.option("--text", default=None, help="Set this text as the element's value instead of performing an action.")
-def act(app_name: str, node_id: int, action_name: str, menus: bool, text: str | None) -> None:
+def act(app_name: str, node_id: int, action_name: str, menus: bool, max_nodes: int, text: str | None) -> None:
     """Perform an action on element NODE_ID from a fresh `inspect` snapshot."""
     try:
         app = ax.find_app(app_name)
         root = ax.app_element(app)
-        snap = snapshot(root, include_menus=menus)
+        snap = snapshot(root, max_nodes=max_nodes, include_menus=menus)
         if node_id >= len(snap.nodes):
             click.secho(f"No element #{node_id} (snapshot has {len(snap.nodes)}).", fg="red")
             sys.exit(1)
@@ -198,12 +217,13 @@ def act(app_name: str, node_id: int, action_name: str, menus: bool, text: str | 
 @click.argument("app_name")
 @click.argument("node_id", type=int)
 @click.option("--menus", is_flag=True, help="Include the menu bar when resolving ids.")
-def anchor(app_name: str, node_id: int, menus: bool) -> None:
+@click.option("--max-nodes", default=800, show_default=True, help=MAX_NODES_HELP)
+def anchor(app_name: str, node_id: int, menus: bool, max_nodes: int) -> None:
     """Print the durable anchor for element NODE_ID, for authoring packs."""
     try:
         app = ax.find_app(app_name)
         root = ax.app_element(app)
-        snap = snapshot(root, include_menus=menus)
+        snap = snapshot(root, max_nodes=max_nodes, include_menus=menus)
         if node_id >= len(snap.nodes):
             click.secho(f"No element #{node_id} (snapshot has {len(snap.nodes)}).", fg="red")
             sys.exit(1)
@@ -231,7 +251,10 @@ def _find_pack(name: str) -> packs.Pack:
 @click.argument("tool_name")
 @click.option("--arg", "arg_pairs", multiple=True, help="Tool argument as key=value. Repeatable.")
 @click.option("--heal", "do_heal", is_flag=True, help="Re-ground broken anchors with a model and quarantine the fix.")
-def run(app_name: str, tool_name: str, arg_pairs: tuple[str, ...], do_heal: bool) -> None:
+@click.option(
+    "--no-values", is_flag=True, help="With --heal: leave field values out of the snapshot sent to the model."
+)
+def run(app_name: str, tool_name: str, arg_pairs: tuple[str, ...], do_heal: bool, no_values: bool) -> None:
     """Execute one compiled tool against the live app, without MCP."""
     from . import heal as heal_mod
 
@@ -252,6 +275,7 @@ def run(app_name: str, tool_name: str, arg_pairs: tuple[str, ...], do_heal: bool
             pack_path = _user_pack_path(pack.bundle_id)
             heal_cb = heal_mod.make_heal_callback(
                 pack, pack_path, notify=click.echo, ask_model=do_heal, low_confidence=low_confidence,
+                redact_values=no_values,
             )
         result = runtime.execute(
             pack, tool_name, args, root, app=app, low_confidence=low_confidence, heal=heal_cb,
@@ -455,6 +479,7 @@ def explore(app_name: str, rounds: int, no_values: bool) -> None:
 
     try:
         app = ax.find_app(app_name)
+        _bundle_id(app)  # the trace is saved under it
         root = ax.app_element(app)
         ax.activate(app)
         pol = policy_mod.Policy()
@@ -489,9 +514,8 @@ def compile_cmd(app_name: str) -> None:
 
     try:
         app = ax.find_app(app_name)
-        if not app.bundle_id:
-            raise ax.AXError(f"{app.name} has no bundle id; cannot compile a pack for it.")
-        trace = explorer.load_trace(paths.traces_dir(), app.bundle_id)
+        bundle_id = _bundle_id(app)
+        trace = explorer.load_trace(paths.traces_dir(), bundle_id)
     except FileNotFoundError:
         click.secho(f"No trace for {app_name!r}. Run `vent explore {app_name}` first.", fg="red")
         sys.exit(1)
@@ -503,9 +527,10 @@ def compile_cmd(app_name: str) -> None:
     # explore runs. With no pack of the user's own, the bundled one is the
     # start: the user's pack shadows it, so leaving it out would hide its
     # tools. A user pack that can't be read is only replaced on a yes.
-    pack_path = _user_pack_path(app.bundle_id)
-    bundled_path = paths.BUNDLED_PACKS_DIR / app.bundle_id / "pack.json"
+    pack_path = _user_pack_path(bundle_id)
+    bundled_path = packs.pack_file(paths.BUNDLED_PACKS_DIR, bundle_id)
     existing = None
+    from_bundled = False
     if pack_path.exists():
         try:
             existing = packs.load(pack_path)
@@ -514,9 +539,15 @@ def compile_cmd(app_name: str) -> None:
             if not click.confirm(f"Replace your {app.name} pack with only the tools you approve now?", default=False):
                 sys.exit(1)
     elif bundled_path.exists():
-        existing = packs.load(bundled_path)
-        click.echo(f"Starting from the bundled {app.name} pack, so its tools stay available.")
+        try:
+            existing = packs.load(bundled_path)
+        except packs.PackError as exc:
+            click.secho(f"⚠ The bundled {app.name} pack did not load, so your pack starts empty: {exc}", fg="yellow")
+        else:
+            from_bundled = True
+            click.echo(f"Starting from the bundled {app.name} pack, so its tools stay available.")
     have = {tool.name for tool in existing.tools} if existing else set()
+    holder = f"The bundled {app.name} pack" if from_bundled else "Your pack"
 
     try:
         proposals = compiler.propose(trace)
@@ -528,7 +559,9 @@ def compile_cmd(app_name: str) -> None:
         click.echo("The model proposed no tools from this trace.")
         return
 
-    approved = []
+    # Keyed by name: two proposals in one run can share a name, and a pack
+    # with both fails to load, so the second only replaces the first on a yes.
+    approved: dict[str, packs.ToolSpec] = {}
     for proposal in proposals:
         try:
             spec = compiler.build_spec(proposal)
@@ -544,11 +577,16 @@ def compile_cmd(app_name: str) -> None:
         if spec.risk == "high":
             click.secho("  ⚠ high risk tool", fg="red")
         if click.confirm("Approve this tool?", default=False):
-            if spec.name in have and not click.confirm(
-                f"Your pack already has {spec.name}. Replace it with this one?", default=False
+            if spec.name in approved:
+                if not click.confirm(
+                    f"You already approved {spec.name} in this run. Replace it with this one?", default=False
+                ):
+                    continue
+            elif spec.name in have and not click.confirm(
+                f"{holder} already has {spec.name}. Replace it with this one?", default=False
             ):
                 continue
-            approved.append(spec)
+            approved[spec.name] = spec
 
     if not approved:
         click.echo("Nothing approved; no pack written.")
@@ -556,40 +594,78 @@ def compile_cmd(app_name: str) -> None:
 
     pack = compiler.assemble_pack(
         trace,
-        approved,
+        list(approved.values()),
         os_version=platform_mod.mac_ver()[0],
         locale=(locale_mod.getlocale()[0] or ""),
     )
     if existing:
         merged = packs.merge(existing, pack)
-        if merged.app_version != pack.app_version or merged.os_version != pack.os_version:
-            click.secho(
-                f"  The tools already in the pack were recorded on a different {app.name} or macOS "
-                "version, so the pack keeps that version and its anchors load cautiously. "
-                "Re-record those tools to clear it.",
-                fg="yellow",
-            )
+        _say_which_version(existing, pack, merged, app.name, bundled=from_bundled)
         pack = merged
+    try:
+        packs.Pack.from_dict(pack.to_dict())
+    except packs.PackError as exc:
+        click.secho(f"✗ Not writing {pack_path}: the pack would not load ({exc})", fg="red")
+        sys.exit(1)
     packs.save(pack, pack_path)
     click.secho(f"✓ Wrote {len(approved)} tool(s) to {pack_path} ({len(pack.tools)} in the pack)", fg="green")
 
 
-@main.command()
-def serve() -> None:
-    """Serve every compiled pack as MCP tools over stdio.
+def _recorded_on(pack: packs.Pack, app_name: str) -> str:
+    app = f"{app_name} {pack.app_version}" if pack.app_version else f"an unrecorded {app_name} version"
+    system = f"macOS {pack.os_version}" if pack.os_version else "an unrecorded macOS version"
+    return f"{app} on {system}"
 
-    High risk tools are refused unless the server was started with
-    VENT_ALLOW_HIGH=1 in the environment. See docs/SECURITY.md.
+
+def _say_which_version(base: packs.Pack, added: packs.Pack, merged: packs.Pack, app_name: str, bundled: bool) -> None:
+    """Tell the user which app and macOS version a merged pack records when
+    it is not the one this compile ran on. A pack records one version for
+    all its tools, and packs.merge keeps the older one while any older tool
+    survives, so the pack loads cautiously here until a compile replaces
+    every tool it holds."""
+    older_tools = f"The bundled {app_name} pack's tools" if bundled else "Your pack's tools from before this run"
+    if packs.environment_differs(merged, added.app_version, added.os_version):
+        replaced = {tool.name for tool in added.tools}
+        kept = ", ".join(tool.name for tool in base.tools if tool.name not in replaced)
+        click.secho(
+            f"  {older_tools} ({kept}) were recorded on {_recorded_on(base, app_name)}, and this "
+            f"run on {_recorded_on(added, app_name)}. A pack records one version, so it keeps "
+            "theirs and loads its anchors cautiously on this Mac. It takes this Mac's version "
+            "in a compile that replaces every tool it holds.",
+            fg="yellow",
+        )
+    elif packs.environment_differs(base, added.app_version, added.os_version):
+        replaced_all = f"Every tool from the bundled {app_name} pack" if bundled else "Every tool from before this run"
+        click.echo(f"  {replaced_all} was replaced, so the pack now records {_recorded_on(added, app_name)}.")
+
+
+SERVE_HELP = """Serve every compiled pack as MCP tools over stdio.
+
+    Each call to a high risk tool asks the user to confirm it, through the
+    client's MCP elicitation. A client without elicitation is not shown
+    them, unless the server was started with VENT_ALLOW_HIGH=1, which runs
+    them without asking. VENT_READ_ONLY=1 serves read_only tools only. See
+    docs/SECURITY.md.
     """
+
+
+@main.command(help=SERVE_HELP)
+def serve() -> None:
     from .server import serve_stdio
 
     serve_stdio(paths.pack_search_path())
 
 
+@click.command("ventriloquist-mcp", help=SERVE_HELP)
+@click.version_option(__version__, prog_name="ventriloquist-mcp")
 def serve_entry() -> None:
     """The `ventriloquist-mcp` command: the MCP server on its own, for
-    launchers that run a package by its name (`uvx ventriloquist-mcp`)."""
-    serve()
+    launchers that run a package by its name (`uvx ventriloquist-mcp`).
+    A command of its own rather than a call into `vent serve`, which parsed
+    `ventriloquist-mcp --version` as an unknown option."""
+    from .server import serve_stdio
+
+    serve_stdio(paths.pack_search_path())
 
 
 def _vent_executable() -> str:
