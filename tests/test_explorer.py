@@ -268,6 +268,21 @@ def test_trace_round_trips_through_disk(tmp_path, monkeypatch):
     assert loaded.actions[0].label == "New"
 
 
+def test_traces_are_readable_by_their_owner_only(tmp_path):
+    """A trace holds the app's labels and window titles. It was written
+    with the default mode, readable by every user on the Mac."""
+    import stat
+
+    trace = Trace(bundle_id="com.example.app", app_name="Example", app_version="2.0")
+    path = tmp_path / "com.example.app" / "trace.json"
+    path.parent.mkdir()
+    path.write_text("{}")
+    path.chmod(0o644)  # one written before this fix
+    assert save_trace(trace, tmp_path) == path
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    assert load_trace(tmp_path, "com.example.app").app_name == "Example"
+
+
 def sample_trace() -> Trace:
     trace = Trace(bundle_id="com.apple.TextEdit", app_name="TextEdit", app_version="1.19")
     anchor = {

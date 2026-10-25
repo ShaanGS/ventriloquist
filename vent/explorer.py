@@ -17,6 +17,7 @@ resolved. The model never gets to invent a step.
 from __future__ import annotations
 
 import json
+import os
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -122,9 +123,16 @@ class Trace:
 
 
 def save_trace(trace: Trace, traces_dir: Path) -> Path:
+    """Write a trace only its owner can read (0600). It holds the app's
+    labels and window titles, which carry document and contact names."""
     path = Path(traces_dir) / trace.bundle_id / "trace.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(trace.to_dict(), indent=2) + "\n")
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as handle:
+        # The mode above applies only to a new file; an older trace
+        # written world-readable is narrowed here.
+        os.fchmod(handle.fileno(), 0o600)
+        handle.write(json.dumps(trace.to_dict(), indent=2) + "\n")
     return path
 
 
