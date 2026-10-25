@@ -33,6 +33,7 @@ from .snapshot import (
     app_children,
     app_windows,
     is_dialog_window,
+    open_dialogs,
     same_element,
     window_sheets,
 )
@@ -50,8 +51,14 @@ SETTLE_DEPTH = 6
 # another Space, TextEdit reported itself frontmost 0.13 s after the
 # request, while a tool's first press can go out about 0.1 s after it,
 # and a press that beats activation reaches a background app, which may
-# flip the button without acting on it.
-FRONTMOST_WAIT_S = 1.0
+# flip the button without acting on it. An app that hasn't come forward
+# by the deadline fails the call, so the deadline leaves room for a slow
+# Space switch; one that comes forward ends the wait at once.
+FRONTMOST_WAIT_S = 2.0
+
+# The ops that change the app, and how a failure message names one that
+# was already sent.
+SENT_OPS = {"press": "press", "set_value": "write", "pick": "pick"}
 
 HealFn = Callable[[anchors.Anchor, Element], Optional[anchors.Anchor]]
 
@@ -199,7 +206,10 @@ def _resolve(
             raise ToolExecutionError(f"{where}: {exc} (healing declined)") from exc
         # The healed anchor is used for this one call. Persisting it is the
         # healer's job and goes through quarantine, never through here.
-        found = anchors.locate(root, healed, low_confidence=False)
+        try:
+            found = anchors.locate(root, healed, low_confidence=False)
+        except (anchors.AnchorLost, anchors.AnchorAmbiguous) as again:
+            raise ToolExecutionError(f"{where}: {exc}; the healed anchor did not resolve either: {again}") from again
         used = healed
     _refuse_secure(found.element, where)
     return found, used
@@ -211,10 +221,10 @@ def cancel_dialog(dialog: OpenDialog) -> bool:
     names none or the press fails. Nothing else is ever pressed: OK, Done,
     Yes and No answer whatever the dialog asks, and a button that only
     reads "Cancel" says so in the app's words, not the dialog's."""
-    ref = dialog.element.attribute("AXCancelButton")
-    if ref is None:
-        return False
     try:
+        ref = dialog.element.attribute("AXCancelButton")
+        if ref is None:
+            return False
         _as_element(ref).perform("AXPress")
     except ax.AXError:
         return False
@@ -397,22 +407,34 @@ def _text_inside(element: Element) -> str:
     return "\n".join(lines)[:READ_TEXT_LIMIT]
 
 
-def _wait_frontmost(root: Element) -> None:
-    """Give an app just activated a moment to report itself frontmost.
+def _wait_frontmost(root: Element, app_name: str, tool_name: str) -> None:
+    """Wait for an app just activated to report itself frontmost.
 
-    Returns at once for an app already in front or one that doesn't
-    answer AXFrontmost, and after FRONTMOST_WAIT_S for one that never
-    comes forward, which then runs as it did before this wait existed.
-    Never raises: a busy app's error belongs to the step that meets it."""
+    Returns at once for an app already in front, or one that doesn't
+    answer AXFrontmost at all. Raises when the app hasn't come forward
+    by FRONTMOST_WAIT_S: this used to give up quietly and run the steps
+    anyway, so a press could reach the app in the background, flip a
+    button without acting on it, and the call reported success. A busy
+    app is waited out like a slow one."""
     deadline = time.monotonic() + FRONTMOST_WAIT_S
-    while time.monotonic() < deadline:
+    busy = False
+    while True:
         try:
             frontmost = root.attribute("AXFrontmost")
-        except ax.AXError:
-            return
-        if frontmost is None or frontmost:
-            return
+        except ax.AXTransientError:
+            busy = True
+        else:
+            if frontmost is None or frontmost:
+                return
+            busy = False
+        if time.monotonic() >= deadline:
+            break
         time.sleep(SETTLE_POLL_S)
+    why = " (it was not answering)" if busy else ""
+    raise ToolExecutionError(
+        f"{tool_name}: {app_name} did not come to the front within {FRONTMOST_WAIT_S:g}s{why}, "
+        f"so no step ran. Bring {app_name} to the front and retry."
+    )
 
 
 def _run_step(
@@ -424,7 +446,10 @@ def _run_step(
     low_confidence: bool,
     heal: Optional[HealFn],
     index: int,
+    sent: list[str],
 ) -> StepReport:
+    """Run one step. A press, write or pick that reaches the app is added
+    to `sent`, so a later failure in the call can say it went out."""
     where = f"{pack.app_name}.{tool.name} step {index} ({step.op})"
 
     if step.op == "wait_for":
@@ -441,12 +466,19 @@ def _run_step(
                 # stays in the tree for a moment, so keep polling.
                 failure = f"the element appeared, but {blocked}"
             except (anchors.AnchorLost, anchors.AnchorAmbiguous):
-                pass
+                failure = f"element did not appear within {step.timeout_s}s"
+            except ax.AXTransientError as exc:
+                # A busy app answers again a moment later, and waiting is
+                # what this step is for, so a busy poll is not the end.
+                failure = f"{pack.app_name} was still not answering after {step.timeout_s}s ({exc})"
             # Resolution only reads, and reads never flush a Chromium
             # host's lazily-published tree: content that rendered after
             # the last action stays invisible to every poll, however
             # long we wait. Nudge with a benign action between polls.
-            _pump_anywhere(root)
+            try:
+                _pump_anywhere(root)
+            except ax.AXTransientError:
+                pass
             time.sleep(WAIT_FOR_POLL_S)
         raise ToolExecutionError(f"{where}: {failure}")
 
@@ -463,7 +495,10 @@ def _run_step(
         windows = app_windows(root)
         if not windows:
             raise ToolExecutionError(f"{where}: app has no windows to raise")
-        windows[0].perform("AXRaise")
+        try:
+            windows[0].perform("AXRaise")
+        except ax.AXError as exc:
+            raise ToolExecutionError(f"{where}: {exc}") from exc
         settle(root, step.timeout_s, include_menus=False)
         return StepReport(op=step.op, ok=True)
 
@@ -525,7 +560,8 @@ def _run_step(
         # Wrap so the failure names the app, tool, and step, per SECURITY.md.
         raise ToolExecutionError(f"{where}: {exc}") from exc
 
-    if step.op in ("press", "set_value", "pick"):
+    if step.op in SENT_OPS:
+        sent.append(f"the {SENT_OPS[step.op]} in step {index}")
         _pump_tree(element)
 
     detail = (
@@ -605,21 +641,24 @@ def execute(
                         f"{tool_name}: precondition failed, {pack.app_name} has no open window"
                     )
         # Open sheets and dialogs are judged per step (_dialog_in_the_way),
-        # because a tool may open one and then act inside it.
+        # because a tool may open one and then act inside it. The ones open
+        # now are the user's, and a failure never cancels those.
+        open_before = {dialog.element.ref_key() for dialog in open_dialogs(root)}
     except ax.AXTransientError as exc:
         raise ToolExecutionError(f"{tool_name}: {exc}") from exc
 
+    sent: list[str] = []
     previous_front = None
-    if tool.requires_frontmost and app is not None:
-        previous_front = ax.frontmost_app()
-        if ax.activate(app):
-            _wait_frontmost(root)
-
     try:
+        if tool.requires_frontmost and app is not None:
+            previous_front = ax.frontmost_app()
+            ax.activate(app)
+            _wait_frontmost(root, pack.app_name, tool_name)
+
         result = ToolResult(ok=True, tool=tool_name)
         for index, step in enumerate(tool.steps):
             try:
-                report = _run_step(step, root, args, pack, tool, low_confidence, heal, index)
+                report = _run_step(step, root, args, pack, tool, low_confidence, heal, index, sent)
             except ax.AXTransientError as exc:
                 raise ToolExecutionError(
                     f"{pack.app_name}.{tool_name} step {index}: {exc}"
@@ -629,7 +668,15 @@ def execute(
                 result.values.append(report.detail)
 
         for index, check in enumerate(tool.verify):
-            _run_verify(check, root, args, tool, low_confidence, heal, index)
+            try:
+                _run_verify(check, root, args, tool, low_confidence, heal, index)
+            except ax.AXTransientError as exc:
+                raise ToolExecutionError(f"{tool_name} verify {index}: {exc}") from exc
+    except ToolExecutionError as exc:
+        # The app is still in front here, so a cancel press reaches it.
+        raise ToolExecutionError(
+            f"{exc}{_sent_note(sent, pack.app_name)}{_cancel_left_open(root, open_before)}"
+        ) from exc
     finally:
         if previous_front is not None and previous_front.pid != (app.pid if app else -1):
             ax.activate(previous_front)
@@ -637,6 +684,49 @@ def execute(
     checks = len(tool.verify)
     result.detail = _count(len(result.steps), "step") + (f", {_count(checks, 'check')} passed" if checks else "")
     return result
+
+
+def _sent_note(sent: list[str], app_name: str) -> str:
+    """What a failed call had already done to the app, so a caller doesn't
+    take the failure to mean nothing happened and press again."""
+    if not sent:
+        return ""
+    done = sent[0] if len(sent) == 1 else ", ".join(sent[:-1]) + " and " + sent[-1]
+    was = "was" if len(sent) == 1 else "were"
+    return f" {done[0].upper()}{done[1:]} {was} already sent, so {app_name} may have changed."
+
+
+def _cancel_left_open(root: Element, open_before: set) -> str:
+    """Cancel each sheet or dialog that opened during a call that then
+    failed, and say what was done.
+
+    A failed Outlook filing used to leave its Choose Folder sheet open, and
+    the next call met it. Only the dialog's own cancel button is pressed
+    (cancel_dialog), and only on dialogs that weren't open when the call
+    started."""
+    try:
+        opened = [dialog for dialog in open_dialogs(root) if dialog.element.ref_key() not in open_before]
+    except ax.AXTransientError:
+        return " The app stopped answering, so vent could not check for a sheet or dialog the call left open."
+    notes = []
+    for dialog in opened:
+        try:
+            what = dialog.describe()
+        except ax.AXTransientError:
+            what = "a sheet or dialog"
+        if cancel_dialog(dialog):
+            notes.append(f" vent cancelled {what}, which the call had opened.")
+        else:
+            notes.append(
+                f" {what[0].upper()}{what[1:]} opened during the call and is still open, and vent "
+                "could not cancel it. Close it by hand."
+            )
+    if opened:
+        try:
+            settle(root, 1.0, include_menus=False)
+        except ax.AXTransientError:
+            pass
+    return "".join(notes)
 
 
 def _count(n: int, word: str) -> str:

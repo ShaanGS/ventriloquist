@@ -231,6 +231,13 @@ class OpenDialog:
     window: Element  # the window a sheet hangs from; a dialog is its own
     kind: str  # "sheet" or "dialog"
 
+    def describe(self) -> str:
+        """"the sheet on 'Inbox'", "the dialog 'Export'", for messages."""
+        title = self.window.label
+        if self.kind == "sheet":
+            return f"the sheet on {title!r}" if title else "the sheet on an untitled window"
+        return f"the dialog {title!r}" if title else "the dialog"
+
 
 def open_dialogs(root: Element, windows: Optional[list[Element]] = None) -> list[OpenDialog]:
     """Every sheet and modal dialog the app has open, among `windows` when

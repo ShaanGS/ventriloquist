@@ -803,3 +803,212 @@ def test_bring_to_front_waits_for_the_app_to_come_forward(monkeypatch):
     app = runtime.ax.RunningApp("TextEdit", "com.apple.TextEdit", 1)
     assert runtime.execute(pack, "bold", {}, tree, app=app).ok
     assert pressed == [True], "the press went out before the app came to the front"
+
+
+def test_a_call_fails_when_its_app_never_comes_to_the_front(monkeypatch):
+    """The wait used to give up quietly and run the steps anyway, so the
+    press reached TextEdit in the background and the call reported
+    success. Now no step runs, and the user's app is given back."""
+
+    class App(FakeElement):
+        def attribute(self, name):
+            if name == "AXFrontmost":
+                return False
+            return super().attribute(name)
+
+    bold = PressRecorder("AXCheckBox", "bold")
+    tree = App("AXApplication", "TextEdit", children=[FakeElement("AXWindow", "notes.rtf", children=[bold])])
+    node = next(n for n in snapshot(tree).nodes if n.label == "bold")
+    tool = ToolSpec(
+        name="bold",
+        description="Press Bold.",
+        risk="mutating",
+        requires_frontmost=True,
+        steps=[Step(op="press", anchor=anchors.build(node), settle=False)],
+    )
+    pack = Pack(bundle_id="com.apple.TextEdit", app_name="TextEdit", tools=[tool])
+    activated = []
+    monkeypatch.setattr(runtime.ax, "frontmost_app", lambda: runtime.ax.RunningApp("Terminal", "com.apple.Terminal", 2))
+    monkeypatch.setattr(runtime.ax, "activate", lambda app: activated.append(app.name) or True)
+    monkeypatch.setattr(runtime, "FRONTMOST_WAIT_S", 0.2)
+    app = runtime.ax.RunningApp("TextEdit", "com.apple.TextEdit", 1)
+
+    with pytest.raises(runtime.ToolExecutionError, match="TextEdit did not come to the front within 0.2s, so no step ran"):
+        runtime.execute(pack, "bold", {}, tree, app=app)
+    assert bold.presses == 0
+    assert activated == ["TextEdit", "Terminal"]
+
+
+def test_a_failure_after_a_press_says_the_press_went_out():
+    """A caller told only "step 1 failed" may take it that nothing
+    happened and call again, pressing a second time."""
+    tree = textedit_like()
+    window = tree.children()[0]
+    next_page = PressRecorder("AXButton", "Next Page")
+    window._children.append(next_page)
+    nodes = snapshot(tree).nodes
+    tool = ToolSpec(
+        name="next_then_write",
+        description="Turn the page, then write.",
+        risk="mutating",
+        params={"text": {"type": "string", "description": "Text."}},
+        steps=[
+            Step(op="press", anchor=anchors.build(next(n for n in nodes if n.label == "Next Page")), timeout_s=0.2),
+            Step(
+                op="set_value",
+                anchor=anchors.build(next(n for n in nodes if n.identifier == "doc-body")),
+                value={"param": "text"},
+                timeout_s=0.2,
+            ),
+        ],
+    )
+    pack = Pack(bundle_id="com.apple.TextEdit", app_name="TextEdit", tools=[tool])
+    window._children[2]._children.clear()  # the body is gone by the second step
+
+    with pytest.raises(runtime.ToolExecutionError) as failed:
+        runtime.execute(pack, "next_then_write", {"text": "x"}, tree)
+    assert next_page.presses == 1
+    assert "step 1 (set_value)" in str(failed.value)
+    assert str(failed.value).endswith("The press in step 0 was already sent, so TextEdit may have changed.")
+
+
+def test_a_failure_before_anything_was_sent_claims_nothing():
+    tree = textedit_like()
+    pack = build_write_tool(tree)
+    tree.children()[0]._children[2]._children.clear()
+    with pytest.raises(runtime.ToolExecutionError) as failed:
+        runtime.execute(pack, "write_document", {"text": "x"}, tree)
+    assert "already sent" not in str(failed.value)
+
+
+def test_a_failed_verify_says_the_write_went_out():
+    tree = textedit_like()
+    pack = build_write_tool(tree)
+    doc_body(tree).set_value = lambda value: None  # the app swallows the write
+    with pytest.raises(runtime.ToolExecutionError, match="value does not contain") as failed:
+        runtime.execute(pack, "write_document", {"text": "brand new"}, tree)
+    assert "The write in step 0 was already sent" in str(failed.value)
+
+
+class FlakyApp(FakeElement):
+    """An app root that stops answering for a stretch of child reads, the
+    way a busy app does for a moment."""
+
+    def __init__(self, *args, busy_reads=range(0), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.busy_reads = busy_reads
+        self.reads = 0
+
+    def children(self):
+        read = self.reads
+        self.reads += 1
+        if read in self.busy_reads:
+            raise runtime.ax.AXTransientError("App is not answering accessibility queries (AXError -25204).")
+        return super().children()
+
+
+def flaky_textedit():
+    return FlakyApp("AXApplication", "TextEdit", children=textedit_like().children())
+
+
+def test_wait_for_keeps_polling_while_the_app_is_busy():
+    """A busy poll used to end the wait at once with a transient error,
+    though waiting is what the step is for."""
+    tree = flaky_textedit()
+    pack = wait_for_body_pack(tree, timeout_s=3.0)
+    tree.reads, tree.busy_reads = 0, range(1, 5)  # read 0 is the call's own dialog check
+    assert runtime.execute(pack, "wait_for_body", {}, tree).ok
+    assert tree.reads > 5
+
+
+def test_wait_for_says_when_the_app_never_answered():
+    tree = flaky_textedit()
+    pack = wait_for_body_pack(tree, timeout_s=0.4)
+    tree.reads, tree.busy_reads = 0, range(1, 10**9)
+    with pytest.raises(runtime.ToolExecutionError, match="TextEdit was still not answering after 0.4s"):
+        runtime.execute(pack, "wait_for_body", {}, tree)
+
+
+def test_a_failed_call_cancels_the_sheet_it_opened():
+    """A failed Outlook filing left its Choose Folder sheet open, and the
+    next call met it. The sheet's own cancel button is pressed, and the
+    message says so."""
+    tree, window, choose_folder = outlook_like()
+    folder_search, move, cancel = choose_folder.children()
+    result = FakeElement("AXRow", "Receipts", actions=["AXPress"])
+    choose_folder._children.append(result)
+    choose = PressRecorder("AXButton", "Choose Folder...", on_press=lambda: window._children.append(choose_folder))
+    window._children.insert(1, choose)
+    nodes = snapshot(tree).nodes
+
+    def recorded(label):
+        return anchors.build(next(n for n in nodes if n.label == label))
+
+    field = anchors.build(next(n for n in nodes if n.role == "AXTextField" and anchors.in_sheet(n.chain)))
+    tool = ToolSpec(
+        name="file_to_folder",
+        description="File the selected message.",
+        risk="mutating",
+        params={"folder": {"type": "string", "description": "Folder name."}},
+        steps=[
+            Step(op="press", anchor=recorded("Choose Folder..."), timeout_s=0.2),
+            Step(op="wait_for", anchor=field, timeout_s=0.4),
+            Step(op="set_value", anchor=field, value={"param": "folder"}, timeout_s=0.2),
+            Step(op="wait_for", anchor=recorded("Receipts"), timeout_s=0.4),
+            Step(op="press", anchor=recorded("Move"), timeout_s=0.2),
+        ],
+    )
+    pack = Pack(bundle_id="com.microsoft.Outlook", app_name="Outlook", tools=[tool])
+    choose_folder._children.remove(result)  # the search finds no such folder
+    window._children.remove(choose_folder)  # and the call starts with the sheet closed
+    cancel._on_press = lambda: window._children.remove(choose_folder)
+
+    with pytest.raises(runtime.ToolExecutionError) as failed:
+        runtime.execute(pack, "file_to_folder", {"folder": "Receipts"}, tree)
+    message = str(failed.value)
+    assert "step 3 (wait_for): element did not appear" in message
+    assert "The press in step 0 and the write in step 2 were already sent" in message
+    assert "vent cancelled the sheet on 'Inbox', which the call had opened." in message
+    assert (cancel.presses, move.presses) == (1, 0)
+    assert choose_folder not in window.children()
+
+
+def test_a_sheet_the_call_opened_without_a_cancel_button_is_left_for_a_human():
+    tree = textedit_like()
+    window = tree.children()[0]
+    ok = PressRecorder("AXButton", "OK")
+    opens = PressRecorder("AXButton", "Print", on_press=lambda: window._children.append(sheet(ok)))
+    window._children.append(opens)
+    nodes = snapshot(tree).nodes
+    tool = ToolSpec(
+        name="print_then_write",
+        description="Print, then write.",
+        risk="mutating",
+        params={"text": {"type": "string", "description": "Text."}},
+        steps=[
+            Step(op="press", anchor=anchors.build(next(n for n in nodes if n.label == "Print")), timeout_s=0.2),
+            Step(
+                op="set_value",
+                anchor=anchors.build(next(n for n in nodes if n.identifier == "doc-body")),
+                value={"param": "text"},
+                timeout_s=0.2,
+            ),
+        ],
+    )
+    pack = Pack(bundle_id="com.apple.TextEdit", app_name="TextEdit", tools=[tool])
+    with pytest.raises(runtime.ToolExecutionError, match="a sheet is open on 'untitled.txt'") as failed:
+        runtime.execute(pack, "print_then_write", {"text": "x"}, tree)
+    assert "The sheet on 'untitled.txt' opened during the call and is still open" in str(failed.value)
+    assert ok.presses == 0
+    assert doc_body(tree).value == "hello"
+
+
+def test_a_healed_anchor_that_does_not_resolve_is_a_tool_error():
+    """The second resolve after a heal let AnchorLost escape as a
+    traceback instead of a message naming the step."""
+    tree = textedit_like()
+    pack = build_write_tool(tree)
+    doc_body(tree)._identifier = "renamed-by-update"
+    ghost = anchors.Anchor("AXTextArea", "never-there", [], "", [])
+    with pytest.raises(runtime.ToolExecutionError, match="the healed anchor did not resolve either"):
+        runtime.execute(pack, "write_document", {"text": "x"}, tree, heal=lambda broken, root: ghost)

@@ -362,6 +362,19 @@ def activate(app: RunningApp) -> bool:
     return bool(ns_app.activateWithOptions_(0))
 
 
+def _unanswered(what: str, err: int) -> AXTransientError:
+    """The error for an action or write the app didn't answer in time.
+
+    The request was delivered and waits in the app's queue, so a busy app
+    may still carry it out once it catches up. Saying "failed" would invite
+    a retry that does it twice. The element is not named: describing it
+    takes more calls to an app that is already not answering."""
+    return AXTransientError(
+        f"{what} got no answer within {MESSAGING_TIMEOUT_S:g}s (AXError {err}). "
+        "The app may be busy, and may still carry it out."
+    )
+
+
 def _ax_get(element: Any, attribute: str) -> Any:
     err, value = AXUIElementCopyAttributeValue(element, attribute, None)
     if err == kAXErrorSuccess:
@@ -449,6 +462,8 @@ class Element:
 
     def perform(self, action: str = "AXPress") -> None:
         err = AXUIElementPerformAction(self._ref, action)
+        if err == AX_ERROR_CANNOT_COMPLETE:
+            raise _unanswered(f"Action {action!r}", err)
         if err != kAXErrorSuccess:
             raise AXError(f"Action {action!r} failed on {self!r} (AXError {err})")
 
@@ -457,6 +472,8 @@ class Element:
 
     def set_attribute(self, name: str, value: Any) -> None:
         err = AXUIElementSetAttributeValue(self._ref, name, value)
+        if err == AX_ERROR_CANNOT_COMPLETE:
+            raise _unanswered(f"Setting {name}", err)
         if err != kAXErrorSuccess:
             raise AXError(f"Setting {name} failed on {self!r} (AXError {err})")
 
