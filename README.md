@@ -117,11 +117,11 @@ names the app or file to switch on.
 Tools show up as `textedit_write_document`, `code_show_search`,
 `slack_filter_channels`, and so on. Then ask for things in plain words,
 like "open the Search view in VS Code and search the workspace for
-TODO". Read-only tools and tools you approved as `mutating` run when
-called. A tool a pack marks `risk: high` is hidden unless your client can
-ask you to confirm each call (MCP elicitation), or the server was started
-with `VENT_ALLOW_HIGH=1`, which runs it without asking. Start the server
-with `VENT_READ_ONLY=1` to serve read-only tools and nothing else.
+TODO". Tools a pack marks `read_only` or `mutating` run when called. A
+tool marked `high` risk is hidden unless your client can ask you to
+confirm each call (MCP elicitation), or the server was started with
+`VENT_ALLOW_HIGH=1`, which runs it without asking. Start the server with
+`VENT_READ_ONLY=1` to serve read-only tools and nothing else.
 [docs/SECURITY.md](https://github.com/ShaanGS/ventriloquist/blob/main/docs/SECURITY.md)
 explains why (T9).
 
@@ -316,7 +316,8 @@ does with caveats:
   Bold does), so the Notes, VS Code and Slack tools, and the Outlook
   example's flag and filing tools, bring their app to the front while
   they run and hand focus back afterwards, switching Spaces if they need
-  to. The Outlook read tool works without coming to the front. The app's
+  to, and fail before acting if the app won't come forward. The Outlook
+  read tool works without coming to the front. The app's
   other windows on other Spaces stay out of reach, and so does the title
   bar of a full-screen window. A locked screen makes every app look
   empty.
