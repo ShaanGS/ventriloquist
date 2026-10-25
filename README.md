@@ -28,7 +28,7 @@ computer use, and made no wrong clicks (computer use made two).
 <p align="center">
   <img src="https://raw.githubusercontent.com/ShaanGS/ventriloquist/main/docs/demo.gif" width="900" alt="A Claude session triages six test emails in new Outlook through vent's tools: it reads each email as text, flags the two that need a reply or have a deadline, and files all six into Receipts, Meetings or Reading. Email addresses are blurred.">
   <br>
-  <sub>A real run on test emails, by an agent that hadn't seen the expected answers: 6 of 6 filed. The preview is sped up 25x; email 1 plays at real speed with the agent's pauses cut.</sub>
+  <sub>A real run on test emails, by an agent that hadn't seen the expected answers: 6 of 6 filed. Email 1 plays at real speed with the agent's pauses cut; the other five are sped up 8x.</sub>
 </p>
 <!-- mcp-name: io.github.ShaanGS/ventriloquist -->
 
