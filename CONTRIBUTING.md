@@ -136,4 +136,5 @@ Packs you record land in `~/.ventriloquist/packs/<bundle id>/pack.json`
 Ventriloquist has been built one phase at a time, each phase adversarially
 reviewed before the next began. A PR that keeps that bar (a clear
 invariant, a test that pins it, an honest note on what it does not cover)
-is easy to accept.
+is easy to accept. Everyone taking part is expected to follow the
+[code of conduct](CODE_OF_CONDUCT.md).

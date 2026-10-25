@@ -1,0 +1,20 @@
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    # A week's wait means a release that turns out to be malicious or
+    # broken has usually been pulled before it reaches a pull request.
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
