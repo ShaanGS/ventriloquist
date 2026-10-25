@@ -17,6 +17,19 @@ def test_version_flag_reports_the_package_version():
     assert __version__ in result.output
 
 
+def test_explore_refuses_a_bundle_id_that_would_leave_its_directory(monkeypatch):
+    """The trace is saved under the app's bundle id, which the app sets."""
+    monkeypatch.setattr(cli.ax, "find_app", lambda name: cli.ax.RunningApp("Evil", "../../evil", 1))
+
+    def never(app):
+        raise AssertionError("explore went on to read the app")
+
+    monkeypatch.setattr(cli.ax, "app_element", never)
+    result = CliRunner().invoke(cli.main, ["explore", "Evil"])
+    assert result.exit_code == 1
+    assert "not reverse-DNS" in result.output
+
+
 def test_mcp_config_names_the_running_vent_by_absolute_path(monkeypatch):
     monkeypatch.setattr(cli.sys, "argv", ["/opt/tools/bin/vent", "mcp-config"])
     result = CliRunner().invoke(cli.main, ["mcp-config"])

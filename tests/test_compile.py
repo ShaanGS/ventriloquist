@@ -100,3 +100,13 @@ def test_merge_keeps_the_versions_the_older_tools_were_recorded_on():
     merged = packs.merge(base, added)
     assert (merged.app_version, merged.os_version) == ("1.18", "15.6")
     assert [t.name for t in merged.tools] == ["write_document", "append_text"]
+
+
+def test_compile_refuses_a_bundle_id_that_would_leave_its_directory(monkeypatch, tmp_path):
+    """An app sets its own bundle id, and vent builds paths from it."""
+    monkeypatch.setenv("VENT_HOME", str(tmp_path / "home"))
+    monkeypatch.setattr(cli.ax, "find_app", lambda name: cli.ax.RunningApp("Evil", "../../evil", 1))
+    result = CliRunner().invoke(cli.main, ["compile", "Evil"])
+    assert result.exit_code == 1
+    assert "not reverse-DNS" in result.output
+    assert not (tmp_path / "evil").exists()

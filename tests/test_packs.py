@@ -2,6 +2,7 @@
 packs survive a save/load round trip with anchors intact."""
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -270,6 +271,25 @@ def test_standard_press_actions_load(action):
 def test_other_press_actions_are_refused(action):
     with pytest.raises(PackError, match="not allowed"):
         Pack.from_dict(press_pack(action))
+
+
+@pytest.mark.parametrize(
+    "bundle_id", ["com.apple.TextEdit", "com.1password.1password", "com.bitdefender.antivirus_mac", "us.zoom.xos"]
+)
+def test_reverse_dns_bundle_ids_are_valid(bundle_id):
+    assert packs.valid_bundle_id(bundle_id)
+    assert packs.pack_file(Path("/packs"), bundle_id) == Path("/packs") / bundle_id / "pack.json"
+
+
+@pytest.mark.parametrize(
+    "bundle_id", ["../../etc", "com.apple/../../x", "com..apple", "/abs.path", ".hidden.app", "TextEdit", "", None, 7]
+)
+def test_bundle_ids_that_could_leave_their_directory_are_refused(bundle_id):
+    assert not packs.valid_bundle_id(bundle_id)
+    with pytest.raises(PackError, match="not a bundle id"):
+        packs.pack_file(Path("/packs"), bundle_id)
+    with pytest.raises(PackError, match="bundle"):
+        Pack.from_dict(edited(lambda data: set_in(data, "bundle_id", bundle_id)))
 
 
 SECURE_LINK = {"role": "AXTextField", "label": "", "identifier": "", "ordinal": 0, "index": 0, "subrole": "AXSecureTextField"}

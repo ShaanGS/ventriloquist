@@ -23,8 +23,23 @@ from .snapshot import MAX_TREE_DEPTH, app_windows, render, snapshot
 
 def _user_pack_path(bundle_id: str) -> Path:
     """Where a pack is saved. Always the user's directory, even when the pack
-    was loaded from the bundled set (see paths.py)."""
-    return paths.user_packs_dir() / bundle_id / "pack.json"
+    was loaded from the bundled set (see paths.py). Raises PackError for a
+    bundle id that could point outside it."""
+    return packs.pack_file(paths.user_packs_dir(), bundle_id)
+
+
+def _bundle_id(app: ax.RunningApp) -> str:
+    """A running app's bundle id, checked before any path is built from it.
+    The id comes from the app's own Info.plist, so an app could name itself
+    "../../somewhere" and have vent write there."""
+    if not app.bundle_id:
+        raise ax.AXError(f"{app.name} has no bundle id, so vent cannot keep a pack or a trace for it.")
+    if not packs.valid_bundle_id(app.bundle_id):
+        raise ax.AXError(
+            f"{app.name}'s bundle id {app.bundle_id!r} is not reverse-DNS letters, digits, '-' and '_', "
+            "so vent will not build a path from it."
+        )
+    return app.bundle_id
 
 
 @click.group()
@@ -455,6 +470,7 @@ def explore(app_name: str, rounds: int, no_values: bool) -> None:
 
     try:
         app = ax.find_app(app_name)
+        _bundle_id(app)  # the trace is saved under it
         root = ax.app_element(app)
         ax.activate(app)
         pol = policy_mod.Policy()
@@ -489,9 +505,8 @@ def compile_cmd(app_name: str) -> None:
 
     try:
         app = ax.find_app(app_name)
-        if not app.bundle_id:
-            raise ax.AXError(f"{app.name} has no bundle id; cannot compile a pack for it.")
-        trace = explorer.load_trace(paths.traces_dir(), app.bundle_id)
+        bundle_id = _bundle_id(app)
+        trace = explorer.load_trace(paths.traces_dir(), bundle_id)
     except FileNotFoundError:
         click.secho(f"No trace for {app_name!r}. Run `vent explore {app_name}` first.", fg="red")
         sys.exit(1)
@@ -503,8 +518,8 @@ def compile_cmd(app_name: str) -> None:
     # explore runs. With no pack of the user's own, the bundled one is the
     # start: the user's pack shadows it, so leaving it out would hide its
     # tools. A user pack that can't be read is only replaced on a yes.
-    pack_path = _user_pack_path(app.bundle_id)
-    bundled_path = paths.BUNDLED_PACKS_DIR / app.bundle_id / "pack.json"
+    pack_path = _user_pack_path(bundle_id)
+    bundled_path = packs.pack_file(paths.BUNDLED_PACKS_DIR, bundle_id)
     existing = None
     if pack_path.exists():
         try:

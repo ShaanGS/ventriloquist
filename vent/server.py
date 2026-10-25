@@ -166,7 +166,7 @@ def build_server(search_path: list[Path]) -> Server:
                 low_confidence = packs.is_stale(pack, ax.app_version(app))
                 heal_cb = None
                 if allow_heal or pack.healed_pending:
-                    pack_path = writable_dir / pack.bundle_id / "pack.json"
+                    pack_path = packs.pack_file(writable_dir, pack.bundle_id)
                     heal_cb = heal.make_heal_callback(
                         pack, pack_path, ask_model=allow_heal, low_confidence=low_confidence,
                     )

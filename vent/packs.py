@@ -50,9 +50,28 @@ PARAM_NAME = re.compile(r"[A-Za-z0-9_.-]{1,64}")
 # allowed to wait for an hour would hold up every later call to its app.
 MAX_TIMEOUT_S = 120.0
 
+# Bundle ids name directories under VENT_HOME and the bundled packs, so
+# only reverse-DNS characters get through: a "/" or ".." in one would point
+# a save, a trace or a heal outside the directory it belongs in.
+BUNDLE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*(\.[A-Za-z0-9][A-Za-z0-9_-]*)+")
+BUNDLE_ID_MAX = 255
+
 
 class PackError(ValueError):
     """A pack failed validation. The message says exactly where."""
+
+
+def valid_bundle_id(value: Any) -> bool:
+    """Whether value is a bundle id safe to build a path from."""
+    return isinstance(value, str) and len(value) <= BUNDLE_ID_MAX and BUNDLE_ID.fullmatch(value) is not None
+
+
+def pack_file(directory: Path, bundle_id: str) -> Path:
+    """Where the pack for bundle_id lives inside directory. Refuses a bundle
+    id that could name a path outside it."""
+    if not valid_bundle_id(bundle_id):
+        raise PackError(f"{bundle_id!r} is not a bundle id (reverse-DNS letters, digits, '-' and '_' only)")
+    return Path(directory) / bundle_id / "pack.json"
 
 
 def _kind(value: Any) -> str:
@@ -369,7 +388,11 @@ class Pack:
             )
         if not data.get("bundle_id"):
             raise PackError("pack is missing bundle_id")
-        _text(data["bundle_id"], "bundle_id")
+        if not valid_bundle_id(data["bundle_id"]):
+            raise PackError(
+                f"bundle_id {data['bundle_id']!r} is not a bundle id "
+                "(reverse-DNS letters, digits, '-' and '_' only)"
+            )
         if not data.get("app_name"):
             raise PackError("pack is missing app_name")
         _text(data["app_name"], "app_name")
