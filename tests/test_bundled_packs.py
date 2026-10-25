@@ -116,3 +116,16 @@ def test_descriptions_name_tools_as_clients_see_them(path):
             for match in re.finditer(rf"(?<!\w){re.escape(other)}(?!\w)", tool.get("description", "")):
                 bare.append((tool["name"], match.group(0)))
     assert not bare, f"{_name(path)} names tools without the {prefix}_ prefix: {bare}"
+
+
+def test_llms_txt_pack_example_loads():
+    """llms.txt shows a whole pack for people and models to copy. It once
+    left fields out of its chain links and stood "..." in for an anchor, so
+    a copy of it didn't load."""
+    from vent.packs import Pack
+
+    text = (Path(__file__).resolve().parent.parent / "llms.txt").read_text()
+    example = re.search(r"```json\n(.*?)\n```", text, re.DOTALL)
+    assert example, "llms.txt has no JSON pack example"
+    pack = Pack.from_dict(json.loads(example.group(1)))
+    assert pack.tools
