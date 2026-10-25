@@ -14,8 +14,8 @@ for you:
 uv run pytest
 ```
 
-Without uv, make the environment with Python 3.11 or newer (`brew install
-python` gives you one; check with `python3 --version`):
+Without uv, make the environment with Python 3.11 or newer
+(`brew install python` gives you one; check with `python3 --version`):
 
 ```bash
 python3 -m venv .venv
