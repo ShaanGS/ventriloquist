@@ -637,8 +637,10 @@ def _say_which_version(base: packs.Pack, added: packs.Pack, merged: packs.Pack, 
 
 SERVE_HELP = """Serve every compiled pack as MCP tools over stdio.
 
-    High risk tools are refused unless the server was started with
-    VENT_ALLOW_HIGH=1 in the environment. See docs/SECURITY.md.
+    Each call to a high risk tool asks the user to confirm it, through the
+    client's MCP elicitation. A client without elicitation is not shown
+    them, unless the server was started with VENT_ALLOW_HIGH=1, which runs
+    them without asking. See docs/SECURITY.md.
     """
 
 
