@@ -16,6 +16,7 @@ do anything the threat model has not named.
 from __future__ import annotations
 
 import json
+import math
 import platform
 import re
 from dataclasses import dataclass, field
@@ -36,6 +37,10 @@ READABLE_VERSIONS = {1, 2}  # version 2 added ChainLink.subrole
 PARAM_TYPES = {"string", "number", "integer", "boolean"}
 # What MCP clients accept as an input property name.
 PARAM_NAME = re.compile(r"[A-Za-z0-9_.-]{1,64}")
+
+# A step's own wait. The server runs one call per app at a time, so a step
+# allowed to wait for an hour would hold up every later call to its app.
+MAX_TIMEOUT_S = 120.0
 
 
 class PackError(ValueError):
@@ -114,6 +119,15 @@ def _anchor(data: Any, where: str) -> Anchor:
     return Anchor.from_dict(data)
 
 
+def _timeout(value: Any, where: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise PackError(f"{where} timeout_s must be a number of seconds, not {_kind(value)}")
+    seconds = float(value)
+    if not math.isfinite(seconds) or not 0 < seconds <= MAX_TIMEOUT_S:
+        raise PackError(f"{where} timeout_s must be more than 0 and at most {MAX_TIMEOUT_S:.0f} seconds, got {value!r}")
+    return seconds
+
+
 def _value_spec(value: Any, where: str) -> dict:
     value = _object(value, f"{where} value")
     if len(value) != 1 or not ({"param", "literal"} & value.keys()):
@@ -190,7 +204,7 @@ class Step:
             value=value,
             expect=expect,
             action=data.get("action", "AXPress"),
-            timeout_s=float(data.get("timeout_s", 5.0)),
+            timeout_s=_timeout(data.get("timeout_s", 5.0), where),
             settle=_flag(data.get("settle", True), f"{where} settle"),
         )
 

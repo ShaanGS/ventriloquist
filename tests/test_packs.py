@@ -235,6 +235,23 @@ def test_load_all_skips_every_kind_of_broken_pack(tmp_path, capsys):
     assert capsys.readouterr().err.count("warning: skipping") == 3
 
 
+@pytest.mark.parametrize("seconds", [0, -1, 120.5, float("nan"), float("inf"), "5", True])
+def test_step_timeouts_are_bounded(tmp_path, seconds):
+    """Every call to an app waits behind the one before it, so one step
+    allowed to wait an hour would hold up every later call to its app."""
+    data = edited(lambda data: set_in(first_step(data), "timeout_s", seconds))
+    path = tmp_path / "p" / "pack.json"
+    path.parent.mkdir()
+    path.write_text(json.dumps(data))  # NaN and Infinity, as Python's json writes them
+    with pytest.raises(PackError, match="timeout_s"):
+        load(path)
+
+
+def test_a_step_may_wait_up_to_two_minutes():
+    data = edited(lambda data: set_in(first_step(data), "timeout_s", 120))
+    assert Pack.from_dict(data).tools[0].steps[0].timeout_s == 120.0
+
+
 def test_shipped_packs_pin_no_window_titles():
     """A recorded window title names one person's document (the TextEdit
     pack once shipped with "vent-demo.txt"). In a shipped pack it steers
