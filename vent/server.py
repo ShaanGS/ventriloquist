@@ -7,9 +7,11 @@ module never imports llm.py.
 Design choices that came out of the security review (SECURITY.md T9, T10):
 
 - Transport is stdio only, launched by the MCP client. No network port.
-- Tool calls against the same app are serialized with a per-bundle lock.
-  A GUI is one global mutable resource; parallel calls against it produce
-  interleaved nonsense, so the second call waits.
+- Tool calls against the same app are serialized with a per-bundle lock,
+  taken before any thread work. A GUI is one global mutable resource;
+  parallel calls against it produce interleaved nonsense, so the second
+  call waits. Tools that bring their app to the front also queue behind
+  each other across apps, because there is only one front.
 - Every tool carries the risk level assigned at the approval gate. High
   risk tools are refused unless the operator started the server with
   VENT_ALLOW_HIGH=1. A call-time confirmation round trip (MCP elicitation)
@@ -24,8 +26,8 @@ from __future__ import annotations
 import os
 import re
 import sys
-import threading
 import unicodedata
+from contextlib import AsyncExitStack
 from pathlib import Path
 
 import anyio
@@ -150,6 +152,32 @@ def _error(text: str) -> types.CallToolResult:
     )
 
 
+def _run_tool(
+    pack: packs.Pack,
+    spec: packs.ToolSpec,
+    arguments: dict,
+    writable_dir: Path,
+    allow_heal: bool,
+) -> runtime.ToolResult:
+    """One call against the live app, on a worker thread. The caller holds
+    the app's lock, and the front's when the tool needs it."""
+    app = ax.find_app_by_bundle(pack.bundle_id)
+    root = ax.app_element(app)
+    low_confidence = packs.is_stale(pack, ax.app_version(app))
+    heal_cb = None
+    if allow_heal or pack.healed_pending:
+        heal_cb = heal.make_heal_callback(
+            pack,
+            packs.pack_file(writable_dir, pack.bundle_id),
+            ask_model=allow_heal,
+            low_confidence=low_confidence,
+        )
+    return runtime.execute(
+        pack, spec.name, arguments, root,
+        app=app, low_confidence=low_confidence, heal=heal_cb,
+    )
+
+
 def _registry(loaded: list[packs.Pack]) -> dict[str, tuple[packs.Pack, packs.ToolSpec]]:
     """(mcp tool name) -> (pack, spec). A tool whose name cannot be served,
     or is taken by a tool registered before it, is skipped with a warning
@@ -190,7 +218,18 @@ def build_server(search_path: list[Path]) -> Server:
     if not registry:
         raise SystemExit("No tool in the packs found could be served; see the warnings above.")
 
-    locks: dict[str, threading.Lock] = {pack.bundle_id: threading.Lock() for pack in loaded}
+    # Taken in the handler, before any thread work, so a queued call holds
+    # no worker thread and a call cancelled while queued never starts. Any
+    # call takes its app's lock first and then, if it needs the front, the
+    # front's, so two calls can never each hold what the other waits for.
+    app_locks = {pack.bundle_id: anyio.Lock() for pack in loaded}
+    front_lock = anyio.Lock()
+    # Tool work gets threads of its own. On anyio's default limiter it
+    # shared the threads that carry the stdio transport's reads and writes,
+    # so enough queued calls could stop the server hearing its client. One
+    # token per app: the app locks already allow no more than that at once.
+    tool_threads = anyio.CapacityLimiter(len(app_locks))
+
     allow_high = os.getenv("VENT_ALLOW_HIGH") == "1"
     # Model-backed healing is opt-in: it spends model tokens and writes
     # quarantine entries to the pack. Off by default keeps the served path
@@ -223,40 +262,30 @@ def build_server(search_path: list[Path]) -> Server:
         if refusal is not None:
             return _error(refusal)
 
-        def run_locked() -> runtime.ToolResult:
-            # One tool call per app at a time, held for the whole call.
-            # The acquire has a deadline so one hung app cannot queue
-            # callers forever (ARCHITECTURE.md section 7).
-            lock = locks[pack.bundle_id]
-            if not lock.acquire(timeout=LOCK_TIMEOUT_S):
-                raise runtime.ToolExecutionError(
-                    f"{name}: another tool call against {pack.app_name} has been "
-                    f"running for over {LOCK_TIMEOUT_S:.0f}s. Giving up on the queue."
-                )
-            try:
-                app = ax.find_app_by_bundle(pack.bundle_id)
-                root = ax.app_element(app)
-                low_confidence = packs.is_stale(pack, ax.app_version(app))
-                heal_cb = None
-                if allow_heal or pack.healed_pending:
-                    pack_path = packs.pack_file(writable_dir, pack.bundle_id)
-                    heal_cb = heal.make_heal_callback(
-                        pack, pack_path, ask_model=allow_heal, low_confidence=low_confidence,
-                    )
-                return runtime.execute(
-                    pack, spec.name, arguments, root,
-                    app=app, low_confidence=low_confidence, heal=heal_cb,
-                )
-            finally:
-                lock.release()
-
         # This handler runs on the main thread, the only place AppKit
         # applies app launches, quits and activations. The tool itself runs
         # on a worker thread, which would otherwise see the state from the
         # server's first call.
         ax.refresh_app_state()
         try:
-            result = await anyio.to_thread.run_sync(run_locked)
+            async with AsyncExitStack() as held:
+                # One tool call per app at a time, held for the whole call.
+                # The wait has a deadline so one hung app cannot queue
+                # callers forever (ARCHITECTURE.md section 7).
+                waiting_for = f"earlier calls to {pack.app_name}"
+                with anyio.move_on_after(LOCK_TIMEOUT_S) as queue:
+                    await held.enter_async_context(app_locks[pack.bundle_id])
+                    if spec.requires_frontmost:
+                        waiting_for = "earlier calls that bring an app to the front"
+                        await held.enter_async_context(front_lock)
+                if queue.cancelled_caught:
+                    return _error(
+                        f"{name}: waited {LOCK_TIMEOUT_S:g}s for {waiting_for} to finish. "
+                        "Giving up on the queue."
+                    )
+                result = await anyio.to_thread.run_sync(
+                    _run_tool, pack, spec, arguments, writable_dir, allow_heal, limiter=tool_threads
+                )
         except (runtime.ToolExecutionError, ax.AXError, packs.PackError) as exc:
             # The message names the app, tool, and step, which is what
             # "fail loudly" means in SECURITY.md.
