@@ -102,6 +102,24 @@ def test_merge_keeps_the_versions_the_older_tools_were_recorded_on():
     assert [t.name for t in merged.tools] == ["write_document", "append_text"]
 
 
+def test_two_proposals_with_one_name_keep_the_first_unless_told_otherwise(monkeypatch, tmp_path):
+    """Both used to go into the pack, which then failed to load."""
+    proposed = [tool("write_document", "First."), tool("write_document", "Second.")]
+    result = compile_with(monkeypatch, tmp_path, proposed, ["y", "y", "n"])
+    assert result.exit_code == 0, result.output
+    assert "You already approved write_document in this run" in result.output
+    pack = packs.load(pack_file(tmp_path))
+    assert [(t.name, t.description) for t in pack.tools] == [("write_document", "First.")]
+
+
+def test_two_proposals_with_one_name_keep_the_second_on_a_yes(monkeypatch, tmp_path):
+    proposed = [tool("write_document", "First."), tool("write_document", "Second.")]
+    result = compile_with(monkeypatch, tmp_path, proposed, ["y", "y", "y"])
+    assert result.exit_code == 0, result.output
+    pack = packs.load(pack_file(tmp_path))
+    assert [(t.name, t.description) for t in pack.tools] == [("write_document", "Second.")]
+
+
 def test_compile_refuses_a_bundle_id_that_would_leave_its_directory(monkeypatch, tmp_path):
     """An app sets its own bundle id, and vent builds paths from it."""
     monkeypatch.setenv("VENT_HOME", str(tmp_path / "home"))

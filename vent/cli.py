@@ -543,7 +543,9 @@ def compile_cmd(app_name: str) -> None:
         click.echo("The model proposed no tools from this trace.")
         return
 
-    approved = []
+    # Keyed by name: two proposals in one run can share a name, and a pack
+    # with both fails to load, so the second only replaces the first on a yes.
+    approved: dict[str, packs.ToolSpec] = {}
     for proposal in proposals:
         try:
             spec = compiler.build_spec(proposal)
@@ -559,11 +561,16 @@ def compile_cmd(app_name: str) -> None:
         if spec.risk == "high":
             click.secho("  ⚠ high risk tool", fg="red")
         if click.confirm("Approve this tool?", default=False):
-            if spec.name in have and not click.confirm(
+            if spec.name in approved:
+                if not click.confirm(
+                    f"You already approved {spec.name} in this run. Replace it with this one?", default=False
+                ):
+                    continue
+            elif spec.name in have and not click.confirm(
                 f"Your pack already has {spec.name}. Replace it with this one?", default=False
             ):
                 continue
-            approved.append(spec)
+            approved[spec.name] = spec
 
     if not approved:
         click.echo("Nothing approved; no pack written.")
@@ -571,7 +578,7 @@ def compile_cmd(app_name: str) -> None:
 
     pack = compiler.assemble_pack(
         trace,
-        approved,
+        list(approved.values()),
         os_version=platform_mod.mac_ver()[0],
         locale=(locale_mod.getlocale()[0] or ""),
     )
@@ -585,6 +592,11 @@ def compile_cmd(app_name: str) -> None:
                 fg="yellow",
             )
         pack = merged
+    try:
+        packs.Pack.from_dict(pack.to_dict())
+    except packs.PackError as exc:
+        click.secho(f"✗ Not writing {pack_path}: the pack would not load ({exc})", fg="red")
+        sys.exit(1)
     packs.save(pack, pack_path)
     click.secho(f"✓ Wrote {len(approved)} tool(s) to {pack_path} ({len(pack.tools)} in the pack)", fg="green")
 
