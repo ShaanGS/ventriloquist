@@ -521,6 +521,7 @@ def compile_cmd(app_name: str) -> None:
     pack_path = _user_pack_path(bundle_id)
     bundled_path = packs.pack_file(paths.BUNDLED_PACKS_DIR, bundle_id)
     existing = None
+    from_bundled = False
     if pack_path.exists():
         try:
             existing = packs.load(pack_path)
@@ -529,9 +530,15 @@ def compile_cmd(app_name: str) -> None:
             if not click.confirm(f"Replace your {app.name} pack with only the tools you approve now?", default=False):
                 sys.exit(1)
     elif bundled_path.exists():
-        existing = packs.load(bundled_path)
-        click.echo(f"Starting from the bundled {app.name} pack, so its tools stay available.")
+        try:
+            existing = packs.load(bundled_path)
+        except packs.PackError as exc:
+            click.secho(f"⚠ The bundled {app.name} pack did not load, so your pack starts empty: {exc}", fg="yellow")
+        else:
+            from_bundled = True
+            click.echo(f"Starting from the bundled {app.name} pack, so its tools stay available.")
     have = {tool.name for tool in existing.tools} if existing else set()
+    holder = f"The bundled {app.name} pack" if from_bundled else "Your pack"
 
     try:
         proposals = compiler.propose(trace)
@@ -567,7 +574,7 @@ def compile_cmd(app_name: str) -> None:
                 ):
                     continue
             elif spec.name in have and not click.confirm(
-                f"Your pack already has {spec.name}. Replace it with this one?", default=False
+                f"{holder} already has {spec.name}. Replace it with this one?", default=False
             ):
                 continue
             approved[spec.name] = spec
@@ -584,13 +591,7 @@ def compile_cmd(app_name: str) -> None:
     )
     if existing:
         merged = packs.merge(existing, pack)
-        if merged.app_version != pack.app_version or merged.os_version != pack.os_version:
-            click.secho(
-                f"  The tools already in the pack were recorded on a different {app.name} or macOS "
-                "version, so the pack keeps that version and its anchors load cautiously. "
-                "Re-record those tools to clear it.",
-                fg="yellow",
-            )
+        _say_which_version(existing, pack, merged, app.name, bundled=from_bundled)
         pack = merged
     try:
         packs.Pack.from_dict(pack.to_dict())
@@ -599,6 +600,34 @@ def compile_cmd(app_name: str) -> None:
         sys.exit(1)
     packs.save(pack, pack_path)
     click.secho(f"✓ Wrote {len(approved)} tool(s) to {pack_path} ({len(pack.tools)} in the pack)", fg="green")
+
+
+def _recorded_on(pack: packs.Pack, app_name: str) -> str:
+    app = f"{app_name} {pack.app_version}" if pack.app_version else f"an unrecorded {app_name} version"
+    system = f"macOS {pack.os_version}" if pack.os_version else "an unrecorded macOS version"
+    return f"{app} on {system}"
+
+
+def _say_which_version(base: packs.Pack, added: packs.Pack, merged: packs.Pack, app_name: str, bundled: bool) -> None:
+    """Tell the user which app and macOS version a merged pack records when
+    it is not the one this compile ran on. A pack records one version for
+    all its tools, and packs.merge keeps the older one while any older tool
+    survives, so the pack loads cautiously here until a compile replaces
+    every tool it holds."""
+    older_tools = f"The bundled {app_name} pack's tools" if bundled else "Your pack's tools from before this run"
+    if packs.environment_differs(merged, added.app_version, added.os_version):
+        replaced = {tool.name for tool in added.tools}
+        kept = ", ".join(tool.name for tool in base.tools if tool.name not in replaced)
+        click.secho(
+            f"  {older_tools} ({kept}) were recorded on {_recorded_on(base, app_name)}, and this "
+            f"run on {_recorded_on(added, app_name)}. A pack records one version, so it keeps "
+            "theirs and loads its anchors cautiously on this Mac. It takes this Mac's version "
+            "in a compile that replaces every tool it holds.",
+            fg="yellow",
+        )
+    elif packs.environment_differs(base, added.app_version, added.os_version):
+        replaced_all = f"Every tool from the bundled {app_name} pack" if bundled else "Every tool from before this run"
+        click.echo(f"  {replaced_all} was replaced, so the pack now records {_recorded_on(added, app_name)}.")
 
 
 @main.command()

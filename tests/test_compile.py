@@ -1,6 +1,7 @@
 """`vent compile` adds to the pack already there instead of replacing it, so
 a pack can grow over several explore runs without losing earlier approvals."""
 
+import pytest
 from click.testing import CliRunner
 
 from vent import anchors, cli, compiler, explorer, packs
@@ -102,6 +103,16 @@ def test_merge_keeps_the_versions_the_older_tools_were_recorded_on():
     assert [t.name for t in merged.tools] == ["write_document", "append_text"]
 
 
+def test_merge_takes_the_new_versions_once_no_older_tool_survives():
+    """Kept forever, the old versions made "re-record those tools" a hint
+    nothing could satisfy."""
+    base = Pack(bundle_id=BUNDLE, app_name="TextEdit", app_version="1.18", os_version="15.6", tools=[tool("write_document")])
+    added = Pack(bundle_id=BUNDLE, app_name="TextEdit", app_version="1.19", os_version="26.0", tools=[tool("write_document", "New.")])
+    merged = packs.merge(base, added)
+    assert (merged.app_version, merged.os_version) == ("1.19", "26.0")
+    assert merged.tool("write_document").description == "New."
+
+
 def test_two_proposals_with_one_name_keep_the_first_unless_told_otherwise(monkeypatch, tmp_path):
     """Both used to go into the pack, which then failed to load."""
     proposed = [tool("write_document", "First."), tool("write_document", "Second.")]
@@ -118,6 +129,63 @@ def test_two_proposals_with_one_name_keep_the_second_on_a_yes(monkeypatch, tmp_p
     assert result.exit_code == 0, result.output
     pack = packs.load(pack_file(tmp_path))
     assert [(t.name, t.description) for t in pack.tools] == [("write_document", "Second.")]
+
+
+def old_pack(where, *tools):
+    path = where / BUNDLE / "pack.json"
+    packs.save(Pack(bundle_id=BUNDLE, app_name="TextEdit", app_version="1.18", os_version="15.6", tools=list(tools)), path)
+    return path
+
+
+@pytest.fixture
+def on_macos_26(monkeypatch):
+    monkeypatch.setattr("platform.mac_ver", lambda: ("26.3.1", ("", "", ""), "arm64"))
+
+
+def test_adding_to_older_tools_says_the_pack_keeps_their_version(monkeypatch, tmp_path, on_macos_26):
+    old_pack(tmp_path / "home" / "packs", tool("write_document"))
+    result = compile_with(monkeypatch, tmp_path, [tool("append_text")], ["y"])
+    assert result.exit_code == 0, result.output
+    flat = " ".join(result.output.split())
+    assert (
+        "Your pack's tools from before this run (write_document) were recorded on TextEdit 1.18 on macOS 15.6, "
+        "and this run on TextEdit 1.19 on macOS 26.3.1." in flat
+    )
+    assert "It takes this Mac's version in a compile that replaces every tool it holds." in flat
+    pack = packs.load(pack_file(tmp_path))
+    assert (pack.app_version, pack.os_version) == ("1.18", "15.6")
+
+
+def test_replacing_every_older_tool_says_the_pack_now_records_this_mac(monkeypatch, tmp_path, on_macos_26):
+    old_pack(tmp_path / "home" / "packs", tool("write_document"))
+    result = compile_with(monkeypatch, tmp_path, [tool("write_document", "New.")], ["y", "y"])
+    assert result.exit_code == 0, result.output
+    assert "Every tool from before this run was replaced, so the pack now records TextEdit 1.19 on macOS 26.3.1." in result.output
+    pack = packs.load(pack_file(tmp_path))
+    assert (pack.app_version, pack.os_version) == ("1.19", "26.3.1")
+
+
+def test_adding_to_older_bundled_tools_names_the_bundled_pack(monkeypatch, tmp_path, on_macos_26):
+    old_pack(tmp_path / "bundled", tool("read_document", "Read the text."))
+    result = compile_with(monkeypatch, tmp_path, [tool("write_document")], ["y"], bundled_dir=tmp_path / "bundled")
+    assert result.exit_code == 0, result.output
+    flat = " ".join(result.output.split())
+    assert "The bundled TextEdit pack's tools (read_document) were recorded on TextEdit 1.18" in flat
+
+
+def test_a_proposal_named_like_a_bundled_tool_asks_about_the_bundled_pack(monkeypatch, tmp_path, on_macos_26):
+    old_pack(tmp_path / "bundled", tool("write_document", "Bundled."))
+    result = compile_with(monkeypatch, tmp_path, [tool("write_document", "Mine.")], ["y", "n"], bundled_dir=tmp_path / "bundled")
+    assert "The bundled TextEdit pack already has write_document" in result.output
+
+
+def test_no_version_note_when_the_pack_was_recorded_here(monkeypatch, tmp_path, on_macos_26):
+    path = tmp_path / "home" / "packs" / BUNDLE / "pack.json"
+    packs.save(Pack(bundle_id=BUNDLE, app_name="TextEdit", app_version="1.19", os_version="26.3", tools=[tool("write_document")]), path)
+    result = compile_with(monkeypatch, tmp_path, [tool("append_text")], ["y"])
+    assert result.exit_code == 0, result.output
+    assert "recorded on" not in result.output
+    assert "now records" not in result.output
 
 
 def test_compile_refuses_a_bundle_id_that_would_leave_its_directory(monkeypatch, tmp_path):
