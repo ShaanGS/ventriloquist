@@ -21,8 +21,8 @@ SHIPPED = sorted(BUNDLED_PACKS_DIR.glob("*/pack.json")) + sorted(EXAMPLES_DIR.gl
 # the separators apps put between a document and the app or folder name,
 # a file name, or an email address.
 TITLE_LIKE = [
-    re.compile(r" [-–—] (Slack|Visual Studio Code|Code|Outlook|Notes|TextEdit)$"),
-    re.compile(r" [–—] "),
+    re.compile(r" [-\u2013\u2014] (Slack|Visual Studio Code|Code|Outlook|Notes|TextEdit)$"),
+    re.compile(r" [\u2013\u2014] "),
     re.compile(r"\(Channel\)|\(DM\)"),
     re.compile(
         r"\w\.(txt|rtf|rtfd|md|pdf|docx?|xlsx?|pptx?|pages|numbers|key|csv|json|ya?ml|py|js|ts|html?|png|jpe?g|gif|heic|mov|mp4)\b",
