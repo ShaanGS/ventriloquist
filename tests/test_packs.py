@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from vent import anchors, packs
-from vent.packs import Pack, PackError, Step, ToolSpec, Verify, load, save
+from vent.packs import Pack, PackError, Step, ToolSpec, Verify, load, load_search_path, save
 from vent.snapshot import snapshot
 
 from .fakes import textedit_like
@@ -318,6 +318,43 @@ def test_anchors_onto_secure_text_fields_do_not_load(where):
     snapshot never surfaces one, so only an edited pack can name it."""
     with pytest.raises(PackError, match="secure text field"):
         Pack.from_dict(edited(where))
+
+
+def test_a_broken_user_pack_still_claims_its_app(tmp_path, capsys):
+    """A typo in the user's pack must not quietly bring back the bundled
+    tools it replaced while the user's own tools vanish."""
+    bundled = sample_pack()
+    save(bundled, tmp_path / "bundled" / bundled.bundle_id / "pack.json")
+    other = sample_pack()
+    other.bundle_id, other.app_name = "com.example.Other", "Other"
+    save(other, tmp_path / "bundled" / other.bundle_id / "pack.json")
+    broken = tmp_path / "user" / bundled.bundle_id / "pack.json"
+    broken.parent.mkdir(parents=True)
+    broken.write_text("{ not json")
+
+    loaded = load_search_path([tmp_path / "user", tmp_path / "bundled"])
+    assert [pack.bundle_id for pack in loaded] == ["com.example.Other"]
+    err = capsys.readouterr().err
+    assert "warning: skipping" in err
+    assert f"not serving the TextEdit pack in {tmp_path / 'bundled'}" in err
+    assert str(broken) in err
+
+
+def test_a_broken_pack_claims_the_bundle_id_written_inside_it(tmp_path, capsys):
+    bundled = sample_pack()
+    save(bundled, tmp_path / "bundled" / bundled.bundle_id / "pack.json")
+    data = bundled.to_dict()
+    data["tools"] = "oops"
+    write_json(tmp_path / "user" / "my-textedit" / "pack.json", data)
+    assert load_search_path([tmp_path / "user", tmp_path / "bundled"]) == []
+    assert "not serving the TextEdit pack" in capsys.readouterr().err
+
+
+def test_a_good_user_pack_shadows_without_a_warning(tmp_path, capsys):
+    save(sample_pack(), tmp_path / "bundled" / "com.apple.TextEdit" / "pack.json")
+    save(sample_pack(), tmp_path / "user" / "com.apple.TextEdit" / "pack.json")
+    assert len(load_search_path([tmp_path / "user", tmp_path / "bundled"])) == 1
+    assert capsys.readouterr().err == ""
 
 
 def test_shipped_packs_pin_no_window_titles():

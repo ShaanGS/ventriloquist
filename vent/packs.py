@@ -19,6 +19,7 @@ import json
 import math
 import platform
 import re
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
@@ -500,18 +501,39 @@ def merge(base: Pack, added: Pack) -> Pack:
     )
 
 
+def _claims(pack_path: Path) -> set[str]:
+    """The bundle ids a pack that failed to load still speaks for: its
+    directory's name when that is a bundle id (where vent saves packs),
+    and the bundle_id inside the file when that much of it parses."""
+    claimed = {pack_path.parent.name} if valid_bundle_id(pack_path.parent.name) else set()
+    try:
+        data = json.loads(pack_path.read_bytes().decode("utf-8-sig"))
+    except (OSError, ValueError, RecursionError):
+        return claimed
+    if isinstance(data, dict) and valid_bundle_id(data.get("bundle_id")):
+        claimed.add(data["bundle_id"])
+    return claimed
+
+
+def _load_dir(packs_dir: Path) -> tuple[list[Pack], dict[str, Path]]:
+    """Every pack in one directory that loads, and for each one that does
+    not, the bundle ids it claims mapped to its file."""
+    loaded: list[Pack] = []
+    broken: dict[str, Path] = {}
+    for path in sorted(Path(packs_dir).glob("*/pack.json")):
+        try:
+            loaded.append(load(path))
+        except PackError as exc:
+            print(f"warning: skipping {exc}", file=sys.stderr)
+            for bundle_id in _claims(path):
+                broken.setdefault(bundle_id, path)
+    return loaded, broken
+
+
 def load_all(packs_dir: Path) -> list[Pack]:
     """Load every pack, skipping invalid ones with a warning on stderr.
     One broken pack should not take down the server for the rest."""
-    import sys
-
-    packs = []
-    for pack_file in sorted(Path(packs_dir).glob("*/pack.json")):
-        try:
-            packs.append(load(pack_file))
-        except PackError as exc:
-            print(f"warning: skipping {exc}", file=sys.stderr)
-    return packs
+    return _load_dir(packs_dir)[0]
 
 
 def load_search_path(dirs: list[Path]) -> list[Pack]:
@@ -520,13 +542,30 @@ def load_search_path(dirs: list[Path]) -> list[Pack]:
     so a user's healed or re-recorded copy replaces the bundled one instead
     of colliding with it. Two packs for one app in the same directory are
     both kept, so the server's collision check still reports them. A
-    directory that does not exist contributes nothing."""
+    directory that does not exist contributes nothing.
+
+    A pack that fails to load still claims its app. Otherwise a typo in a
+    user's pack would quietly bring back the bundled tools it replaced, and
+    the tools the user approved would vanish with nothing but a skip
+    warning to say why. The shadowed pack gets a stderr line of its own."""
     loaded: list[Pack] = []
-    claimed: set[str] = set()
+    claimed: dict[str, Optional[Path]] = {}  # bundle id -> the broken pack holding it, None for one that loaded
     for packs_dir in dirs:
-        found = [pack for pack in load_all(packs_dir) if pack.bundle_id not in claimed]
-        loaded.extend(found)
-        claimed.update(pack.bundle_id for pack in found)
+        found, broken = _load_dir(packs_dir)
+        for pack in found:
+            if pack.bundle_id not in claimed:
+                loaded.append(pack)
+            elif claimed[pack.bundle_id] is not None:
+                print(
+                    f"warning: not serving the {pack.app_name} pack in {packs_dir}: "
+                    f"{claimed[pack.bundle_id]} failed to load and takes its place, so "
+                    f"{pack.app_name} has no tools until that file is fixed or removed.",
+                    file=sys.stderr,
+                )
+        for pack in found:
+            claimed.setdefault(pack.bundle_id, None)
+        for bundle_id, path in broken.items():
+            claimed.setdefault(bundle_id, path)
     return loaded
 
 
