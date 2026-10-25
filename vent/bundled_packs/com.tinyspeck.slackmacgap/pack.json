@@ -49,7 +49,7 @@
               },
               {
                 "role": "AXGroup",
-                "label": "new-channel (Channel) - Kairo - Slack",
+                "label": "",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -97,7 +97,7 @@
               },
               {
                 "role": "AXWebArea",
-                "label": "new-channel (Channel) - Kairo - Slack",
+                "label": "",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -193,7 +193,7 @@
               },
               {
                 "role": "AXGroup",
-                "label": "new-channel (Channel) - Kairo - Slack",
+                "label": "",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -241,7 +241,7 @@
               },
               {
                 "role": "AXWebArea",
-                "label": "new-channel (Channel) - Kairo - Slack",
+                "label": "",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -369,7 +369,7 @@
               },
               {
                 "role": "AXGroup",
-                "label": "new-channel (Channel) - Kairo - Slack",
+                "label": "",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -417,7 +417,7 @@
               },
               {
                 "role": "AXWebArea",
-                "label": "new-channel (Channel) - Kairo - Slack",
+                "label": "",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -518,7 +518,7 @@
     },
     {
       "name": "filter_channels",
-      "description": "Type into the sidebar's channel and user filter, narrowing the visible list. Pass an empty string to clear the filter. The Home tab must be showing (call show_home first).",
+      "description": "Type into the sidebar's channel and user filter, narrowing the visible list. Pass an empty string to clear the filter. The Home tab must be showing (call slack_show_home first).",
       "risk": "read_only",
       "requires_frontmost": true,
       "params": {
@@ -564,7 +564,7 @@
               },
               {
                 "role": "AXGroup",
-                "label": "new-channel (Channel) - Kairo - Slack",
+                "label": "",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -612,7 +612,7 @@
               },
               {
                 "role": "AXWebArea",
-                "label": "new-channel (Channel) - Kairo - Slack",
+                "label": "",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -738,7 +738,7 @@
               },
               {
                 "role": "AXGroup",
-                "label": "new-channel (Channel) - Kairo - Slack",
+                "label": "",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -786,7 +786,7 @@
               },
               {
                 "role": "AXWebArea",
-                "label": "new-channel (Channel) - Kairo - Slack",
+                "label": "",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -919,7 +919,7 @@
               },
               {
                 "role": "AXGroup",
-                "label": "new-channel (Channel) - Kairo - Slack",
+                "label": "",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,
@@ -967,7 +967,7 @@
               },
               {
                 "role": "AXWebArea",
-                "label": "new-channel (Channel) - Kairo - Slack",
+                "label": "",
                 "identifier": "",
                 "ordinal": 0,
                 "index": 0,

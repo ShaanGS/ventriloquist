@@ -8,12 +8,18 @@ on:
 permissions:
   contents: read
 
+# Actions are pinned to full commit SHAs, with the release tag in a comment,
+# so a moved tag can't change what runs here, least of all in the job that
+# publishes to PyPI. Dependabot keeps them current.
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.13"
       - name: Check the tag matches the package version
@@ -22,7 +28,33 @@ jobs:
           test "v$version" = "$GITHUB_REF_NAME" || { echo "Tag $GITHUB_REF_NAME does not match version $version"; exit 1; }
       - run: python -m pip install --upgrade build
       - run: python -m build
-      - uses: actions/upload-artifact@v7
+
+      # Test what is about to be published, not the checkout: the built wheel
+      # in a clean environment. Nothing below runs unless these pass, so a
+      # broken wheel never reaches PyPI.
+      - name: Install the built wheel into a clean environment
+        run: |
+          python -m venv "$RUNNER_TEMP/env"
+          "$RUNNER_TEMP/env/bin/pip" install dist/*.whl pytest
+      - name: Serve the bundled packs from the installed wheel
+        working-directory: ${{ runner.temp }}
+        run: '"$RUNNER_TEMP/env/bin/python" "$GITHUB_WORKSPACE/tests/install_smoke.py" "$RUNNER_TEMP/env/bin"'
+      - name: Copy the tests to a folder with no vent source in it
+        run: |
+          cp -R "$GITHUB_WORKSPACE" "$RUNNER_TEMP/check"
+          rm -rf "$RUNNER_TEMP/check/vent"
+      - name: Check vent is imported from the wheel
+        working-directory: ${{ runner.temp }}/check
+        run: |
+          "$RUNNER_TEMP/env/bin/python" -c 'import sys, vent; print(vent.__file__); sys.exit("/site-packages/" not in vent.__file__)'
+      - name: Check the release metadata the MCP registry reads
+        working-directory: ${{ runner.temp }}/check
+        run: '"$RUNNER_TEMP/env/bin/python" -m pytest -q -p no:cacheprovider tests/test_release.py'
+      - name: Run the offline test suite against the wheel
+        working-directory: ${{ runner.temp }}/check
+        run: '"$RUNNER_TEMP/env/bin/python" -m pytest -q -p no:cacheprovider tests/'
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist
           path: dist/
@@ -36,8 +68,62 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dist
           path: dist/
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+
+  # Lists the new version in the official MCP registry. The registry checks
+  # the package on PyPI, so this runs after the publish job. GitHub's OIDC
+  # token proves the job runs in a ShaanGS repository, which is what the
+  # io.github.ShaanGS namespace needs, so no secret is stored for it.
+  mcp-registry:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      # A fixed publisher release and the SHA-256 GitHub lists for its
+      # linux_amd64 archive on that release page. Change both together.
+      MCP_PUBLISHER_VERSION: v1.8.1
+      MCP_PUBLISHER_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install mcp-publisher, checking its checksum
+        run: |
+          archive="$RUNNER_TEMP/mcp-publisher_linux_amd64.tar.gz"
+          curl --fail --location --silent --show-error --output "$archive" \
+            "https://github.com/modelcontextprotocol/registry/releases/download/$MCP_PUBLISHER_VERSION/mcp-publisher_linux_amd64.tar.gz"
+          echo "$MCP_PUBLISHER_SHA256  $archive" | sha256sum --check --strict
+          tar -xzf "$archive" -C "$RUNNER_TEMP" mcp-publisher
+          "$RUNNER_TEMP/mcp-publisher" --version
+      - name: Wait for PyPI to list the new version
+        # A fresh upload can take a minute or two to show up in PyPI's JSON
+        # API, which is what the registry checks.
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent --output /dev/null "https://pypi.org/pypi/ventriloquist-mcp/$version/json"; then
+              echo "PyPI lists ventriloquist-mcp $version"
+              exit 0
+            fi
+            echo "PyPI doesn't list $version yet (try $attempt of 20), waiting 15 s"
+            sleep 15
+          done
+          echo "PyPI never listed ventriloquist-mcp $version"
+          exit 1
+      - name: Publish server.json to the MCP registry
+        # Logging in on every try keeps the short-lived registry token fresh.
+        run: |
+          for attempt in 1 2 3; do
+            if "$RUNNER_TEMP/mcp-publisher" login github-oidc && "$RUNNER_TEMP/mcp-publisher" publish; then
+              exit 0
+            fi
+            echo "Publishing failed (try $attempt of 3), waiting 30 s"
+            sleep 30
+          done
+          exit 1

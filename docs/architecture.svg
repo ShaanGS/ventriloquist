@@ -61,7 +61,7 @@
 
   <!-- ============ run time (bottom) ============ -->
   <rect x="24" y="290" width="932" height="246" rx="10" fill="none" stroke="#57606a" stroke-dasharray="5 4"/>
-  <text x="40" y="282" font-size="14" font-weight="bold" fill="#57606a">RUN TIME&#160;&#160;(deterministic, milliseconds, no model)</text>
+  <text x="40" y="282" font-size="14" font-weight="bold" fill="#57606a">RUN TIME&#160;&#160;(deterministic, no model unless healing is on)</text>
 
   <!-- mcp client -->
   <rect x="48" y="330" width="150" height="86" rx="10" fill="#f6f8fa" stroke="#333" stroke-width="1.5"/>
@@ -96,7 +96,7 @@
 
   <!-- healer strip -->
   <rect x="48" y="446" width="470" height="74" rx="10" fill="#fff8c5" stroke="#9a6700" stroke-width="1.5" stroke-dasharray="4 3"/>
-  <text x="64" y="472" font-size="13" font-weight="bold" fill="#4d2d00">When an app update breaks an anchor</text>
+  <text x="64" y="472" font-size="13" font-weight="bold" fill="#4d2d00">If healing is on and an app update breaks an anchor,</text>
   <text x="64" y="492" font-size="12" fill="#4d2d00">a model re-grounds it, the fix is quarantined, and</text>
   <text x="64" y="508" font-size="12" fill="#4d2d00">nothing is promoted until you approve it in vent verify</text>
   <line x1="518" y1="483" x2="539" y2="483" stroke="#9a6700" stroke-width="1.5"/>

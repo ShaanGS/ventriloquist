@@ -1,0 +1,22 @@
+name: Feature request
+description: Suggest a change to vent itself. For a pack for one app, use App request.
+title: "Feature: <short summary>"
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: task
+    attributes:
+      label: What you're trying to do
+      description: The task, and where vent gets in the way of it today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+      description: The change you have in mind, if you have one.
+  - type: textarea
+    id: safety
+    attributes:
+      label: Keeping it safe
+      description: vent drives real apps with real data in them. If this lets tools do more, how should it stay safe? Leave it empty if it doesn't apply.

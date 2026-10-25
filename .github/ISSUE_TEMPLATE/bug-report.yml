@@ -1,0 +1,57 @@
+name: Bug report
+description: Something in vent didn't do what the docs say it does.
+title: "Bug: <what happened>"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. For a security problem, please don't open an
+        issue: open the repository's Security tab and choose "Report a
+        vulnerability". If a bundled pack refused or misbehaved on your Mac,
+        the Pack report form asks for what helps most there.
+  - type: input
+    id: vent
+    attributes:
+      label: vent version
+      description: Output of `vent --version`.
+      placeholder: vent, version 0.3.0
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "26.3.1"
+    validations:
+      required: true
+  - type: input
+    id: app
+    attributes:
+      label: App and version
+      description: The app vent was driving, if there was one.
+      placeholder: TextEdit 1.19
+  - type: input
+    id: client
+    attributes:
+      label: How you ran vent
+      description: The MCP client (Claude Desktop, Claude Code, Cursor, Codex), or a vent command such as `vent run`.
+      placeholder: Claude Code
+  - type: textarea
+    id: doctor
+    attributes:
+      label: vent doctor output
+      description: |
+        Output of `vent doctor <App>` for the app involved, or `vent doctor`
+        if no app was. It can include paths with your user name in them;
+        edit those out if you like.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, and what you saw instead, with any error message.
+    validations:
+      required: true
