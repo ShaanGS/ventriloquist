@@ -109,6 +109,12 @@ class Anchor:
         )
 
 
+def _repeats_title(label: str, window_title: str) -> bool:
+    """Whether a label carries the window's title, the volatile user data
+    the window link is blanked for."""
+    return bool(window_title) and window_title in label
+
+
 def build(node: Node) -> Anchor:
     """Create an anchor from a surfaced snapshot node.
 
@@ -116,17 +122,28 @@ def build(node: Node) -> Anchor:
     scored through the anchor's own window_title field, and window labels
     embed volatile user data (document names, "Notes - 38 notes") that
     would otherwise leak into shared packs and booby-trap future scoring.
+    Ancestor labels that equal or contain the window title are blanked for
+    the same reason. Electron apps (Slack, VS Code) repeat the title on
+    their root AXGroup and AXWebArea, which is how a bundled Slack pack
+    shipped a workspace name. The element's own label is kept; it is what
+    the anchor matches on.
     """
+    title = node.window_title
+    last = len(node.chain) - 1
     chain = [
         ChainLink(
             role=link.role,
-            label="" if link.role == "AXWindow" else link.label,
+            label=(
+                ""
+                if link.role == "AXWindow" or (index < last and _repeats_title(link.label, title))
+                else link.label
+            ),
             identifier=link.identifier,
             ordinal=link.ordinal,
             index=link.index,
             subrole=link.subrole,
         )
-        for link in node.chain
+        for index, link in enumerate(node.chain)
     ]
     return Anchor(
         role=node.role,
@@ -208,7 +225,9 @@ def _walk_with_chains(
     yield from visit(root, (root_link,), 0)
 
 
-def _ancestry_similarity(recorded: list[ChainLink], candidate: tuple[ChainLink, ...]) -> float:
+def _ancestry_similarity(
+    recorded: list[ChainLink], candidate: tuple[ChainLink, ...], recorded_title: str = ""
+) -> float:
     """How alike two ancestor chains are, from 0 to 1.
 
     The leaf is excluded: its role, identifier, and label already carry
@@ -216,18 +235,23 @@ def _ancestry_similarity(recorded: list[ChainLink], candidate: tuple[ChainLink, 
     wrong-element scores in review. Window links are keyed by role only,
     because window identity is scored separately against the recorded
     window title; keying windows by their document-name labels would break
-    every anchor the moment a differently named document opened.
+    every anchor the moment a differently named document opened. Labels
+    that carry their side's window title are keyed as blank, matching what
+    build records, so an Electron anchor still matches link for link after
+    the channel or document in its window's title changes.
     """
+    candidate_title = _candidate_window_title(candidate)
 
-    def key(link: ChainLink) -> str:
+    def key(link: ChainLink, title: str) -> str:
         if link.role == "AXWindow":
             return link.role
-        return f"{link.role}:{link.identifier or link.label}"
+        label = "" if _repeats_title(link.label, title) else link.label
+        return f"{link.role}:{link.identifier or label}"
 
     return SequenceMatcher(
         None,
-        [key(link) for link in recorded[:-1]],
-        [key(link) for link in candidate[:-1]],
+        [key(link, recorded_title) for link in recorded[:-1]],
+        [key(link, candidate_title) for link in candidate[:-1]],
     ).ratio()
 
 
@@ -299,7 +323,7 @@ def _score(anchor: Anchor, chain: tuple[ChainLink, ...]) -> tuple[float, dict]:
         score += W_WINDOW
         breakdown["window"] = W_WINDOW
 
-    similarity = _ancestry_similarity(anchor.chain, chain)
+    similarity = _ancestry_similarity(anchor.chain, chain, anchor.window_title)
     score += W_CHAIN * similarity
     breakdown["chain"] = round(W_CHAIN * similarity, 2)
 

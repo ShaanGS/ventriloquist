@@ -6,6 +6,8 @@ Refusal is a feature: binding the wrong element and reporting success is
 the one failure mode this project must never have.
 """
 
+import json
+
 import pytest
 
 from vent import anchors
@@ -323,6 +325,61 @@ def test_twins_inside_the_focused_window_still_refuse():
     anchor.window_title = ""
     with pytest.raises((anchors.AnchorAmbiguous, anchors.AnchorLost)):
         anchors.resolve(tree, anchor)
+
+
+def electron_app(title):
+    """A tree shaped like Slack's: the window title repeats on the root
+    group, and the web area's label contains it."""
+    home = FakeElement("AXRadioButton", "Home", subrole="AXTabButton", actions=["AXPress"])
+    tree = FakeElement(
+        "AXApplication",
+        "Slack",
+        children=[
+            FakeElement(
+                "AXWindow",
+                title,
+                subrole="AXStandardWindow",
+                children=[
+                    FakeElement(
+                        "AXGroup",
+                        title,
+                        children=[
+                            FakeElement(
+                                "AXWebArea",
+                                f"{title} (web content)",
+                                children=[FakeElement("AXGroup", "Sidebar", children=[home])],
+                            )
+                        ],
+                    )
+                ],
+            )
+        ],
+    )
+    return tree, home
+
+
+def test_recorded_chains_leave_out_labels_that_carry_the_window_title():
+    """The bundled Slack pack shipped a workspace name this way: the window
+    link was blanked, but the same title sat on the group and web area
+    below it."""
+    tree, _ = electron_app("general (Channel) - Acme Corp - Slack")
+    anchor = anchor_for(tree, label="Home")
+    assert "Acme" not in json.dumps(anchor.to_dict()["chain"])
+    labels = [link.label for link in anchor.chain]
+    assert "Sidebar" in labels  # an ancestor label without the title stays
+    assert labels[-1] == "Home"  # and so does the element's own
+
+
+def test_title_free_chains_still_match_after_the_window_title_changes():
+    """Matching keys labels the same way, so the anchor scores a full chain
+    match after a channel or workspace switch retitles the window."""
+    tree, _ = electron_app("general (Channel) - Acme Corp - Slack")
+    anchor = anchor_for(tree, label="Home")
+    anchor.window_title = ""  # shared packs pin no window, like the bundled Slack pack
+    switched, home = electron_app("random (Channel) - Other Co - Slack")
+    live = next(n for n in snapshot(switched).nodes if n.label == "Home")
+    assert anchors._ancestry_similarity(anchor.chain, live.chain, anchor.window_title) == 1.0
+    assert anchors.resolve(switched, anchor) is home
 
 
 def test_window_anchor_never_walks_the_menu_bar():
