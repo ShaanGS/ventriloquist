@@ -4,6 +4,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Keep the minimums in pyproject.toml low so installing vent doesn't
+    # force upgrades: only propose a change when a release falls outside
+    # the allowed range.
+    versioning-strategy: increase-if-necessary
     # A week's wait means a release that turns out to be malicious or
     # broken has usually been pulled before it reaches a pull request.
     cooldown:
