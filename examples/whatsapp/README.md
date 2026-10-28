@@ -25,8 +25,8 @@ To try it:
 2. Restart your MCP client. The tools show up as `whatsapp_list_chats`
    and so on.
 
-It needs a vent with label reads (after 0.3.0): WhatsApp keeps its
-message text in labels, which earlier versions don't read.
+It needs vent 0.3.1 or later: WhatsApp keeps its message text in
+labels, which earlier versions don't read.
 
 What it can't do:
 

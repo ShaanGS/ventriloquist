@@ -4,7 +4,9 @@ The notes for every release are on
 [GitHub Releases](https://github.com/ShaanGS/ventriloquist/releases). This
 file lists what has changed since the last one.
 
-## Unreleased
+## 0.3.1 (2026-10-28)
+
+Reads that work on apps like WhatsApp, and a WhatsApp example pack.
 
 - Reading a container now includes the text an app keeps in labels: a
   static text, button, heading or link with no children gives its label,
