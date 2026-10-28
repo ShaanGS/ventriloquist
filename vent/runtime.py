@@ -281,6 +281,13 @@ def _dialog_in_the_way(
         title = window.label
         dialog = f"{app_name} has a dialog open{f' ({title!r})' if title else ''}"
         if not (in_window and same_element(top, window)):
+            if window.attribute("AXMinimized"):
+                # WhatsApp's window reports itself as a dialog while it is
+                # minimized. Still refused, but said as what it is.
+                return (
+                    f"{app_name}'s window{f' ({title!r})' if title else ''} is minimized and reports "
+                    "itself as a dialog. Refusing to act; restore the window and retry."
+                )
             return f"{dialog}. Refusing to act behind it; dismiss it and retry."
         if not _recorded_in_dialog(step_anchor, window):
             return (
@@ -363,6 +370,18 @@ def _pump_tree(element: Element) -> None:
 # can't flood the caller's context.
 READ_TEXT_LIMIT = 20_000
 
+# Roles whose label is their text when they have no value and no children.
+TEXT_LEAF_ROLES = {"AXStaticText", "AXButton", "AXHeading", "AXLink"}
+
+# Invisible bidi marks, embeddings, overrides and isolates, dropped from what
+# a read returns. WhatsApp puts a left-to-right mark before almost every
+# word it shows, which costs tokens and carries nothing, and an override in
+# app text can make a result display in an order other than the one a
+# model reads (SECURITY.md T12). Joiners stay: emoji sequences need them.
+DIRECTION_MARKS = dict.fromkeys(
+    [0x061C, 0x200E, 0x200F, *range(0x202A, 0x202F), *range(0x2066, 0x206A)]
+)
+
 
 def _text_inside(element: Element) -> str:
     """The text an element holds in its descendants, one line per text run.
@@ -374,28 +393,47 @@ def _text_inside(element: Element) -> str:
     children repeat its words, so the walk stops at it; secure fields are
     never entered (SECURITY.md T4), and the ancestor-cycle guard matches the
     other walks.
+
+    Some apps keep their words in labels instead: WhatsApp's message bubbles
+    are static texts with no value, and each chat in its list is a button
+    whose label is the chat's name and whose value is its last message. A
+    leaf of one of the TEXT_LEAF_ROLES contributes its label, then its value
+    when it has one. Leaves only, so a link or button that wraps its own
+    static text is still read once, through that text.
     """
     lines: list[str] = []
     total = 0
     path_keys: set[int] = set()
 
-    def visit(el: Element, depth: int) -> bool:
+    def add(text: str) -> bool:
         nonlocal total
+        lines.append(text.strip())
+        total += len(text)
+        return total < READ_TEXT_LIMIT
+
+    def visit(el: Element, depth: int) -> bool:
         if el.subrole == SECURE_SUBROLE:
             return True
-        if el.role == "AXStaticText":
-            text = el.value
-            if isinstance(text, str) and text.strip():
-                lines.append(text.strip())
-                total += len(text)
-                return total < READ_TEXT_LIMIT
+        value = el.value
+        has_value = isinstance(value, str) and bool(value.strip())
+        if el.role == "AXStaticText" and has_value:
+            return add(value)
         key = el.ref_key() if hasattr(el, "ref_key") else None
         if (key is not None and key in path_keys) or depth >= MAX_TREE_DEPTH:
             return True
+        children = el.children()
+        if not children:
+            if el.role not in TEXT_LEAF_ROLES:
+                return True
+            # One line per leaf: a chat's preview can hold line breaks,
+            # and a list read one row per line must not split a row.
+            parts = [" ".join(el.label.split())] + ([" ".join(value.split())] if has_value else [])
+            text = ", ".join(dict.fromkeys(p for p in parts if p))
+            return add(text) if text else True
         if key is not None:
             path_keys.add(key)
         try:
-            for child in el.children():
+            for child in children:
                 if not visit(child, depth + 1):
                     return False
         finally:
@@ -521,6 +559,21 @@ def _run_step(
     element = found.element
     _check_expect(element, step.expect, where)
 
+    # A read returns whatever the element it lands on says, and a caller
+    # can't tell a stand-in's text from the real thing. Resolution lets an
+    # element with no identifier stand in for one recorded with an
+    # identifier, which keeps a press working through an app update that
+    # drops identifiers wholesale; for a read it means WhatsApp's header
+    # anchor, with no chat open, could read a sidebar button as the chat's
+    # name (one scored 6.2 against a 6.0 threshold).
+    # So a read whose anchor recorded an identifier needs that identifier.
+    if step.op == "read_value" and step.anchor.identifier and not found.chain[-1].identifier:
+        raise ToolExecutionError(
+            f"{where}: the element this read was recorded on (identifier "
+            f"{step.anchor.identifier!r}) isn't there, and the nearest match has no identifier. "
+            "Refusing to read a stand-in; open the view the element lives in and retry."
+        )
+
     # Semantic drift guard (SECURITY.md T11), acting ops only. When the
     # recorded element is absent, resolution can score a same-role
     # neighbor above threshold; in a collapsed-sidebar VS Code the search
@@ -540,7 +593,7 @@ def _run_step(
         value = "" if element.value is None else str(element.value)
         if not value:
             value = _text_inside(element)
-        return StepReport(op=step.op, ok=True, detail=value)
+        return StepReport(op=step.op, ok=True, detail=value.translate(DIRECTION_MARKS))
 
     include_menus = anchors.in_menu_bar(step.anchor)
     # A write has landed by the time set_value returns, so a fingerprint

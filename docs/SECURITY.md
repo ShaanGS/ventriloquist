@@ -35,7 +35,9 @@ input and output pointed away from the MCP connection.
 
 `read_value` is the one op that moves data out. It returns an element's
 live value or, for an element with no value of its own such as a web view,
-the text inside it (up to 20,000 characters). It changes nothing, but it
+the text inside it (up to 20,000 characters): the values of its static
+text, and the labels of the text, buttons, headings and links at its
+leaves, where apps like WhatsApp keep their words. It changes nothing, but it
 is how app content reaches an MCP client, so T6 and T12 apply to it, and
 it never reads a password field (T4).
 
@@ -371,7 +373,12 @@ nonce-delimited wrapper `llm.py` uses for its own prompts (it lives in
 `untrusted.py`, so the server uses it without importing `llm.py`). App
 text quoted in an error message, such as a window title or a label, is
 wrapped the same way. Every tool with a read step says in its description
-that its output is app data, not instructions. A well-behaved client can
+that its output is app data, not instructions. A read drops invisible
+bidi marks, embeddings, overrides and isolates first, so app text can't
+display in an order other than the one the model reads. And a read whose
+element was recorded with an identifier refuses an element without one:
+a press can survive an app dropping its identifiers, but a read that lands
+on a look-alike returns the wrong text as if it were right. A well-behaved client can
 quarantine it. This doesn't make injection impossible; it makes the
 boundary visible to the party that can act on it. Tests pin both,
 including that app text can't close the wrapper early.

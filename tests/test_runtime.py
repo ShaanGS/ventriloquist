@@ -125,6 +125,65 @@ def test_read_value_does_not_repeat_nested_text():
     assert read_pane(reading_pane_like(header)) == ["To: someone@example.com"]
 
 
+def test_read_value_reads_labels_where_an_app_keeps_its_words():
+    # WhatsApp's message bubbles are static texts with no value, and a chat
+    # in its list is a button labelled with the name, valued with the last
+    # message. Both are leaves, so their labels are the text.
+    bubble = FakeElement("AXStaticText", label="Asha, see you at 6, 5:02 PM")
+    chat = FakeElement("AXButton", label="Asha", value="see you at 6")
+    unnamed = FakeElement("AXButton", value="")
+    assert read_pane(reading_pane_like(bubble, chat, unnamed)) == ["Asha, see you at 6, 5:02 PM\nAsha, see you at 6"]
+
+
+def test_read_value_keeps_each_labelled_leaf_on_one_line():
+    # A list is read one row per line, so a preview's own line breaks fold.
+    chat = FakeElement("AXButton", label="Asha", value="Order:\n  1 cake\n2 candles")
+    after = FakeElement("AXButton", label="Ravi", value="ok")
+    assert read_pane(reading_pane_like(chat, after)) == ["Asha, Order: 1 cake 2 candles\nRavi, ok"]
+
+
+def test_read_value_leaves_a_container_s_own_label_out():
+    # Only leaves speak for themselves: a group's label names the group, and
+    # a button wrapping its own text is read once, through that text.
+    group = FakeElement("AXGroup", label="List of chats", children=[FakeElement("AXStaticText", value="Asha")])
+    wrapped = FakeElement("AXButton", label="Reply", children=[FakeElement("AXStaticText", value="Reply")])
+    assert read_pane(reading_pane_like(group, wrapped)) == ["Asha\nReply"]
+
+
+def chat_like(header: FakeElement) -> FakeElement:
+    """A WhatsApp-shaped window: a sidebar, then the chat's nav bar."""
+    sidebar = FakeElement("AXGroup", children=[FakeElement("AXStaticText", value="Chats")])
+    navbar = FakeElement("AXGroup", identifier="WDSNavigationBar", children=[header])
+    return FakeElement(
+        "AXApplication", label="WhatsApp", children=[FakeElement("AXWindow", label="WhatsApp", children=[sidebar, navbar])]
+    )
+
+
+def test_read_value_refuses_a_stand_in_without_the_recorded_identifier():
+    tree = chat_like(FakeElement("AXButton", label="Asha", identifier="NavigationBar_HeaderViewButton"))
+    node = next(n for n in snapshot(tree).nodes if n.identifier == "NavigationBar_HeaderViewButton")
+    header = anchors.build(node)
+    header.labels = []  # the chat's name changes with the chat
+    tool = ToolSpec(name="read_header", description="Read the chat's name.", risk="read_only",
+                    steps=[Step(op="read_value", anchor=header)])
+    pack = Pack(bundle_id="net.whatsapp.WhatsApp", app_name="WhatsApp", tools=[tool])
+    assert runtime.execute(pack, "read_header", {}, tree).values == ["Asha"]
+
+    # No chat open: the header is gone and the one button in its place has
+    # no identifier. Its text must not come back as the chat's name.
+    closed = chat_like(FakeElement("AXButton", label="Archived"))
+    with pytest.raises(runtime.ToolExecutionError, match="Refusing to read a stand-in"):
+        runtime.execute(pack, "read_header", {}, closed)
+
+
+def test_read_value_drops_direction_marks_but_keeps_joiners():
+    # WhatsApp puts a left-to-right mark before most words; an override
+    # would make the text display in another order than it reads. The
+    # zero-width joiner holds an emoji family together and stays.
+    marked = FakeElement("AXStaticText", value="‎Asha, ‮evil‬ ⁨ok⁩ \U0001F468‍\U0001F467")
+    assert read_pane(reading_pane_like(marked)) == ["Asha, evil ok \U0001F468‍\U0001F467"]
+
+
 def test_read_value_skips_secure_fields_and_cuts_cycles():
     secret = FakeElement(
         "AXTextField",
@@ -411,6 +470,17 @@ def test_a_modal_dialog_blocks_every_step_outside_it():
         with pytest.raises(runtime.ToolExecutionError, match="TextEdit has a dialog open"):
             runtime.execute(pack, "write_document", {"text": "hi"}, tree)
         assert doc_body(tree).value == "hello"
+
+
+def test_a_minimized_window_posing_as_a_dialog_is_named_as_minimized():
+    # WhatsApp's window reports the dialog subrole while it sits in the
+    # Dock. Steps behind it are still refused, with the reason that's true.
+    tree = textedit_like()
+    pack = build_write_tool(tree)
+    tree._children.append(FakeElement("AXWindow", "WhatsApp", subrole="AXDialog", minimized=True))
+    with pytest.raises(runtime.ToolExecutionError, match="is minimized and reports itself as a dialog"):
+        runtime.execute(pack, "write_document", {"text": "hi"}, tree)
+    assert doc_body(tree).value == "hello"
 
 
 def test_a_step_recorded_inside_a_dialog_may_act_in_it():

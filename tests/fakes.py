@@ -24,6 +24,7 @@ class FakeElement:
         children: Optional[list["FakeElement"]] = None,
         enabled: bool = True,
         modal: bool = False,
+        minimized: bool = False,
     ):
         self.role = role
         self.subrole = subrole
@@ -32,6 +33,7 @@ class FakeElement:
         self.value = value
         self.enabled = enabled
         self.modal = modal  # AXModal, on a window the app runs modally
+        self.minimized = minimized  # AXMinimized, on a window in the Dock
         self._identifier = identifier
         self._actions = actions or []
         self._children = children or []
@@ -50,6 +52,8 @@ class FakeElement:
             return self.focused_window
         if name == "AXMainWindow":
             return self.main_window
+        if name == "AXMinimized":
+            return self.minimized if self.role == "AXWindow" else None
         if name == "AXModal":
             return self.modal if self.role == "AXWindow" else None
         if name == "AXCancelButton":

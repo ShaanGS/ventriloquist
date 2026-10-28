@@ -4,6 +4,22 @@ The notes for every release are on
 [GitHub Releases](https://github.com/ShaanGS/ventriloquist/releases). This
 file lists what has changed since the last one.
 
+## Unreleased
+
+- Reading a container now includes the text an app keeps in labels: a
+  static text, button, heading or link with no children gives its label,
+  then its value if it has one. WhatsApp keeps its messages and chat list
+  this way, and reads of them used to come back nearly empty. Each such
+  leaf is one line, so a list reads one row per line.
+- Reads drop invisible bidi marks, embeddings, overrides and isolates,
+  which WhatsApp puts before almost every word.
+- A read recorded on an element with an identifier refuses when that
+  element is gone, instead of returning the text of a look-alike without
+  one. With no chat open, WhatsApp's chat-name read could otherwise have
+  returned a sidebar button's label.
+- A step refused because of a minimized window that reports itself as a
+  dialog, as WhatsApp's does, now says the window is minimized.
+
 ## 0.3.0 (2026-10-26)
 
 Safety fixes from a review before the launch, and a gate that asks you
