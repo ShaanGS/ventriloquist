@@ -78,12 +78,19 @@ Everything lives in the `vent/` package. One file per concern:
   aren't bundled live in `examples/`; `examples/outlook/` is the one from
   the README demo, and copying its `pack.json` into
   `~/.ventriloquist/packs/com.microsoft.Outlook/` installs it.
+  `examples/whatsapp/` reads WhatsApp's chat list and open chat and leaves
+  drafts; none of its tools sends.
 - `runtime.py`. Deterministic replay. For each step: resolve the anchor,
   refuse if a sheet or modal dialog is in the way (unless the step was
   recorded inside it), assert the expected role, perform the action, then
   wait for the tree to settle (a shape-hash poll that distinguishes "reacted
   then went quiet" from "nothing happened"). Verify checks re-read live
-  element values, never snapshot previews. Two Chromium-specific pumps live
+  element values, never snapshot previews. A `read_value` returns the
+  element's value or, for a container, the text inside it, including the
+  labels of leaf text, buttons, headings and links (WhatsApp keeps its words
+  there), one line per leaf, with invisible bidi marks dropped. A read whose
+  anchor recorded an identifier refuses an element without one, so it never
+  returns a look-alike's text. Two Chromium-specific pumps live
   here: after any mutating op the runtime performs a no-op scroll-to-visible
   on the element, because Chromium hosts publish their accessibility tree
   lazily and reads would otherwise return the pre-action tree forever; and
