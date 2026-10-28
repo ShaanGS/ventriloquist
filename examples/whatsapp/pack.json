@@ -1,0 +1,1488 @@
+{
+ "format_version": 2,
+ "bundle_id": "net.whatsapp.WhatsApp",
+ "app_name": "WhatsApp",
+ "app_version": "26.37.76",
+ "os_version": "26.3.1",
+ "locale": "C",
+ "tools": [
+  {
+   "name": "list_chats",
+   "description": "Read WhatsApp's chat list as it shows on screen. Returns one value: first the filters with their unread totals (for example \"Unread, 12 unread chats\"), then one line per visible chat with its name, its last message, when it came and its unread count. Reading the list opens no chat, so nothing is marked read and no read receipt is sent. Only the chats in view are listed, about a dozen.",
+   "risk": "read_only",
+   "requires_frontmost": false,
+   "params": {},
+   "preconditions": [
+    {
+     "kind": "app_running"
+    },
+    {
+     "kind": "window_exists"
+    }
+   ],
+   "steps": [
+    {
+     "op": "read_value",
+     "anchor": {
+      "role": "AXGroup",
+      "identifier": "ChatListView_TableView",
+      "labels": [
+       "\u200eList of chats"
+      ],
+      "window_title": "\u200eWhatsApp",
+      "chain": [
+       {
+        "role": "AXApplication",
+        "label": "WhatsApp",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXWindow",
+        "label": "",
+        "identifier": "SceneWindow",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": "AXStandardWindow"
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": "iOSContentGroup"
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "\u200eList of chats",
+        "identifier": "ChatListView_TableView",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       }
+      ]
+     },
+     "expect": {
+      "role": "AXGroup"
+     }
+    }
+   ],
+   "verify": []
+  },
+  {
+   "name": "read_open_chat",
+   "description": "Read the chat open in WhatsApp. Returns two values: the chat's name, then its messages on screen, one per line, each with its sender and time. Only the messages in view are returned, about ten. It needs a chat open in WhatsApp and fails, without acting, if none is.",
+   "risk": "read_only",
+   "requires_frontmost": false,
+   "params": {},
+   "preconditions": [
+    {
+     "kind": "app_running"
+    },
+    {
+     "kind": "window_exists"
+    }
+   ],
+   "steps": [
+    {
+     "op": "read_value",
+     "anchor": {
+      "role": "AXButton",
+      "identifier": "NavigationBar_HeaderViewButton",
+      "labels": [],
+      "window_title": "\u200eWhatsApp",
+      "chain": [
+       {
+        "role": "AXApplication",
+        "label": "WhatsApp",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXWindow",
+        "label": "",
+        "identifier": "SceneWindow",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": "AXStandardWindow"
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": "iOSContentGroup"
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "WDSNavigationBar",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXButton",
+        "label": "",
+        "identifier": "NavigationBar_HeaderViewButton",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       }
+      ]
+     },
+     "expect": {
+      "role": "AXButton"
+     }
+    },
+    {
+     "op": "read_value",
+     "anchor": {
+      "role": "AXGroup",
+      "identifier": "ChatMessagesTableView",
+      "labels": [],
+      "window_title": "\u200eWhatsApp",
+      "chain": [
+       {
+        "role": "AXApplication",
+        "label": "WhatsApp",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXWindow",
+        "label": "",
+        "identifier": "SceneWindow",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": "AXStandardWindow"
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": "iOSContentGroup"
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "ChatMessagesTableView",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       }
+      ]
+     },
+     "expect": {
+      "role": "AXGroup"
+     }
+    }
+   ],
+   "verify": []
+  },
+  {
+   "name": "draft_message",
+   "description": "Put text in the message box of the chat open in WhatsApp, replacing whatever is there, and return the chat's name. It never sends: the message waits in the box until you press Return yourself. It needs a chat open in WhatsApp and fails, without acting, if none is.",
+   "risk": "mutating",
+   "requires_frontmost": false,
+   "params": {
+    "text": {
+     "type": "string",
+     "description": "The message to leave in the box, unsent."
+    }
+   },
+   "preconditions": [
+    {
+     "kind": "app_running"
+    },
+    {
+     "kind": "window_exists"
+    }
+   ],
+   "steps": [
+    {
+     "op": "read_value",
+     "anchor": {
+      "role": "AXButton",
+      "identifier": "NavigationBar_HeaderViewButton",
+      "labels": [],
+      "window_title": "\u200eWhatsApp",
+      "chain": [
+       {
+        "role": "AXApplication",
+        "label": "WhatsApp",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXWindow",
+        "label": "",
+        "identifier": "SceneWindow",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": "AXStandardWindow"
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": "iOSContentGroup"
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "WDSNavigationBar",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXButton",
+        "label": "",
+        "identifier": "NavigationBar_HeaderViewButton",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       }
+      ]
+     },
+     "expect": {
+      "role": "AXButton"
+     }
+    },
+    {
+     "op": "wait_for",
+     "anchor": {
+      "role": "AXTextArea",
+      "identifier": "ChatBar_ComposerTextView",
+      "labels": [
+       "\u200eCompose message"
+      ],
+      "window_title": "\u200eWhatsApp",
+      "chain": [
+       {
+        "role": "AXApplication",
+        "label": "WhatsApp",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXWindow",
+        "label": "",
+        "identifier": "SceneWindow",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": "AXStandardWindow"
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": "iOSContentGroup"
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXTextArea",
+        "label": "\u200eCompose message",
+        "identifier": "ChatBar_ComposerTextView",
+        "ordinal": 0,
+        "index": 2,
+        "subrole": ""
+       }
+      ]
+     },
+     "timeout_s": 3.0
+    },
+    {
+     "op": "set_value",
+     "anchor": {
+      "role": "AXTextArea",
+      "identifier": "ChatBar_ComposerTextView",
+      "labels": [
+       "\u200eCompose message"
+      ],
+      "window_title": "\u200eWhatsApp",
+      "chain": [
+       {
+        "role": "AXApplication",
+        "label": "WhatsApp",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXWindow",
+        "label": "",
+        "identifier": "SceneWindow",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": "AXStandardWindow"
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": "iOSContentGroup"
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXTextArea",
+        "label": "\u200eCompose message",
+        "identifier": "ChatBar_ComposerTextView",
+        "ordinal": 0,
+        "index": 2,
+        "subrole": ""
+       }
+      ]
+     },
+     "value": {
+      "param": "text"
+     },
+     "expect": {
+      "role": "AXTextArea"
+     }
+    }
+   ],
+   "verify": [
+    {
+     "kind": "value_contains",
+     "anchor": {
+      "role": "AXTextArea",
+      "identifier": "ChatBar_ComposerTextView",
+      "labels": [
+       "\u200eCompose message"
+      ],
+      "window_title": "\u200eWhatsApp",
+      "chain": [
+       {
+        "role": "AXApplication",
+        "label": "WhatsApp",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXWindow",
+        "label": "",
+        "identifier": "SceneWindow",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": "AXStandardWindow"
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": "iOSContentGroup"
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXTextArea",
+        "label": "\u200eCompose message",
+        "identifier": "ChatBar_ComposerTextView",
+        "ordinal": 0,
+        "index": 2,
+        "subrole": ""
+       }
+      ]
+     },
+     "param": "text"
+    }
+   ]
+  },
+  {
+   "name": "open_next_chat",
+   "description": "View > Next Chat: open the chat below the open one in WhatsApp's list, and return its name. Opening a chat marks it read and sends read receipts if they are on. It needs a chat open in WhatsApp and fails, without acting, if none is.",
+   "risk": "mutating",
+   "requires_frontmost": false,
+   "params": {},
+   "preconditions": [
+    {
+     "kind": "app_running"
+    },
+    {
+     "kind": "window_exists"
+    }
+   ],
+   "steps": [
+    {
+     "op": "wait_for",
+     "anchor": {
+      "role": "AXMenuItem",
+      "identifier": "\u200enext_chat",
+      "labels": [
+       "\u200eNext Chat"
+      ],
+      "window_title": "",
+      "chain": [
+       {
+        "role": "AXApplication",
+        "label": "WhatsApp",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuBar",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuBarItem",
+        "label": "View",
+        "identifier": "com.apple.menu.view",
+        "ordinal": 6,
+        "index": 6,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenu",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuItem",
+        "label": "\u200eNext Chat",
+        "identifier": "\u200enext_chat",
+        "ordinal": 8,
+        "index": 8,
+        "subrole": ""
+       }
+      ]
+     },
+     "timeout_s": 3.0
+    },
+    {
+     "op": "press",
+     "anchor": {
+      "role": "AXMenuItem",
+      "identifier": "\u200enext_chat",
+      "labels": [
+       "\u200eNext Chat"
+      ],
+      "window_title": "",
+      "chain": [
+       {
+        "role": "AXApplication",
+        "label": "WhatsApp",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuBar",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuBarItem",
+        "label": "View",
+        "identifier": "com.apple.menu.view",
+        "ordinal": 6,
+        "index": 6,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenu",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuItem",
+        "label": "\u200eNext Chat",
+        "identifier": "\u200enext_chat",
+        "ordinal": 8,
+        "index": 8,
+        "subrole": ""
+       }
+      ]
+     },
+     "expect": {
+      "role": "AXMenuItem"
+     }
+    },
+    {
+     "op": "read_value",
+     "anchor": {
+      "role": "AXButton",
+      "identifier": "NavigationBar_HeaderViewButton",
+      "labels": [],
+      "window_title": "\u200eWhatsApp",
+      "chain": [
+       {
+        "role": "AXApplication",
+        "label": "WhatsApp",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXWindow",
+        "label": "",
+        "identifier": "SceneWindow",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": "AXStandardWindow"
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": "iOSContentGroup"
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "WDSNavigationBar",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXButton",
+        "label": "",
+        "identifier": "NavigationBar_HeaderViewButton",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       }
+      ]
+     },
+     "expect": {
+      "role": "AXButton"
+     }
+    }
+   ],
+   "verify": []
+  },
+  {
+   "name": "open_previous_chat",
+   "description": "View > Previous Chat: open the chat above the open one in WhatsApp's list, and return its name. Opening a chat marks it read and sends read receipts if they are on. It needs a chat open in WhatsApp and fails, without acting, if none is.",
+   "risk": "mutating",
+   "requires_frontmost": false,
+   "params": {},
+   "preconditions": [
+    {
+     "kind": "app_running"
+    },
+    {
+     "kind": "window_exists"
+    }
+   ],
+   "steps": [
+    {
+     "op": "wait_for",
+     "anchor": {
+      "role": "AXMenuItem",
+      "identifier": "\u200eprevious_chat",
+      "labels": [
+       "\u200ePrevious Chat"
+      ],
+      "window_title": "",
+      "chain": [
+       {
+        "role": "AXApplication",
+        "label": "WhatsApp",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuBar",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuBarItem",
+        "label": "View",
+        "identifier": "com.apple.menu.view",
+        "ordinal": 6,
+        "index": 6,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenu",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuItem",
+        "label": "\u200ePrevious Chat",
+        "identifier": "\u200eprevious_chat",
+        "ordinal": 7,
+        "index": 7,
+        "subrole": ""
+       }
+      ]
+     },
+     "timeout_s": 3.0
+    },
+    {
+     "op": "press",
+     "anchor": {
+      "role": "AXMenuItem",
+      "identifier": "\u200eprevious_chat",
+      "labels": [
+       "\u200ePrevious Chat"
+      ],
+      "window_title": "",
+      "chain": [
+       {
+        "role": "AXApplication",
+        "label": "WhatsApp",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuBar",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuBarItem",
+        "label": "View",
+        "identifier": "com.apple.menu.view",
+        "ordinal": 6,
+        "index": 6,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenu",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuItem",
+        "label": "\u200ePrevious Chat",
+        "identifier": "\u200eprevious_chat",
+        "ordinal": 7,
+        "index": 7,
+        "subrole": ""
+       }
+      ]
+     },
+     "expect": {
+      "role": "AXMenuItem"
+     }
+    },
+    {
+     "op": "read_value",
+     "anchor": {
+      "role": "AXButton",
+      "identifier": "NavigationBar_HeaderViewButton",
+      "labels": [],
+      "window_title": "\u200eWhatsApp",
+      "chain": [
+       {
+        "role": "AXApplication",
+        "label": "WhatsApp",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXWindow",
+        "label": "",
+        "identifier": "SceneWindow",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": "AXStandardWindow"
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": "iOSContentGroup"
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "WDSNavigationBar",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXButton",
+        "label": "",
+        "identifier": "NavigationBar_HeaderViewButton",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       }
+      ]
+     },
+     "expect": {
+      "role": "AXButton"
+     }
+    }
+   ],
+   "verify": []
+  },
+  {
+   "name": "mark_open_chat_unread",
+   "description": "Chat > Mark as unread, for the chat open in WhatsApp, so it stands out in the list again. Returns the chat's name. It needs a chat open in WhatsApp and fails, without acting, if none is.",
+   "risk": "mutating",
+   "requires_frontmost": false,
+   "params": {},
+   "preconditions": [
+    {
+     "kind": "app_running"
+    },
+    {
+     "kind": "window_exists"
+    }
+   ],
+   "steps": [
+    {
+     "op": "read_value",
+     "anchor": {
+      "role": "AXButton",
+      "identifier": "NavigationBar_HeaderViewButton",
+      "labels": [],
+      "window_title": "\u200eWhatsApp",
+      "chain": [
+       {
+        "role": "AXApplication",
+        "label": "WhatsApp",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXWindow",
+        "label": "",
+        "identifier": "SceneWindow",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": "AXStandardWindow"
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": "iOSContentGroup"
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "WDSNavigationBar",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXButton",
+        "label": "",
+        "identifier": "NavigationBar_HeaderViewButton",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       }
+      ]
+     },
+     "expect": {
+      "role": "AXButton"
+     }
+    },
+    {
+     "op": "wait_for",
+     "anchor": {
+      "role": "AXMenuItem",
+      "identifier": "\u200emark_as_unread",
+      "labels": [
+       "\u200eMark as unread"
+      ],
+      "window_title": "",
+      "chain": [
+       {
+        "role": "AXApplication",
+        "label": "WhatsApp",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuBar",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuBarItem",
+        "label": "\u200eChat",
+        "identifier": "UIMenuChatListIdentifier",
+        "ordinal": 4,
+        "index": 4,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenu",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuItem",
+        "label": "\u200eMark as unread",
+        "identifier": "\u200emark_as_unread",
+        "ordinal": 7,
+        "index": 7,
+        "subrole": ""
+       }
+      ]
+     },
+     "timeout_s": 3.0
+    },
+    {
+     "op": "press",
+     "anchor": {
+      "role": "AXMenuItem",
+      "identifier": "\u200emark_as_unread",
+      "labels": [
+       "\u200eMark as unread"
+      ],
+      "window_title": "",
+      "chain": [
+       {
+        "role": "AXApplication",
+        "label": "WhatsApp",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuBar",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuBarItem",
+        "label": "\u200eChat",
+        "identifier": "UIMenuChatListIdentifier",
+        "ordinal": 4,
+        "index": 4,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenu",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuItem",
+        "label": "\u200eMark as unread",
+        "identifier": "\u200emark_as_unread",
+        "ordinal": 7,
+        "index": 7,
+        "subrole": ""
+       }
+      ]
+     },
+     "expect": {
+      "role": "AXMenuItem"
+     }
+    }
+   ],
+   "verify": []
+  },
+  {
+   "name": "archive_open_chat",
+   "description": "Chat > Archive, for the chat open in WhatsApp, and return its name. The chat moves to Archived, where it can be unarchived, and WhatsApp unpins it if it was pinned. Nothing is deleted. WhatsApp then usually opens the next chat in the list, which marks that chat read and sends read receipts if they are on. It needs a chat open in WhatsApp and fails, without acting, if none is.",
+   "risk": "mutating",
+   "requires_frontmost": false,
+   "params": {},
+   "preconditions": [
+    {
+     "kind": "app_running"
+    },
+    {
+     "kind": "window_exists"
+    }
+   ],
+   "steps": [
+    {
+     "op": "read_value",
+     "anchor": {
+      "role": "AXButton",
+      "identifier": "NavigationBar_HeaderViewButton",
+      "labels": [],
+      "window_title": "\u200eWhatsApp",
+      "chain": [
+       {
+        "role": "AXApplication",
+        "label": "WhatsApp",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXWindow",
+        "label": "",
+        "identifier": "SceneWindow",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": "AXStandardWindow"
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": "iOSContentGroup"
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "",
+        "ordinal": 1,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXGroup",
+        "label": "",
+        "identifier": "WDSNavigationBar",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXButton",
+        "label": "",
+        "identifier": "NavigationBar_HeaderViewButton",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       }
+      ]
+     },
+     "expect": {
+      "role": "AXButton"
+     }
+    },
+    {
+     "op": "wait_for",
+     "anchor": {
+      "role": "AXMenuItem",
+      "identifier": "\u200earchive",
+      "labels": [
+       "\u200eArchive"
+      ],
+      "window_title": "",
+      "chain": [
+       {
+        "role": "AXApplication",
+        "label": "WhatsApp",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuBar",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuBarItem",
+        "label": "\u200eChat",
+        "identifier": "UIMenuChatListIdentifier",
+        "ordinal": 4,
+        "index": 4,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenu",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuItem",
+        "label": "\u200eArchive",
+        "identifier": "\u200earchive",
+        "ordinal": 8,
+        "index": 8,
+        "subrole": ""
+       }
+      ]
+     },
+     "timeout_s": 3.0
+    },
+    {
+     "op": "press",
+     "anchor": {
+      "role": "AXMenuItem",
+      "identifier": "\u200earchive",
+      "labels": [
+       "\u200eArchive"
+      ],
+      "window_title": "",
+      "chain": [
+       {
+        "role": "AXApplication",
+        "label": "WhatsApp",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuBar",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 1,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuBarItem",
+        "label": "\u200eChat",
+        "identifier": "UIMenuChatListIdentifier",
+        "ordinal": 4,
+        "index": 4,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenu",
+        "label": "",
+        "identifier": "",
+        "ordinal": 0,
+        "index": 0,
+        "subrole": ""
+       },
+       {
+        "role": "AXMenuItem",
+        "label": "\u200eArchive",
+        "identifier": "\u200earchive",
+        "ordinal": 8,
+        "index": 8,
+        "subrole": ""
+       }
+      ]
+     },
+     "expect": {
+      "role": "AXMenuItem"
+     }
+    }
+   ],
+   "verify": []
+  }
+ ],
+ "healed_pending": []
+}

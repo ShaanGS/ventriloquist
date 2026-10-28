@@ -19,6 +19,9 @@ file lists what has changed since the last one.
   returned a sidebar button's label.
 - A step refused because of a minimized window that reports itself as a
   dialog, as WhatsApp's does, now says the window is minimized.
+- An example WhatsApp pack in `examples/whatsapp`: read the chat list and
+  the open chat, leave a draft, move between chats, mark one unread or
+  archive it. It has no tool that sends.
 
 ## 0.3.0 (2026-10-26)
 

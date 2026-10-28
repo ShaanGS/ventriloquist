@@ -136,7 +136,10 @@ explains why (T9).
 
 The Outlook tools in the demo aren't bundled: they're tied to three test
 folders. They're in [examples/outlook](https://github.com/ShaanGS/ventriloquist/tree/main/examples/outlook)
-as a pack you can copy and adapt.
+as a pack you can copy and adapt. So are the WhatsApp tools, in
+[examples/whatsapp](https://github.com/ShaanGS/ventriloquist/tree/main/examples/whatsapp):
+they read your chat list and open chat and leave drafts, and none of them
+sends.
 
 Electron apps like VS Code and Slack only publish a working tree when
 started with that flag, for example
