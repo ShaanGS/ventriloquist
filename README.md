@@ -218,6 +218,10 @@ driving apps, if you're careful about how you find elements again later.
   screenshots and, in Claude's case, the accessibility tree too, and picks
   the actions on every run. It works on any app with no setup, and each
   run pays for those screenshots and model decisions.
+- **Record-a-task features** (Claude's Record a skill, Codex's
+  Record & Replay): you show the task once and get a skill, written
+  instructions the model follows on every run with computer use and its
+  other tools, so it still picks the actions each time.
 - **Accessibility MCP servers** such as
   [Peekaboo](https://github.com/openclaw/Peekaboo) and
   [MacOS-MCP](https://github.com/CursorTouch/MacOS-MCP): they hand the
