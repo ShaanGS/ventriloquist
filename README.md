@@ -222,10 +222,11 @@ driving apps, if you're careful about how you find elements again later.
   Record & Replay): you show the task once and get a skill, written
   instructions the model follows on every run with computer use and its
   other tools, so it still picks the actions each time.
-- **Accessibility MCP servers** such as
+- **Accessibility-tree tools** such as
+  [agent-desktop](https://github.com/vercel-labs/agent-desktop),
   [Peekaboo](https://github.com/openclaw/Peekaboo) and
   [MacOS-MCP](https://github.com/CursorTouch/MacOS-MCP): they hand the
-  accessibility tree and its actions to your client's model, which still
+  accessibility tree and its actions to your agent's model, which still
   decides each click on every call. Nothing to record first, and nothing
   fixed either.
 - **AppleScript servers**: dependable where an app has a scripting
