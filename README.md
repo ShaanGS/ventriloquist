@@ -333,9 +333,12 @@ does with caveats:
   app queue, and tools that bring their app to the front queue across
   apps, since there's only one front. A call the client cancels while
   it waits never runs.
-- **Preconditions are prose.** VS Code's `search_workspace` says to open
-  the Search view first, but nothing enforces it, and called cold it
-  fails. Stateful preconditions are planned.
+- **Few tools check the app's state.** A tool can refuse unless an
+  element it needs is on screen: VS Code's `search_workspace` refuses
+  until the Search view is open and says to call `code_show_search`.
+  Other tools' needs, like Slack's `filter_channels` needing the Home
+  tab, are still written in their descriptions, and compiled tools don't
+  record the state they started in.
 - **High-risk tools need a client that can ask you.** Each call to one
   asks you first, through MCP elicitation. A client without it doesn't
   see them, unless the server runs with `VENT_ALLOW_HIGH=1`, and then

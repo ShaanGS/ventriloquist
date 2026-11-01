@@ -326,9 +326,10 @@ def verify(app_name: str, report_path: str | None) -> None:
     if low_confidence:
         click.secho("Pack is stale for this app version; anchors load low-confidence.", fg="yellow")
 
-    # Dry-resolve every distinct anchor across steps AND verify blocks. An
-    # anchor shared by several steps is counted once; verify anchors break
-    # too, so they belong in the durability number.
+    # Dry-resolve every distinct anchor across steps, verify blocks and
+    # preconditions. An anchor shared by several steps is counted once;
+    # verify and precondition anchors break too, so they belong in the
+    # durability number.
     seen: set = set()
     total = resolved = 0
     drift: list = []
@@ -336,6 +337,7 @@ def verify(app_name: str, report_path: str | None) -> None:
     for tool in pack.tools:
         anchored = [(s.op, s.anchor) for s in tool.steps if s.anchor]
         anchored += [("verify", v.anchor) for v in tool.verify if v.anchor]
+        anchored += [("precondition", p.anchor) for p in tool.preconditions if p.anchor]
         for op, anchor in anchored:
             key = (anchor.role, anchor.identifier, tuple(anchor.labels), anchor.window_title,
                    tuple((l.role, l.ordinal) for l in anchor.chain))

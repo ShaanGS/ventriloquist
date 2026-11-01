@@ -370,8 +370,9 @@ def _quarantine(
 def promote(pack: packs.Pack, index: int) -> int:
     """Move one quarantined heal into the anchor of record.
 
-    Rewrites every step and verify whose anchor matches the quarantined
-    original to use the healed anchor, then removes the quarantine entry.
+    Rewrites every step, verify and precondition whose anchor matches the
+    quarantined original to use the healed anchor, then removes the
+    quarantine entry.
     Returns how many anchors were rewritten. This is the only path that
     changes a tool's anchor of record, and it is only ever reached from
     `vent verify` after a human looks at the fix.
@@ -392,6 +393,10 @@ def promote(pack: packs.Pack, index: int) -> int:
         for check in tool.verify:
             if matches(check.anchor):
                 check.anchor = healed
+                rewritten += 1
+        for pre in tool.preconditions:
+            if matches(pre.anchor):
+                pre.anchor = healed
                 rewritten += 1
 
     # Only consume the quarantine entry if it actually rewrote something.

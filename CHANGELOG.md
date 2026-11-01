@@ -4,6 +4,19 @@ The notes for every release are on
 [GitHub Releases](https://github.com/ShaanGS/ventriloquist/releases). This
 file lists what has changed since the last one.
 
+## Unreleased
+
+- A tool can check the app is in the state it needs before it acts (#2).
+  An `element_exists` precondition names an element that is only on
+  screen in that state, and the call refuses before any step if it isn't
+  there. It can name the tool that gets the app there (`run_first`), and
+  the refusal says to call it. An element with a label its anchor never
+  recorded doesn't count, and the check never heals. ARCHITECTURE.md says
+  which states can be checked this way.
+- VS Code's `search_workspace` refuses until the Search view is open and
+  says to call `code_show_search`. It used to wait six seconds and time
+  out.
+
 ## 0.3.1 (2026-10-28)
 
 Reads that work on apps like WhatsApp, and a WhatsApp example pack.

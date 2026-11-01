@@ -1095,3 +1095,140 @@ def test_a_healed_anchor_that_does_not_resolve_is_a_tool_error():
     ghost = anchors.Anchor("AXTextArea", "never-there", [], "", [])
     with pytest.raises(runtime.ToolExecutionError, match="the healed anchor did not resolve either"):
         runtime.execute(pack, "write_document", {"text": "x"}, tree, heal=lambda broken, root: ghost)
+
+
+SEARCH_BOX = "Search: Type Search Term and press Enter to search"
+
+
+class LazyWebArea(FakeElement):
+    """A web area that, like Chromium's, publishes content rendered since
+    the last action only when the next action arrives."""
+
+    def __init__(self, *args, pending=None, **kwargs):
+        super().__init__(*args, actions=["AXScrollToVisible"], **kwargs)
+        self.pending = list(pending or [])
+
+    def perform(self, action: str = "AXPress") -> None:
+        super().perform(action)
+        self._children.extend(self.pending)
+        self.pending.clear()
+
+
+def code_like(search_open: bool = True) -> FakeElement:
+    """A window shaped like VS Code's: a side bar showing either the
+    Search view's box or the Explorer heading, and an editor pane."""
+    side = FakeElement("AXTextArea", SEARCH_BOX) if search_open else FakeElement("AXHeading", "Explorer")
+    return FakeElement(
+        "AXApplication",
+        "Code",
+        children=[
+            FakeElement(
+                "AXWindow",
+                children=[
+                    LazyWebArea(
+                        "AXWebArea",
+                        children=[
+                            FakeElement("AXGroup", children=[side]),
+                            FakeElement("AXGroup", children=[FakeElement("AXTextArea", "Editor", value="")]),
+                        ],
+                    )
+                ],
+            )
+        ],
+    )
+
+
+def search_box(tree) -> FakeElement:
+    return tree.children()[0].children()[0].children()[0].children()[0]
+
+
+def build_search_tool(tree) -> Pack:
+    box = next(n for n in snapshot(tree).nodes if n.label == SEARCH_BOX)
+    anchor = anchors.build(box)
+    show = ToolSpec(name="show_search", description="Open the Search view.", risk="read_only",
+                    steps=[Step(op="wait_for", anchor=anchor, timeout_s=0.2)])
+    search = ToolSpec(
+        name="search_workspace",
+        description="Type a query into the search box.",
+        risk="read_only",
+        params={"query": {"type": "string", "description": "What to search for."}},
+        preconditions=[
+            {"kind": "app_running"},
+            {"kind": "element_exists", "anchor": anchor.to_dict(), "run_first": "show_search"},
+        ],
+        steps=[Step(op="set_value", anchor=anchor, expect={"role": "AXTextArea"}, value={"param": "query"})],
+    )
+    return Pack(bundle_id="com.microsoft.VSCode", app_name="Code", tools=[show, search])
+
+
+def test_element_exists_precondition_lets_the_call_run_in_its_state():
+    tree = code_like()
+    pack = build_search_tool(tree)
+    assert runtime.execute(pack, "search_workspace", {"query": "todo"}, tree).ok
+    assert search_box(tree).value == "todo"
+
+
+def test_element_exists_precondition_refuses_before_any_step(monkeypatch):
+    """Called with the Explorer showing, the tool refuses up front, names
+    the tool that opens the view, and types into nothing."""
+    monkeypatch.setattr(runtime, "STATE_RETRY_S", 0)
+    pack = build_search_tool(code_like())
+    tree = code_like(search_open=False)
+    with pytest.raises(runtime.ToolExecutionError) as failed:
+        runtime.execute(pack, "search_workspace", {"query": "todo"}, tree)
+    message = str(failed.value)
+    assert "precondition failed, Code is not in the state this tool needs" in message
+    assert f"the AXTextArea {SEARCH_BOX!r} it needs isn't there" in message
+    assert "Run Code's show_search tool first." in message
+    assert "already sent" not in message
+    editor = tree.children()[0].children()[0].children()[1].children()[0]
+    assert editor.value == ""
+
+
+def test_element_exists_precondition_does_not_take_a_stand_in(monkeypatch):
+    """With its box gone, the search anchor can score a same-role neighbor
+    above threshold. One wearing a label the anchor never recorded is not
+    the state the tool needs."""
+    monkeypatch.setattr(runtime, "STATE_RETRY_S", 0)
+    tree = code_like()
+    pack = build_search_tool(tree)
+    tree.children()[0].children()[0]._children.pop()  # no editor pane to tie with
+    search_box(tree).label = "Replace"
+    with pytest.raises(runtime.ToolExecutionError, match="never recorded under stands in its place"):
+        runtime.execute(pack, "search_workspace", {"query": "todo"}, tree)
+    assert search_box(tree).value is None
+
+
+def test_element_exists_precondition_never_heals(monkeypatch):
+    monkeypatch.setattr(runtime, "STATE_RETRY_S", 0)
+    pack = build_search_tool(code_like())
+    tree = code_like(search_open=False)
+    asked = []
+    with pytest.raises(runtime.ToolExecutionError, match="precondition failed"):
+        runtime.execute(pack, "search_workspace", {"query": "todo"}, tree,
+                        heal=lambda broken, root: asked.append(broken))
+    assert asked == []
+
+
+def test_element_exists_precondition_pumps_a_lazy_tree(monkeypatch):
+    """A view the user opened by hand stays out of a Chromium tree until an
+    action arrives. A check that misses pumps and looks again."""
+    monkeypatch.setattr(runtime, "STATE_RETRY_S", 0)
+    pack = build_search_tool(code_like())
+    tree = code_like()
+    web = tree.children()[0].children()[0]
+    web.pending, web._children = web._children, []
+    assert runtime.execute(pack, "search_workspace", {"query": "todo"}, tree).ok
+
+
+def test_element_exists_precondition_leaves_a_tree_alone_when_it_is_in_state():
+    """The pump is a real action on the app, so a check that finds its
+    element at once never sends one."""
+    tree = code_like()
+    pack = build_search_tool(tree)
+    web = tree.children()[0].children()[0]
+    pumped = []
+    web.perform = lambda action="AXPress": pumped.append(action)
+    pack.tools[1].steps = [Step(op="read_value", anchor=pack.tools[1].steps[0].anchor)]
+    assert runtime.execute(pack, "search_workspace", {"query": "todo"}, tree).ok
+    assert pumped == []

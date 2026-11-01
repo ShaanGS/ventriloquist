@@ -167,12 +167,10 @@ each with the element's role, label and window, what the policy decided,
 how the app reacted, and, for every probe that ran, the anchor built for its
 element at the time.
 
-**Planned (issue #2):** traces that begin with an `AppState` fingerprint
-(the window set and titles, the focused element, the current selection),
-which compiled tools carry as a precondition, so a tool recorded "with a
-note selected" refuses to run when nothing is selected instead of acting on
-the wrong thing. Today the preconditions are `app_running` and
-`window_exists`, and a tool's other needs are written in its description.
+Traces don't record the state the app started in, so a compiled tool
+gets only the `app_running` and `window_exists` preconditions. A tool that
+needs the app in a particular state gets an `element_exists` precondition
+written into its pack (see Preconditions below).
 
 ### ToolSpec
 
@@ -220,9 +218,67 @@ Notes on the shape:
   lists (every table in every Electron app, most AppKit outlines) that only
   expose visible rows. There is deliberately no `exec`, no `shell`, no
   AppleScript op, and model output can never extend this set.
-- Preconditions are `app_running` and `window_exists`. Verify checks are
-  `value_equals`, `value_contains` (against a parameter or a literal) and
-  `element_exists`.
+- Preconditions are `app_running`, `window_exists` and `element_exists`.
+  Verify checks are `value_equals`, `value_contains` (against a parameter
+  or a literal) and `element_exists`.
+
+### Preconditions
+
+A precondition is checked before any step runs, and a call that fails one
+does nothing to the app. `app_running` and `window_exists` cover the app
+itself. `element_exists` covers the state the app is in: it names, by
+anchor, an element that is there only in the state the tool needs, and
+optionally `run_first`, the tool in the same pack that gets the app there.
+
+Which states can be asserted:
+
+- **A view's own content can.** VS Code drops a view's content from its
+  tree when the view closes, so the Search view is open exactly when its
+  search box is there. Every cold `search_workspace` call in the harness
+  failed because the box wasn't.
+- **The control that opens a view can't.** Chromium's cached `AXValue`
+  on a radio button, like those in VS Code's activity bar, is unreliable,
+  which is why the show tools verify by waiting for view content rather
+  than by reading the button.
+- **A stand-in is not the state.** In the degraded-environment run
+  (BENCHMARKS.md), with the sidebar collapsed, the search box anchor bound
+  an open editor pane. So an element wearing a label its anchor never
+  recorded counts as absent, and a precondition never heals: a healer's
+  guess would let the call act on whatever stands where the state should
+  be.
+- **A stale tree can hide the state.** Chromium publishes its tree only
+  when an action arrives, so a view opened by hand may not show up in a
+  plain read. A check that misses pumps the tree (the same no-op
+  scroll-to-visible `wait_for` uses) and looks once more. A check that
+  finds its element at once sends nothing to the app.
+
+Slack's `filter_channels` has the same shape (it needs the Home tab), but
+its tree hasn't been probed for this, so it still says so in its
+description. Recording the starting state in traces, so the compiler can
+write these itself, is the next step.
+
+The bundled VS Code pack's `search_workspace`, with the anchor shortened:
+
+```json
+"preconditions": [
+  {"kind": "app_running"},
+  {"kind": "window_exists"},
+  {"kind": "element_exists", "anchor": {...}, "run_first": "show_search"}
+]
+```
+
+Called with the Explorer showing, it refuses with:
+
+```
+search_workspace: precondition failed, Code is not in the state this tool
+needs: the AXTextArea 'Search: Type Search Term and press Enter to search'
+it needs isn't there. Run Code's show_search tool first.
+```
+
+`run_first` must name another tool in the same pack, or the pack doesn't
+load. `vent verify` resolves precondition anchors with the rest, and
+promoting a heal rewrites a precondition on the same anchor along with
+the steps.
 
 ### Pack
 

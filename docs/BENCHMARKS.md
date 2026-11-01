@@ -152,8 +152,10 @@ description says to open the Search view first, but that dependency is
 prose, not a machine-checked precondition, so a caller who ignores it
 fails and so does this harness, on purpose. The anchors were fine in
 every failing call. That gap between 87.5% per-anchor and 75% per-tool
-is the honest cost of state in a GUI, and stateful preconditions are the
-planned fix.
+is the honest cost of state in a GUI. Since these runs, `search_workspace`
+has a precondition on its search box, so a cold call refuses before
+acting and says to call `code_show_search` first instead of timing out.
+The harness still counts that as a failure.
 
 ### A changed environment
 

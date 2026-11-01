@@ -22,7 +22,7 @@ from typing import Any, Callable, Optional
 
 from . import anchors, ax
 from .ax import Element
-from .packs import Pack, Step, ToolSpec, Verify
+from .packs import Pack, Precondition, Step, ToolSpec, Verify
 from .snapshot import (
     DIALOG_SUBROLES,
     MAX_TREE_DEPTH,
@@ -635,6 +635,51 @@ def _run_step(
     return StepReport(op=step.op, ok=True, detail=detail)
 
 
+STATE_RETRY_S = 0.3
+
+
+def _check_state(
+    pre: Precondition, root: Element, pack: Pack, tool_name: str, low_confidence: bool
+) -> None:
+    """Refuse a call when the element its tool needs isn't there, before
+    any step runs.
+
+    The element is one that exists only in the state the tool needs, a
+    view's own content rather than the control that opens the view:
+    Chromium's cached AXValue on a selected radio button can't be trusted.
+    A precondition never heals, since a healer's guess would let the call
+    act on whatever stands where the state should be, and an element
+    wearing a label its anchor never recorded counts as absent, the way
+    an editor pane can stand in for VS Code's closed search box. Chromium
+    publishes its tree only when an action arrives, so a view the user
+    opened by hand can be invisible to a plain read: when the first look
+    misses, the tree is pumped and looked at once more."""
+    missing = ""
+    for attempt in range(2):
+        if attempt:
+            _pump_anywhere(root)
+            time.sleep(STATE_RETRY_S)
+        try:
+            found = anchors.locate(root, pre.anchor, low_confidence=low_confidence)
+        except anchors.AnchorLost:
+            missing = "isn't there"
+            continue
+        except anchors.AnchorAmbiguous:
+            missing = "matches more than one element"
+            continue
+        if anchors.semantic_drift(pre.anchor, found.element):
+            missing = "isn't there (an element with a label it was never recorded under stands in its place)"
+            continue
+        return
+    label = pre.anchor.labels[0] if pre.anchor.labels else pre.anchor.identifier
+    target = f"{pre.anchor.role} {label[:60]!r}" if label else pre.anchor.role
+    hint = f" Run {pack.app_name}'s {pre.run_first} tool first." if pre.run_first else ""
+    raise ToolExecutionError(
+        f"{tool_name}: precondition failed, {pack.app_name} is not in the state this tool needs: "
+        f"the {target} it needs {missing}.{hint}"
+    )
+
+
 def _run_verify(
     check: Verify,
     root: Element,
@@ -693,16 +738,18 @@ def execute(
 
     try:
         for pre in tool.preconditions:
-            if pre["kind"] == "app_running":
+            if pre.kind == "app_running":
                 if root.role != "AXApplication":
                     raise ToolExecutionError(
                         f"{tool_name}: precondition failed, {pack.app_name} is not responding"
                     )
-            elif pre["kind"] == "window_exists":
+            elif pre.kind == "window_exists":
                 if not app_windows(root):
                     raise ToolExecutionError(
                         f"{tool_name}: precondition failed, {pack.app_name} has no open window"
                     )
+            elif pre.kind == "element_exists":
+                _check_state(pre, root, pack, tool_name, low_confidence)
         # Open sheets and dialogs are judged per step (_dialog_in_the_way),
         # because a tool may open one and then act inside it. The ones open
         # now are the user's, and a failure never cancels those.

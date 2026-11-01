@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from vent import anchors, packs
-from vent.packs import Pack, PackError, Step, ToolSpec, Verify, load, load_search_path, save
+from vent.packs import Pack, PackError, Precondition, Step, ToolSpec, Verify, load, load_search_path, save
 from vent.snapshot import snapshot
 
 from .fakes import textedit_like
@@ -43,6 +43,28 @@ def test_round_trip(tmp_path):
     tool = loaded.tool("write_document")
     assert tool.risk == "mutating"
     assert tool.steps[0].anchor.identifier == "doc-body"
+
+
+def test_element_exists_precondition_round_trips(tmp_path):
+    """A stateful precondition keeps its anchor and the tool it names
+    through a save and a load, and the plain kinds stay {"kind": ...}."""
+    pack = sample_pack()
+    anchor = pack.tools[0].steps[0].anchor
+    pack.tools.append(
+        ToolSpec(name="open_document", description="Open it.", risk="read_only",
+                 steps=[Step(op="press", anchor=anchor)])
+    )
+    pack.tools[0].preconditions = [
+        Precondition(kind="app_running"),
+        Precondition(kind="element_exists", anchor=anchor, run_first="open_document"),
+    ]
+    path = tmp_path / "com.apple.TextEdit" / "pack.json"
+    save(pack, path)
+    loaded = load(path).tool("write_document")
+    assert loaded.preconditions[0].to_dict() == {"kind": "app_running"}
+    assert loaded.preconditions[1].anchor.identifier == "doc-body"
+    assert loaded.preconditions[1].run_first == "open_document"
+    assert load(path).to_dict() == pack.to_dict()
 
 
 def test_unknown_op_rejected(tmp_path):
@@ -185,6 +207,24 @@ MALFORMED = {
     "requires_frontmost given as text": lambda data: set_in(data["tools"][0], "requires_frontmost", "yes"),
     "preconditions given as an object": lambda data: set_in(data["tools"][0], "preconditions", {"kind": "app_running"}),
     "a precondition given as a string": lambda data: set_in(data["tools"][0], "preconditions", ["app_running"]),
+    "an element_exists precondition with no anchor": lambda data: set_in(
+        data["tools"][0], "preconditions", [{"kind": "element_exists"}]
+    ),
+    "an app_running precondition with an anchor": lambda data: set_in(
+        data["tools"][0], "preconditions", [{"kind": "app_running", "anchor": first_step(data)["anchor"]}]
+    ),
+    "a run_first given as a number": lambda data: set_in(
+        data["tools"][0], "preconditions",
+        [{"kind": "element_exists", "anchor": first_step(data)["anchor"], "run_first": 2}],
+    ),
+    "a run_first naming no tool": lambda data: set_in(
+        data["tools"][0], "preconditions",
+        [{"kind": "element_exists", "anchor": first_step(data)["anchor"], "run_first": "open_document"}],
+    ),
+    "a run_first naming its own tool": lambda data: set_in(
+        data["tools"][0], "preconditions",
+        [{"kind": "element_exists", "anchor": first_step(data)["anchor"], "run_first": "write_document"}],
+    ),
     "a verify given as a string": lambda data: set_in(data["tools"][0], "verify", ["value_contains"]),
     "a verify on an undeclared param": lambda data: set_in(data["tools"][0]["verify"][0], "param", "ghost"),
     "a description given as a number": lambda data: set_in(data["tools"][0], "description", 7),

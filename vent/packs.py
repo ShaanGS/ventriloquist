@@ -31,7 +31,7 @@ from .snapshot import SECURE_SUBROLE
 OPS = {"press", "set_value", "pick", "reveal", "raise_window", "open_app", "wait_for", "read_value"}
 RISK_LEVELS = {"read_only", "mutating", "high"}
 VERIFY_KINDS = {"value_contains", "value_equals", "element_exists"}
-PRECONDITION_KINDS = {"app_running", "window_exists"}
+PRECONDITION_KINDS = {"app_running", "window_exists", "element_exists"}
 FORMAT_VERSION = 2
 READABLE_VERSIONS = {1, 2}  # version 2 added ChainLink.subrole
 
@@ -298,15 +298,62 @@ class Verify:
 
 
 @dataclass
+class Precondition:
+    """What must be true before a tool acts. app_running and window_exists
+    need nothing else. element_exists names an element that is only there
+    in the state the tool needs, such as a view's own content, and may name
+    the pack's tool that gets the app there (run_first), so a refusal can
+    say what to call."""
+
+    kind: str
+    anchor: Optional[Anchor] = None
+    run_first: str = ""
+
+    def to_dict(self) -> dict:
+        data: dict[str, Any] = {"kind": self.kind}
+        if self.anchor is not None:
+            data["anchor"] = self.anchor.to_dict()
+        if self.run_first:
+            data["run_first"] = self.run_first
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict, where: str) -> "Precondition":
+        data = _object(data, where)
+        kind = data.get("kind")
+        if not isinstance(kind, str) or kind not in PRECONDITION_KINDS:
+            raise PackError(f"{where}: unknown precondition {kind!r}")
+        if kind != "element_exists":
+            extra = sorted(set(data) & {"anchor", "run_first"})
+            if extra:
+                raise PackError(f"{where}: {kind} takes no {' or '.join(extra)}")
+            return cls(kind=kind)
+        if "anchor" not in data:
+            raise PackError(f"{where}: element_exists requires an anchor")
+        return cls(
+            kind=kind,
+            anchor=_anchor(data["anchor"], where),
+            run_first=_text(data.get("run_first", ""), f"{where} run_first"),
+        )
+
+
+@dataclass
 class ToolSpec:
     name: str
     description: str
     risk: str
     steps: list[Step]
     params: dict[str, dict] = field(default_factory=dict)
-    preconditions: list[dict] = field(default_factory=list)
+    preconditions: list[Precondition] = field(default_factory=list)
     verify: list[Verify] = field(default_factory=list)
     requires_frontmost: bool = False
+
+    def __post_init__(self) -> None:
+        # The compiler and tests write the plain kinds as {"kind": ...}.
+        self.preconditions = [
+            pre if isinstance(pre, Precondition) else Precondition.from_dict(pre, f"tool {self.name} precondition {i}")
+            for i, pre in enumerate(self.preconditions)
+        ]
 
     def to_dict(self) -> dict:
         return {
@@ -315,7 +362,7 @@ class ToolSpec:
             "risk": self.risk,
             "requires_frontmost": self.requires_frontmost,
             "params": self.params,
-            "preconditions": self.preconditions,
+            "preconditions": [p.to_dict() for p in self.preconditions],
             "steps": [s.to_dict() for s in self.steps],
             "verify": [v.to_dict() for v in self.verify],
         }
@@ -329,11 +376,10 @@ class ToolSpec:
         risk = data.get("risk")
         if not isinstance(risk, str) or risk not in RISK_LEVELS:
             raise PackError(f"tool {name}: risk must be one of {sorted(RISK_LEVELS)}, got {risk!r}")
-        preconditions = _array(data.get("preconditions", []), f"tool {name} preconditions")
-        for index, pre in enumerate(preconditions):
-            kind = _object(pre, f"tool {name} precondition {index}").get("kind")
-            if not isinstance(kind, str) or kind not in PRECONDITION_KINDS:
-                raise PackError(f"tool {name}: unknown precondition {kind!r}")
+        preconditions = [
+            Precondition.from_dict(pre, f"tool {name} precondition {index}")
+            for index, pre in enumerate(_array(data.get("preconditions", []), f"tool {name} preconditions"))
+        ]
         steps = [
             Step.from_dict(s, where=f"tool {name} step {i}")
             for i, s in enumerate(_array(data.get("steps", []), f"tool {name} steps"))
@@ -420,6 +466,12 @@ class Pack:
         names = [t.name for t in tools]
         if len(names) != len(set(names)):
             raise PackError("duplicate tool names in pack")
+        for tool in tools:
+            for pre in tool.preconditions:
+                if pre.run_first and (pre.run_first not in names or pre.run_first == tool.name):
+                    raise PackError(
+                        f"tool {tool.name}: precondition run_first {pre.run_first!r} is not another tool in this pack"
+                    )
         healed_pending = _array(data.get("healed_pending", []), "healed_pending")
         for index, entry in enumerate(healed_pending):
             # The healer reuses these anchors on a break before any human

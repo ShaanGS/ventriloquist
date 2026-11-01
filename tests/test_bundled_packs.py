@@ -45,6 +45,9 @@ def _anchors(data: dict):
         for index, check in enumerate(tool.get("verify", [])):
             if "anchor" in check:
                 yield f"{tool['name']} verify {index}", check["anchor"]
+        for index, pre in enumerate(tool.get("preconditions", [])):
+            if "anchor" in pre:
+                yield f"{tool['name']} precondition {index}", pre["anchor"]
 
 
 def _labels(anchor: dict):
@@ -129,3 +132,14 @@ def test_llms_txt_pack_example_loads():
     assert example, "llms.txt has no JSON pack example"
     pack = Pack.from_dict(json.loads(example.group(1)))
     assert pack.tools
+
+
+def test_vs_code_search_refuses_until_the_search_view_is_open():
+    """search_workspace used to fail cold with a timeout and a description
+    nobody enforced. Its search box is now a precondition naming the tool
+    that opens the view."""
+    tool = load(BUNDLED_PACKS_DIR / "com.microsoft.VSCode" / "pack.json").tool("search_workspace")
+    state = [pre for pre in tool.preconditions if pre.kind == "element_exists"]
+    assert len(state) == 1
+    assert state[0].run_first == "show_search"
+    assert state[0].anchor.to_dict() == tool.steps[1].anchor.to_dict()

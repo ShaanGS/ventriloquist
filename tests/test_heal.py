@@ -156,6 +156,23 @@ def test_promote_rewrites_anchor_of_record(tmp_path):
     assert pack.healed_pending == []
 
 
+def test_promote_rewrites_a_precondition_on_the_same_anchor(tmp_path):
+    """A precondition usually names the element its tool acts on. Healing
+    the step alone would leave the tool refusing on the old anchor."""
+    tree = textedit_like()
+    pack, path, anchor = pack_with_step(tree, tmp_path)
+    pack.tools[0].preconditions = [packs.Precondition(kind="element_exists", anchor=anchor)]
+    break_body(tree)
+    new_node = next(n for n in snapshot(tree).nodes if n.identifier == "renamed-after-update")
+    pack.healed_pending.append({
+        "original": anchor.to_dict(), "healed": anchors.build(new_node).to_dict(),
+        "target_role": new_node.role, "target_label": new_node.label,
+    })
+
+    assert heal.promote(pack, 0) == 2
+    assert pack.tools[0].preconditions[0].anchor.identifier == "renamed-after-update"
+
+
 def test_promoted_pack_still_validates(tmp_path):
     tree = textedit_like()
     pack, path, anchor = pack_with_step(tree, tmp_path)
