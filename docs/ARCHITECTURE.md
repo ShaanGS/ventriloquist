@@ -22,11 +22,10 @@ before the next step trusts the tree. Through a plain MCP client, a TextEdit
 write takes about half a second and a read about a tenth of one
 (docs/BENCHMARKS.md). The model only comes back if you turn healing on and a
 recording breaks, and then the fix is quarantined until you approve it.
-Interpreter when needed, compiler by default.
 
 ## 2. What we are not building
 
-Non-goals keep the scope honest:
+Non-goals:
 
 - Not a general computer-use agent. We make specific apps programmable; we do
   not compete with open-ended screen agents.

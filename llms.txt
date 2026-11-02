@@ -291,7 +291,7 @@ tab. The load-bearing invariants:
   `VENT_ALLOW_HIGH=1`; they are never a caller's decision.
   `VENT_READ_ONLY=1` serves read-only tools only.
 
-Honest limits, also documented: probe reversibility is local (an app that
+Limits, also documented: probe reversibility is local (an app that
 syncs on every keystroke may transmit a probe string before the restore),
 the policy reads English only (so the explorer refuses apps whose menus are
 in another language), and truncation of previews is a privacy measure, not

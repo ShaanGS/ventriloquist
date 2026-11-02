@@ -13,17 +13,20 @@
 
 ## About
 
-Ventriloquist learns a Mac app once through the macOS accessibility API
-and keeps the actions worth having as typed tools, like
-`outlook_file_to_receipts` or `textedit_write_document`. An app's tools
-live together in one JSON file, its pack. Your agent calls them over MCP,
-and every call replays the recorded steps: no screenshots and no vision
-model. The agent still decides which tool to call. It never decides where
-to click.
+Ventriloquist is an MCP server that turns actions in Mac apps into tools
+your agent can call, like `outlook_file_to_receipts` or
+`textedit_write_document`. Each tool is a list of steps on elements in the
+app's accessibility tree, saved in a JSON file per app (its pack). A tool
+is made once, by hand or by letting a model explore the app and propose
+tools you approve. After that, every call replays the saved steps: no
+screenshots, and no model deciding where to click. Your agent still
+decides which tool to call.
 
-Why that matters: sorting six test emails in Outlook, the same model read
-about 3.6x fewer tokens through vent than through Claude's built-in
-computer use, and made no wrong clicks (computer use made two).
+In one test, sorting six test emails in Outlook, the same model read about
+3.6x fewer tokens through vent than through Claude's built-in computer
+use, and made no wrong clicks (computer use made two). That was one run
+each, with caveats in
+[docs/BENCHMARKS.md](https://github.com/ShaanGS/ventriloquist/blob/main/docs/BENCHMARKS.md).
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/ShaanGS/ventriloquist/main/docs/demo.gif" width="900" alt="A Claude session triages six test emails in new Outlook through vent's tools: it reads each email as text, flags the two that need a reply or have a deadline, and files all six into Receipts, Meetings or Reading. Email addresses are blurred.">
@@ -151,8 +154,8 @@ description of the element (its role, label and identifier, and the chain
 of elements above it) that vent matches against the live app. Anchors are
 recorded per machine and per app version, so the bundled packs are
 working examples of the format more than guarantees for your exact setup.
-If a tool refuses to resolve, that's the safety design doing its job (it
-never guesses between lookalike elements), and re-recording takes about a
+If a tool refuses to resolve, that's on purpose (it never guesses
+between lookalike elements), and re-recording takes about a
 minute with `vent inspect` and `vent anchor`, as in
 [Write a tool by hand](#write-a-tool-by-hand). Section 5 of
 [docs/ARCHITECTURE.md](https://github.com/ShaanGS/ventriloquist/blob/main/docs/ARCHITECTURE.md)
@@ -162,13 +165,12 @@ has the details.
 
 ![Architecture](https://raw.githubusercontent.com/ShaanGS/ventriloquist/main/docs/architecture.svg)
 
-Most computer-use agents are interpreters. A model looks at your app and
-decides every action, every time. That works on any app with no setup,
-but every run pays again for screenshots and model decisions. This is the
-compiler version. You pay the model cost once, while a pack is recorded,
-and get back tools like `write_document(text)` or `file_to_receipts()`,
-which run no model on vent's side. The agent still reads, judges and
-picks the tool; vent does the clicking.
+With computer use, a model looks at your app and decides every action,
+every time. That works on any app with no setup, but every run pays again
+for screenshots and model decisions. vent moves that work to when a tool
+is made. You get back tools like `write_document(text)` or
+`file_to_receipts()`, which run no model on vent's side. The agent still
+reads, judges and picks the tool, and vent does the clicking.
 
 On a one-step task the two are even: in a TextEdit test, Claude's
 computer use needed the same two tool calls and about the same total
@@ -178,9 +180,9 @@ longer task the difference shows. Triaging six test emails in new Outlook
 into one of three folders), both filed all six correctly. vent took 1:59
 and made no wrong clicks. Claude's computer use took 2:31, made two
 harmless wrong moves, and put about 3.6x as many tokens into the context
-(18k against 5k), because it works from screenshots and vent returns
-text. The TextEdit test was three rounds each and the Outlook one a
-single run each, with the same model;
+(18k against 5k), mostly screenshots, where vent returns text. The
+TextEdit test was three rounds each and the Outlook one a single run
+each, with the same model, which knew the answer key both times;
 [docs/BENCHMARKS.md](https://github.com/ShaanGS/ventriloquist/blob/main/docs/BENCHMARKS.md)
 has the method and the caveats.
 
@@ -200,8 +202,8 @@ If you turn healing on (`VENT_HEAL=1`), a model is brought back in when an
 app update breaks a recorded action, but the fix sits in quarantine until
 you approve it.
 
-The top half of the diagram runs once per app and is where the model
-earns its keep, with a policy screening every probe and a human approving
+The top half of the diagram runs once per app. It's the only part that
+uses a model, with a policy screening every probe and a human approving
 every tool. The bottom half is what you actually use day to day, and it
 has no model in it unless you turn healing on. The pack file in the
 middle is the whole interface between the two: plain JSON you can read,
@@ -231,8 +233,9 @@ driving apps, if you're careful about how you find elements again later.
   fixed either.
 - **AppleScript servers**: dependable where an app has a scripting
   dictionary, which most Electron apps don't.
-- **Ventriloquist**: the model works once, while you record. What gets
-  served is a fixed set of tools you approved, replayed with no model.
+- **Ventriloquist**: the steps are worked out once, when a tool is made,
+  by hand or by a model exploring the app. What gets served is a fixed
+  set of tools you approved, replayed with no model.
   It covers fewer apps than any of the above, by design, and in exchange
   calls are cheap in tokens and the same every time. The closest idea
   elsewhere is [terminator](https://github.com/mediar-ai/terminator),
@@ -370,9 +373,8 @@ numbers, the whole-tool runs and the field notes are in
 
 Read [docs/ARCHITECTURE.md](https://github.com/ShaanGS/ventriloquist/blob/main/docs/ARCHITECTURE.md)
 before the code, and [docs/SECURITY.md](https://github.com/ShaanGS/ventriloquist/blob/main/docs/SECURITY.md)
-for the threat model. Both went through adversarial review before
-implementation and got rewritten from the findings, and each phase since
-has gotten the same treatment.
+for the threat model. Both were reviewed and rewritten before the code
+was written, and each phase since has been reviewed the same way.
 
 ## Contributing
 

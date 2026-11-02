@@ -92,7 +92,7 @@ returns its text.
 the app (a real window resize, and optionally a full quit and relaunch),
 and then tries to resolve every anchor again. Survival only counts when
 the element found is provably the one that was recorded. Binding a
-lookalike counts as WRONG, which is the number that actually matters.
+lookalike counts as WRONG, the outcome that matters most.
 
 Numbers from the author's Mac (macOS 26, small anchor sets, early days):
 
@@ -114,7 +114,7 @@ restart. Every non-survivor is an ambiguity refusal.
 Figma desktop is the deliberate worst case and it behaves like one: the
 app shell (tabs, navigation, buttons) publishes a usable tree, and the
 design canvas publishes nothing, because it's rendered pixels. That's
-the honest boundary of the accessibility thesis. Apps whose content is
+where the accessibility approach stops working. Apps whose content is
 a custom-drawn canvas keep their chrome scriptable and their content
 opaque.
 
@@ -152,7 +152,7 @@ description says to open the Search view first, but that dependency is
 prose, not a machine-checked precondition, so a caller who ignores it
 fails and so does this harness, on purpose. The anchors were fine in
 every failing call. That gap between 87.5% per-anchor and 75% per-tool
-is the honest cost of state in a GUI. Since these runs, `search_workspace`
+is the cost of state in a GUI. Since these runs, `search_workspace`
 has a precondition on its search box, so a cold call refuses before
 acting and says to call `code_show_search` first instead of timing out.
 The harness still counts that as a failure.
