@@ -13,6 +13,12 @@ file lists what has changed since the last one.
   the refusal says to call it. An element with a label its anchor never
   recorded doesn't count, and the check never heals. ARCHITECTURE.md says
   which states can be checked this way.
+- A tool parameter can list the only values a call may pass (`enum`).
+  Clients are shown the list, and any other value is refused before the
+  tool touches the app.
+- The Outlook example's three filing tools are now one,
+  `file_to_folder(folder)`, which accepts only Receipts, Meetings or
+  Reading.
 - VS Code's `search_workspace` refuses until the Search view is open and
   says to call `code_show_search`. It used to wait six seconds and time
   out.

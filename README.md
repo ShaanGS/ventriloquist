@@ -14,7 +14,7 @@
 ## About
 
 Ventriloquist is an MCP server that turns actions in Mac apps into tools
-your agent can call, like `outlook_file_to_receipts` or
+your agent can call, like `outlook_file_to_folder` or
 `textedit_write_document`. Each tool is a list of steps on elements in the
 app's accessibility tree, saved in a JSON file per app (its pack). A tool
 is made once, by hand or by letting a model explore the app and propose
@@ -169,7 +169,7 @@ With computer use, a model looks at your app and decides every action,
 every time. That works on any app with no setup, but every run pays again
 for screenshots and model decisions. vent moves that work to when a tool
 is made. You get back tools like `write_document(text)` or
-`file_to_receipts()`, which run no model on vent's side. The agent still
+`file_to_folder(folder)`, which run no model on vent's side. The agent still
 reads, judges and picks the tool, and vent does the clicking.
 
 On a one-step task the two are even: in a TextEdit test, Claude's
@@ -290,7 +290,12 @@ pack in its place, and a broken pack never stops the other apps' tools.
    `{"op": "read_value", "anchor": ...}` and a wait is
    `{"op": "wait_for", "anchor": ..., "timeout_s": 5}`. The bundled
    [TextEdit pack](https://github.com/ShaanGS/ventriloquist/blob/main/vent/bundled_packs/com.apple.TextEdit/pack.json)
-   is a short one to copy from.
+   is a short one to copy from. A step that types takes its text from a
+   parameter: declare it under `params` and give the step
+   `"value": {"param": "<name>"}`. A parameter with an `enum` list
+   accepts only those values, the way the
+   [Outlook example](https://github.com/ShaanGS/ventriloquist/blob/main/examples/outlook)
+   accepts only its three folders.
 4. `vent run <App> <tool>` runs it, and `vent verify <App>` checks that
    every anchor in the pack still resolves.
 

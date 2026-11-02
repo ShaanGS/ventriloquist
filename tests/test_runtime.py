@@ -1179,7 +1179,7 @@ def test_element_exists_precondition_refuses_before_any_step(monkeypatch):
     message = str(failed.value)
     assert "precondition failed, Code is not in the state this tool needs" in message
     assert f"the AXTextArea {SEARCH_BOX!r} it needs isn't there" in message
-    assert "Run Code's show_search tool first." in message
+    assert "Call code_show_search first." in message
     assert "already sent" not in message
     editor = tree.children()[0].children()[0].children()[1].children()[0]
     assert editor.value == ""
@@ -1232,3 +1232,17 @@ def test_element_exists_precondition_leaves_a_tree_alone_when_it_is_in_state():
     pack.tools[1].steps = [Step(op="read_value", anchor=pack.tools[1].steps[0].anchor)]
     assert runtime.execute(pack, "search_workspace", {"query": "todo"}, tree).ok
     assert pumped == []
+
+
+def test_an_argument_outside_its_enum_never_reaches_the_app():
+    """A client's schema check is advice. The runtime refuses a value the
+    pack doesn't list before the first step, so a tool limited to three
+    folders can't be talked into a fourth."""
+    tree = textedit_like()
+    pack = build_write_tool(tree)
+    pack.tools[0].params["text"]["enum"] = ["Receipts", "Meetings"]
+    with pytest.raises(runtime.ToolExecutionError, match="text must be one of 'Receipts', 'Meetings', not 'Inbox'"):
+        runtime.execute(pack, "write_document", {"text": "Inbox"}, tree)
+    assert doc_body(tree).value == "hello"
+    assert runtime.execute(pack, "write_document", {"text": "Meetings"}, tree).ok
+    assert doc_body(tree).value == "Meetings"

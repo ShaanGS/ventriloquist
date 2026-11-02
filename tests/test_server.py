@@ -203,6 +203,13 @@ def test_parameter_descriptions_reach_the_client_cleaned(tmp_path):
     assert len(description) == server_mod.PARAM_DESCRIPTION_LIMIT
 
 
+def test_parameter_enums_reach_the_client(tmp_path):
+    pack = sample_pack()
+    pack.tools[0].params["text"]["enum"] = ["Receipts", "Meetings"]
+    schema = listed(served(tmp_path, pack))["textedit_write_document"].input_schema
+    assert schema["properties"]["text"]["enum"] == ["Receipts", "Meetings"]
+
+
 def never_answered(context, params):
     raise AssertionError("the server asked for a confirmation it should not have")
 

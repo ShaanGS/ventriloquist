@@ -217,6 +217,11 @@ Notes on the shape:
   lists (every table in every Electron app, most AppKit outlines) that only
   expose visible rows. There is deliberately no `exec`, no `shell`, no
   AppleScript op, and model output can never extend this set.
+- A parameter is a JSON Schema scalar (`string`, `number`, `integer`,
+  `boolean`) with a description, and may list its allowed values in
+  `enum`. The client is shown the list, and the runtime refuses any other
+  value before the first step, so a list of folders is a list of the only
+  places a tool can file to.
 - Preconditions are `app_running`, `window_exists` and `element_exists`.
   Verify checks are `value_equals`, `value_contains` (against a parameter
   or a literal) and `element_exists`.
@@ -271,7 +276,7 @@ Called with the Explorer showing, it refuses with:
 ```
 search_workspace: precondition failed, Code is not in the state this tool
 needs: the AXTextArea 'Search: Type Search Term and press Enter to search'
-it needs isn't there. Run Code's show_search tool first.
+it needs isn't there. Call code_show_search first.
 ```
 
 `run_first` must name another tool in the same pack, or the pack doesn't

@@ -9,11 +9,15 @@ exist only for the demo: Receipts, Meetings and Reading.
 | --- | --- |
 | `read_selected_message` | Reads the selected email: subject, sender line, received time and body. Read-only. |
 | `flag_message` | Message > Flag > No Date. An email that is already flagged stays flagged. |
-| `file_to_receipts`, `file_to_meetings`, `file_to_reading` | Message > Move > Choose Folder..., types the folder name, and moves the email only if exactly one folder matches. |
+| `file_to_folder(folder)` | Message > Move > Choose Folder..., types the folder name, and moves the email only if exactly one folder matches. |
 
-There is one filing tool per folder on purpose: the agent can only move
-mail into folders you approved, and a typed folder name can never land in
-a folder in some other account.
+`folder` must be Receipts, Meetings or Reading. Any other name is refused
+before Outlook is touched, so the agent can only move mail into folders
+you approved, and a name that also matches a folder in another account
+is refused rather than guessed. To allow other folders, edit the `enum`
+list in `pack.json`. The demo video was recorded with an earlier version
+that had one filing tool per folder (`file_to_receipts` and so on), with
+the same steps.
 
 To try it:
 

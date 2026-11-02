@@ -225,7 +225,9 @@ tool. It loads as written:
 `window_title` is empty, so the tool acts on whichever TextEdit document is
 in front; an anchor that records a title acts only in a window with that
 title. Verify kinds are `value_equals`, `value_contains` (against a param or
-a literal), and `element_exists`. Preconditions are `app_running`,
+a literal), and `element_exists`. A parameter may list its allowed values
+in `enum`, and a call with any other value is refused before the first
+step. Preconditions are `app_running`,
 `window_exists` and `element_exists`, which refuses the call before any
 step unless an anchored element is on screen and may name a `run_first`
 tool in the same pack that gets the app there. `wait_for` steps take a `timeout_s` and poll until the

@@ -20,7 +20,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
-from . import anchors, ax
+from . import anchors, ax, packs
 from .ax import Element
 from .packs import Pack, Precondition, Step, ToolSpec, Verify
 from .snapshot import (
@@ -673,7 +673,7 @@ def _check_state(
         return
     label = pre.anchor.labels[0] if pre.anchor.labels else pre.anchor.identifier
     target = f"{pre.anchor.role} {label[:60]!r}" if label else pre.anchor.role
-    hint = f" Run {pack.app_name}'s {pre.run_first} tool first." if pre.run_first else ""
+    hint = f" Call {packs.tool_name(pack, pack.tool(pre.run_first))} first." if pre.run_first else ""
     raise ToolExecutionError(
         f"{tool_name}: precondition failed, {pack.app_name} is not in the state this tool needs: "
         f"the {target} it needs {missing}.{hint}"
@@ -735,6 +735,14 @@ def execute(
     missing = [p for p in tool.params if p not in args]
     if missing:
         raise ToolExecutionError(f"{tool_name}: missing arguments {missing}")
+    # A client's schema check is advice; this one is the gate. An argument
+    # outside a parameter's listed values never reaches the app.
+    for param, meta in tool.params.items():
+        allowed = meta.get("enum")
+        if allowed is not None and args[param] not in allowed:
+            raise ToolExecutionError(
+                f"{tool_name}: {param} must be one of {', '.join(map(repr, allowed))}, not {args[param]!r}"
+            )
 
     try:
         for pre in tool.preconditions:

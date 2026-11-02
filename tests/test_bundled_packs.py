@@ -143,3 +143,9 @@ def test_vs_code_search_refuses_until_the_search_view_is_open():
     assert len(state) == 1
     assert state[0].run_first == "show_search"
     assert state[0].anchor.to_dict() == tool.steps[1].anchor.to_dict()
+
+
+def test_outlook_files_only_into_the_folders_it_lists():
+    tool = load(EXAMPLES_DIR / "outlook" / "pack.json").tool("file_to_folder")
+    assert tool.params["folder"]["enum"] == ["Receipts", "Meetings", "Reading"]
+    assert [s.value for s in tool.steps if s.value] == [{"param": "folder"}]

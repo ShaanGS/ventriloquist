@@ -47,6 +47,12 @@ PRESS_ACTIONS = {
 PARAM_TYPES = {"string", "number", "integer", "boolean"}
 # What MCP clients accept as an input property name.
 PARAM_NAME = re.compile(r"[A-Za-z0-9_.-]{1,64}")
+# A parameter may list the only values a call can pass, the way the Outlook
+# example names the folders it may file into. Each one is shown to the
+# client, so the list stays short.
+MAX_ENUM_VALUES = 50
+ENUM_TEXT_LIMIT = 200
+ENUM_TYPES = {"string": str, "integer": int, "number": (int, float)}
 
 # A step's own wait. The server runs one call per app at a time, so a step
 # allowed to wait for an hour would hold up every later call to its app.
@@ -57,6 +63,38 @@ MAX_TIMEOUT_S = 120.0
 # a save, a trace or a heal outside the directory it belongs in.
 BUNDLE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*(\.[A-Za-z0-9][A-Za-z0-9_-]*)+")
 BUNDLE_ID_MAX = 255
+
+
+# The longest app prefix a served tool name gets (see server.py's TOOL_NAME).
+SLUG_MAX = 63
+
+
+def _ascii(text: str) -> str:
+    """Text folded to lowercase ASCII: accents dropped, anything with no
+    ASCII form removed."""
+    return unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii").lower()
+
+
+def _slug(name: str) -> str:
+    folded = "".join(c if c.isalnum() else "_" for c in _ascii(name)).strip("_")
+    return folded[:SLUG_MAX].rstrip("_")
+
+
+def app_slug(pack: "Pack") -> str:
+    """The prefix of an app's tool names. An app named with no ASCII letters
+    or digits at all goes by the last part of its bundle id instead."""
+    return _slug(pack.app_name) or _slug(pack.bundle_id.rsplit(".", 1)[-1]) or "app"
+
+
+def tool_part(spec: "ToolSpec") -> str:
+    return "".join(c if c.isalnum() else "_" for c in _ascii(spec.name))
+
+
+def tool_name(pack: "Pack", spec: "ToolSpec") -> str:
+    """The name a client calls a tool by: the app's slug and the tool's own
+    name, folded to ASCII [a-z0-9_]. For the snake_case names the compiler
+    writes, the fold changes nothing."""
+    return f"{app_slug(pack)}_{tool_part(spec)}"
 
 
 class PackError(ValueError):
@@ -202,8 +240,23 @@ def _params(value: Any, tool: str) -> dict[str, dict]:
         where = f"tool {tool} param {name!r}"
         if not isinstance(meta, dict):
             raise PackError(f'{where} must be a schema object such as {{"type": "string"}}, not {_kind(meta)}')
-        _choice(meta.get("type", "string"), PARAM_TYPES, f"{where} type")
+        kind = _choice(meta.get("type", "string"), PARAM_TYPES, f"{where} type")
         _text(meta.get("description", ""), f"{where} description")
+        if "enum" in meta:
+            values = _array(meta["enum"], f"{where} enum")
+            if not values or len(values) > MAX_ENUM_VALUES:
+                raise PackError(f"{where} enum must list 1 to {MAX_ENUM_VALUES} values")
+            if kind not in ENUM_TYPES or any(
+                isinstance(v, bool) or not isinstance(v, ENUM_TYPES[kind]) for v in values
+            ):
+                raise PackError(f"{where} enum values must all be of type {kind}")
+            if len(set(values)) != len(values):
+                raise PackError(f"{where} enum lists a value twice")
+            # The client is shown these exactly, so they must already be
+            # plain text: one cleaned for display would no longer match.
+            for value in values:
+                if isinstance(value, str) and (not value or value != clean_text(value, ENUM_TEXT_LIMIT)):
+                    raise PackError(f"{where} enum value {value[:40]!r} must be plain text of 1 to {ENUM_TEXT_LIMIT} characters")
     return params
 
 

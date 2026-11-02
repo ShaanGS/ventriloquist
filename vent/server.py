@@ -55,10 +55,9 @@ CONFIRM_NOTE = "Each call asks the user to confirm it before anything happens."
 
 # MCP tool names: ASCII, at most 128 characters (SEP-986), and lowercase
 # with underscores here so every client accepts them as they are. An app's
-# slug stops at 63, so with "_" and a compiled tool name (at most 64) every
-# compiled tool fits.
+# slug stops at packs.SLUG_MAX (63), so with "_" and a compiled tool name
+# (at most 64) every compiled tool fits.
 TOOL_NAME = re.compile(r"[a-z0-9_]{1,128}")
-SLUG_MAX = 63
 TITLE_LIMIT = 100
 DESCRIPTION_LIMIT = 1000
 PARAM_DESCRIPTION_LIMIT = 200
@@ -77,32 +76,12 @@ INPUT_REQUIRED_VERSION = "2026-07-28"
 RUN_LOOP_IDLE_S = 0.02
 
 
-def _ascii(text: str) -> str:
-    """Text folded to lowercase ASCII: accents dropped, anything with no
-    ASCII form removed."""
-    return unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii").lower()
-
-
-def _slug(name: str) -> str:
-    folded = "".join(c if c.isalnum() else "_" for c in _ascii(name)).strip("_")
-    return folded[:SLUG_MAX].rstrip("_")
-
-
-def app_slug(pack: packs.Pack) -> str:
-    """The prefix of an app's tool names. An app named with no ASCII letters
-    or digits at all goes by the last part of its bundle id instead."""
-    return _slug(pack.app_name) or _slug(pack.bundle_id.rsplit(".", 1)[-1]) or "app"
-
-
-def _tool_part(spec: packs.ToolSpec) -> str:
-    return "".join(c if c.isalnum() else "_" for c in _ascii(spec.name))
-
-
-def tool_name(pack: packs.Pack, spec: packs.ToolSpec) -> str:
-    """The name a client calls a tool by: the app's slug and the tool's own
-    name, folded to ASCII [a-z0-9_]. For the snake_case names the compiler
-    writes, the fold changes nothing."""
-    return f"{app_slug(pack)}_{_tool_part(spec)}"
+# Tool names are built in packs.py, where the runtime can reach them too:
+# a refusal that tells the client to call another tool has to use the name
+# the client sees.
+app_slug = packs.app_slug
+tool_name = packs.tool_name
+_tool_part = packs.tool_part
 
 
 def tool_title(pack: packs.Pack, spec: packs.ToolSpec) -> str:
@@ -118,6 +97,9 @@ def _tool_schema(spec: packs.ToolSpec) -> dict:
             "type": meta.get("type", "string"),
             "description": packs.clean_text(meta.get("description", ""), PARAM_DESCRIPTION_LIMIT),
         }
+        if "enum" in meta:
+            # Checked as plain text when the pack loaded.
+            properties[param]["enum"] = list(meta["enum"])
     return {
         "type": "object",
         "properties": properties,
