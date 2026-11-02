@@ -1,5 +1,5 @@
 {
-  "format_version": 2,
+  "format_version": 3,
   "bundle_id": "com.microsoft.VSCode",
   "app_name": "Code",
   "app_version": "1.133.0",

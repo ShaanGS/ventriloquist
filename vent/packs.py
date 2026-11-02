@@ -32,8 +32,12 @@ OPS = {"press", "set_value", "pick", "reveal", "raise_window", "open_app", "wait
 RISK_LEVELS = {"read_only", "mutating", "high"}
 VERIFY_KINDS = {"value_contains", "value_equals", "element_exists"}
 PRECONDITION_KINDS = {"app_running", "window_exists", "element_exists"}
-FORMAT_VERSION = 2
-READABLE_VERSIONS = {1, 2}  # version 2 added ChainLink.subrole
+FORMAT_VERSION = 3
+# Version 2 added ChainLink.subrole. Version 3 added parameter enums and
+# element_exists preconditions, and a pack using either says 3 so an older
+# vent refuses it: one that loaded it would drop the enum, and a tool
+# limited to three folders would take any name.
+READABLE_VERSIONS = {1, 2, 3}
 
 # The AX actions a press step may perform. An open action name would reopen
 # the closed op set: an app decides for itself what an action it defines
@@ -519,6 +523,14 @@ class Pack:
         names = [t.name for t in tools]
         if len(names) != len(set(names)):
             raise PackError("duplicate tool names in pack")
+        if version < 3:
+            for tool in tools:
+                uses = [f"param {name!r} lists enum values" for name, meta in tool.params.items() if "enum" in meta]
+                uses += ["an element_exists precondition" for pre in tool.preconditions if pre.kind == "element_exists"]
+                if uses:
+                    raise PackError(
+                        f"tool {tool.name}: {uses[0]}, which needs format_version 3 so older vent refuses the pack"
+                    )
         for tool in tools:
             for pre in tool.preconditions:
                 if pre.run_first and (pre.run_first not in names or pre.run_first == tool.name):

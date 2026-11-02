@@ -16,6 +16,8 @@ file lists what has changed since the last one.
 - A tool parameter can list the only values a call may pass (`enum`).
   Clients are shown the list, and any other value is refused before the
   tool touches the app.
+- Packs that use either of these say `"format_version": 3`, so an
+  older vent refuses them instead of loading them without the checks.
 - The Outlook example's three filing tools are now one,
   `file_to_folder(folder)`, which accepts only Receipts, Meetings or
   Reading.

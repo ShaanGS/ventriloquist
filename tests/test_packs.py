@@ -231,6 +231,9 @@ MALFORMED = {
     "an enum listing a value twice": lambda data: set_in(data["tools"][0]["params"]["text"], "enum", ["a", "a"]),
     "an enum value with a line break": lambda data: set_in(data["tools"][0]["params"]["text"], "enum", ["a\nb"]),
     "an enum on a boolean": lambda data: set_in(data["tools"][0], "params", {"text": {"type": "boolean", "enum": [True]}}),
+    "an enum in a format 2 pack": lambda data: (
+        set_in(data, "format_version", 2), set_in(data["tools"][0]["params"]["text"], "enum", ["a"])
+    ) and None,
     "a verify given as a string": lambda data: set_in(data["tools"][0], "verify", ["value_contains"]),
     "a verify on an undeclared param": lambda data: set_in(data["tools"][0]["verify"][0], "param", "ghost"),
     "a description given as a number": lambda data: set_in(data["tools"][0], "description", 7),
