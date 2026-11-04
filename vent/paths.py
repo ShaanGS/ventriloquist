@@ -17,6 +17,9 @@ import os
 from pathlib import Path
 
 BUNDLED_PACKS_DIR = Path(__file__).resolve().parent / "bundled_packs"
+# SKILL.md lives at the repo root, where people find it on GitHub, and the
+# wheel carries a copy inside the package (pyproject.toml's force-include).
+SKILL_FILES = [Path(__file__).resolve().parent / "SKILL.md", Path(__file__).resolve().parent.parent / "SKILL.md"]
 
 
 def home() -> Path:

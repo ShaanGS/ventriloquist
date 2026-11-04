@@ -57,6 +57,10 @@ path = "vent/__init__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["vent"]
 
+# `vent skill` prints this from an installed wheel, with no checkout.
+[tool.hatch.build.targets.wheel.force-include]
+"SKILL.md" = "vent/SKILL.md"
+
 [tool.hatch.build.targets.sdist]
 # README media is for GitHub; building vent from source doesn't need it.
 exclude = ["docs/*.gif", "docs/*.png", "docs/assets"]

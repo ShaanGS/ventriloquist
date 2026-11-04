@@ -7,12 +7,13 @@ wheel, a broken entry point) fail here instead of on a user's machine:
 
     python tests/install_smoke.py /path/to/env/bin
 
-It lists tools and never calls one, so it needs no Accessibility
+It lists tools and never calls one, and prints the agent skill, so it needs no Accessibility
 permission and no running app. CI runs it on Linux and macOS.
 """
 
 import asyncio
 import os
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -45,6 +46,13 @@ def main() -> int:
             if missing:
                 print(f"  missing: {sorted(missing)}")
                 failed = True
+    # SKILL.md rides in the wheel through a force-include, which a
+    # checkout's tests can't see go missing.
+    skill = subprocess.run([str(bin_dir / "vent"), "skill"], capture_output=True, text=True)
+    print(f"vent skill: {len(skill.stdout)} characters")
+    if skill.returncode != 0 or not skill.stdout.startswith("---\nname: ventriloquist\n"):
+        print(f"  vent skill failed: {skill.stderr.strip()[:200]}")
+        failed = True
     return 1 if failed else 0
 
 

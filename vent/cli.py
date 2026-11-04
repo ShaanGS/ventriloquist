@@ -687,6 +687,17 @@ def _vent_python() -> str:
     return ax.executable_path(os.getpid()) or os.path.realpath(sys.executable)
 
 
+@main.command()
+def skill() -> None:
+    """Print vent's agent skill, SKILL.md, for an agent to save and load."""
+    for path in paths.SKILL_FILES:
+        if path.is_file():
+            click.echo(path.read_text(encoding="utf-8"), nl=False)
+            return
+    click.secho("SKILL.md is missing from this install of vent.", fg="red", err=True)
+    sys.exit(1)
+
+
 @main.command("mcp-config")
 def mcp_config() -> None:
     """Print a ready-to-paste MCP client entry for this install of vent.

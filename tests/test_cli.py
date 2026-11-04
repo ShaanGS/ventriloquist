@@ -167,3 +167,23 @@ def test_doctor_asks_for_a_window_when_the_app_has_none(monkeypatch):
     assert result.exit_code == 1
     assert "TextEdit is running but has no open window" in result.output
     assert "cannot be packed" not in result.output
+
+
+def test_skill_prints_the_agent_skill():
+    result = CliRunner().invoke(cli.main, ["skill"])
+    assert result.exit_code == 0
+    assert result.output.startswith("---\nname: ventriloquist\ndescription: ")
+    assert "onboarding.md" in result.output
+
+
+def test_skill_lists_every_shipped_tool_with_its_parameters():
+    """The skill's table is what an agent reads to call the bundled tools,
+    so a renamed tool or parameter must show up here too."""
+    from vent.packs import load
+    from vent.paths import BUNDLED_PACKS_DIR
+
+    text = CliRunner().invoke(cli.main, ["skill"]).output
+    for path in BUNDLED_PACKS_DIR.glob("*/pack.json"):
+        for tool in load(path).tools:
+            shown = f"`{tool.name}({', '.join(tool.params)})`" if tool.params else f"`{tool.name}`"
+            assert shown in text, f"SKILL.md doesn't list {shown}"

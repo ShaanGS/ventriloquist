@@ -35,9 +35,25 @@ each, with caveats in
 </p>
 <!-- mcp-name: io.github.ShaanGS/ventriloquist -->
 
+## Set it up with your agent
+
+Paste this into Claude Code, Codex or another coding agent on your Mac:
+
+```text
+Install Ventriloquist with uv (uv tool install ventriloquist-mcp), then read https://github.com/ShaanGS/ventriloquist/blob/main/onboarding.md and walk me through it.
+```
+
+The agent checks what's already set up, installs vent, connects it to
+your agent app, and stops only for the steps that need you, like
+switching on the Accessibility permission. It follows
+[onboarding.md](https://github.com/ShaanGS/ventriloquist/blob/main/onboarding.md),
+and [SKILL.md](https://github.com/ShaanGS/ventriloquist/blob/main/SKILL.md)
+(also printed by `vent skill`) tells it how to use vent afterwards.
+
 ## Try it in a minute
 
-Needs macOS and [uv](https://docs.astral.sh/uv/) (`brew install uv`).
+To do it by hand instead, you need macOS and
+[uv](https://docs.astral.sh/uv/) (`brew install uv`).
 
 ```bash
 uv tool install ventriloquist-mcp

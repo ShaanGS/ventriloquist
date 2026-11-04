@@ -4,6 +4,14 @@ The notes for every release are on
 [GitHub Releases](https://github.com/ShaanGS/ventriloquist/releases). This
 file lists what has changed since the last one.
 
+## Unreleased
+
+- Set vent up by pasting one prompt into your coding agent. The agent
+  follows the new `onboarding.md`: it checks what's in place, installs
+  vent, connects it to your agent app and stops only for the steps that
+  need you. `SKILL.md`, which `vent skill` prints, tells an agent how to
+  use vent's tools and make new ones.
+
 ## 0.4.0 (2026-11-04)
 
 Tools that check the app is in the right state before acting, and
