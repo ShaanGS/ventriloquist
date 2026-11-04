@@ -22,6 +22,10 @@ tools you approve. After that, every call replays the saved steps: no
 screenshots, and no model deciding where to click. Your agent still
 decides which tool to call.
 
+For an app with no tools yet, turn on [live mode](#use-any-app-live).
+Your agent reads the app's tree and presses and types by element number,
+and once a task works it can ask to keep those steps as a tool.
+
 In one test, sorting six test emails in Outlook, the same model read about
 3.6x fewer tokens through vent than through Claude's built-in computer
 use, and made no wrong clicks (computer use made two). That was one run
@@ -49,6 +53,17 @@ switching on the Accessibility permission. It follows
 [onboarding.md](https://github.com/ShaanGS/ventriloquist/blob/main/onboarding.md),
 and [SKILL.md](https://github.com/ShaanGS/ventriloquist/blob/main/SKILL.md)
 (also printed by `vent skill`) tells it how to use vent afterwards.
+
+Or install the plugin, which sets up the server and the skill with live
+mode on, for Claude Code:
+
+```bash
+claude plugin marketplace add ShaanGS/ventriloquist
+claude plugin install ventriloquist@ventriloquist
+```
+
+OpenClaw installs the same folder; see
+[integrations/claude-plugin](https://github.com/ShaanGS/ventriloquist/tree/main/integrations/claude-plugin).
 
 ## Try it in a minute
 
@@ -144,6 +159,36 @@ confirm each call (MCP elicitation), or the server was started with
 [docs/SECURITY.md](https://github.com/ShaanGS/ventriloquist/blob/main/docs/SECURITY.md)
 explains why (T9).
 
+## Use any app live
+
+Live mode is off by default. Turn it on with `VENT_LIVE=1` in the server's
+environment. `vent mcp-config --live` prints the entry with it, and for
+Claude Code:
+
+```bash
+claude mcp add --scope user -e VENT_LIVE=1 ventriloquist -- ~/.local/bin/vent serve
+```
+
+Your agent gets three more tools:
+
+- `vent_live_look` lists a running app's elements, numbered, read from
+  its accessibility tree. No screenshot.
+- `vent_live_act` presses an element, or types into a text field, by its
+  number. Each act runs through the same runtime a saved tool uses, so a
+  step that worked once is one that replays.
+- `vent_live_save` keeps steps that worked as a tool. You see the exact
+  steps and every bit of text it will type, and nothing is saved until
+  you accept. The new tool shows up right away in clients that listen
+  for tool-list changes; others need a restart.
+
+It asks you before pressing anything labelled like send, delete, pay or
+archive, before buttons with no label, and before typing over a long
+text. Without a client that can ask (MCP elicitation), those steps are
+refused, and a tool to save waits for `vent approve` in a terminal. It
+never touches password fields, sign-in windows, terminals, password
+managers or System Settings. [docs/SECURITY.md](https://github.com/ShaanGS/ventriloquist/blob/main/docs/SECURITY.md)
+(T13) has the details.
+
 ## What ships
 
 | App | Tools | Notes |
@@ -159,6 +204,12 @@ as a pack you can copy and adapt. So are the WhatsApp tools, in
 [examples/whatsapp](https://github.com/ShaanGS/ventriloquist/tree/main/examples/whatsapp):
 they read your chat list and open chat and leave drafts, and none of them
 sends.
+
+More packs people have shared are in
+[examples/](https://github.com/ShaanGS/ventriloquist/tree/main/examples),
+and `vent add-pack examples/<app>` adds one after you approve each tool.
+If you make tools for an app you use, a pull request adding them there
+helps the next person with that app.
 
 Electron apps like VS Code and Slack only publish a working tree when
 started with that flag, for example
@@ -271,6 +322,9 @@ Approved tools join the app's pack, so a pack can grow over several
 explore runs. A tool with the same name as one already there is replaced
 only if you say yes, and an app with a bundled pack starts from it, so
 its tools stay.
+
+With [live mode](#use-any-app-live) on, there is a third way: ask your
+agent to do the task in the app, then to save the steps.
 
 `vent compile` makes tools that press buttons and type text, because
 those are the two things the explorer does. A tool that reads text back

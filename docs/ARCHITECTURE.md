@@ -318,6 +318,7 @@ vent/
   runtime.py       execute a ToolSpec: preconditions, steps, settle, verify
   heal.py          re-ground lost anchors, quarantine the fixes
   server.py        MCP stdio server, per-app serialization, risk gating
+  live.py          live mode: look, act by number, save what ran as a tool
   llm.py           single home for every model call
   untrusted.py     marks app text as data for any model that reads it
   policy.py        action and tool safety policy (see SECURITY.md)
@@ -465,6 +466,27 @@ server, `--heal` for `vent run`); without it, only fixes already in
 quarantine are reused, with no model call. If healing fails, the tool call
 fails loudly, naming the app, tool, and step. Silent degradation is banned,
 and so is silent self-modification.
+
+### Live mode
+
+`live.py` is for the time before an app has a pack. The client's model
+looks at an app (a snapshot rendered with numbers), and acts by number.
+Each act is built into a one-step `ToolSpec` from the anchor of the node
+it named and run through `runtime.execute`, so a live act and a saved
+step are the same thing: if it ran, it replays. The runtime is called
+without the app handle, so focus isn't handed back after each act; that
+would close a menu the act had just opened.
+
+Acts are screened by `policy.screen_live` into run, ask, or refuse, and
+the server asks through the same elicitation path as a high risk tool.
+Executed acts are kept per app for as long as the server runs. Save takes
+step numbers and which typed texts become parameters, builds steps only
+from what was recorded, and shows the user `packs.step_summary`, the same
+ground truth the compile gate shows. On a yes the tool is merged into the
+user's pack (starting from the bundled one, as compile does), the server
+replaces that app's tools in its registry, and it sends
+`tools/list_changed`. `live.py` never imports `llm.py`, `compiler.py` or
+`explorer.py`; the summary moved to `packs.py` for that reason.
 
 ## 10. Build order and milestones
 

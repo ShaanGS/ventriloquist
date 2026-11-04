@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from . import llm
 from .anchors import Anchor
 from .explorer import Trace, TraceAction
-from .packs import Pack, PackError, Step, ToolSpec, Verify, clean_text
+from .packs import Pack, PackError, Step, ToolSpec, Verify, clean_text, step_summary
 
 # Names the model proposes. MCP tool names are ASCII [a-z0-9_], and so are
 # the parameter names every client accepts; holding the model to that here
@@ -257,39 +257,9 @@ def build_spec(proposal: Proposal) -> ToolSpec:
     return spec
 
 
-def deterministic_summary(spec: ToolSpec, app_name: str) -> str:
-    """The ground-truth rendering shown at the approval gate. Built from the
-    steps themselves, never from model text (SECURITY.md T5). Every value a
-    step writes is shown: the argument it is bound to, or the literal text.
-    The one model text included is each argument's description, labelled as
-    the model's, since it is what the client will be told to pass."""
-    lines = [f"{spec.name!r} (risk: {spec.risk}) does exactly this to {app_name!r}:"]
-    for index, step in enumerate(spec.steps):
-        target = ""
-        if step.anchor:
-            label = step.anchor.labels[0] if step.anchor.labels else ""
-            target = f" {step.anchor.role}"
-            if label:
-                target += f" {label!r}"
-            elif step.anchor.identifier:
-                target += f" id={step.anchor.identifier}"
-            if step.anchor.window_title:
-                target += f" in window {step.anchor.window_title!r}"
-        if step.op == "press" and step.action != "AXPress":
-            target += f" with {step.action}"
-        value = ""
-        if step.value and "param" in step.value:
-            value = f" with argument {step.value['param']!r}"
-        elif step.value and "literal" in step.value:
-            value = f" with the literal text {str(step.value['literal'])!r}"
-        lines.append(f"  step {index}: {step.op}{target}{value}")
-    if not spec.params:
-        lines.append("It takes no arguments.")
-    else:
-        lines.append(f"It takes {len(spec.params)} argument(s), described by the model as:")
-        for param, meta in spec.params.items():
-            lines.append(f"  {param} ({meta.get('type', 'string')}): {meta.get('description', '')!r}")
-    return "\n".join(lines)
+# Built in packs.py, so the deterministic half (live mode's save) can show
+# the same summary without importing this module, which reaches the model.
+deterministic_summary = step_summary
 
 
 def assemble_pack(trace: Trace, specs: list[ToolSpec], os_version: str, locale: str) -> Pack:

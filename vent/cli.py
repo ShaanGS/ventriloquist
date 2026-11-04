@@ -641,6 +641,145 @@ def _say_which_version(base: packs.Pack, added: packs.Pack, merged: packs.Pack, 
         click.echo(f"  {replaced_all} was replaced, so the pack now records {_recorded_on(added, app_name)}.")
 
 
+def _human_at_terminal() -> bool:
+    """Whether stdin and stdout are a terminal. Approving a tool is a
+    person's yes, and this keeps an agent from piping one in by accident
+    or on a hint. It is a speed bump, not a boundary: a shell can fake a
+    terminal (script(1)), and a shell that can do that can write the pack
+    file itself (SECURITY.md T13)."""
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+
+def _refuse_without_terminal(command: str) -> None:
+    if not _human_at_terminal():
+        click.secho(
+            f"✗ vent {command} asks you to approve each tool, so it runs only in a terminal you type in, "
+            "not with input piped in or from an agent's shell.",
+            fg="red",
+        )
+        sys.exit(1)
+
+
+@main.command()
+@click.argument("app_name", required=False)
+def approve(app_name: str | None) -> None:
+    """Review tools that live mode saved for approval.
+
+    A client that cannot ask the user (no MCP elicitation) leaves the tools
+    its model wants to keep under ~/.ventriloquist/drafts. Each is shown
+    with its exact steps, and only a yes adds it to the app's pack.
+    """
+    from . import live
+
+    _refuse_without_terminal("approve")
+    drafts = live.load_drafts(app_name or "")
+    if not drafts:
+        where = f" for {app_name}" if app_name else ""
+        click.echo(f"No tools are waiting for approval{where}.")
+        return
+    for path, draft in drafts:
+        spec = draft.tools[0]
+        click.echo()
+        click.secho(f"{draft.app_name}: {spec.name}", bold=True)
+        click.echo(f"  The agent describes it as: {packs.clean_text(spec.description, 300)!r}")
+        click.echo(packs.step_summary(spec, draft.app_name))
+        if spec.risk == "high":
+            click.secho("  ⚠ high risk: every call to it will ask you first", fg="red")
+        if not click.confirm("Save this tool?", default=False):
+            if click.confirm("Throw this draft away?", default=False):
+                path.unlink()
+            continue
+        try:
+            base, _ = live.existing_pack(paths.user_packs_dir(), draft.bundle_id)
+        except live.LiveError as exc:
+            click.secho(f"✗ {exc}", fg="red")
+            continue
+        if base is not None and any(tool.name == spec.name for tool in base.tools):
+            if not click.confirm(f"{draft.app_name} already has a {spec.name} tool. Replace it?", default=False):
+                continue
+        try:
+            pack, pack_path = live.write(draft, paths.user_packs_dir())
+        except (live.LiveError, packs.PackError) as exc:
+            click.secho(f"✗ {exc}", fg="red")
+            continue
+        path.unlink()
+        click.secho(f"✓ Saved {spec.name} to {pack_path}. Restart your MCP client to see it.", fg="green")
+
+
+@main.command("add-pack")
+@click.argument("pack_path", type=click.Path(exists=True, dir_okay=True, path_type=Path))
+def add_pack(pack_path: Path) -> None:
+    """Add tools from a shared pack, after you review each one.
+
+    PACK_PATH is a pack.json, or a folder holding one, such as
+    examples/outlook in the repo. Each tool is shown with its exact steps
+    and joins your pack for that app only on a yes. A pack is code that
+    drives your apps: read the steps before you approve them.
+    """
+    from . import live
+
+    _refuse_without_terminal("add-pack")
+    if pack_path.is_dir():
+        pack_path = pack_path / "pack.json"
+    try:
+        shared = packs.load(pack_path)
+    except packs.PackError as exc:
+        click.secho(f"✗ {exc}", fg="red")
+        sys.exit(1)
+    try:
+        base, target = live.existing_pack(paths.user_packs_dir(), shared.bundle_id)
+    except live.LiveError as exc:
+        click.secho(f"✗ {exc}", fg="red")
+        sys.exit(1)
+    have = {tool.name for tool in base.tools} if base else set()
+    click.echo(f"{pack_path} has {len(shared.tools)} tool(s) for {shared.app_name} ({shared.bundle_id}).")
+    click.echo(f"It was recorded on {_recorded_on(shared, shared.app_name)}.")
+    approved = []
+    for spec in shared.tools:
+        click.echo()
+        click.secho(f"{shared.app_name}: {spec.name}", bold=True)
+        click.echo(f"  Its description: {packs.clean_text(spec.description, 300)!r}")
+        click.echo(packs.step_summary(spec, shared.app_name))
+        if spec.risk == "high":
+            click.secho("  ⚠ high risk: every call to it will ask you first", fg="red")
+        if not click.confirm("Add this tool?", default=False):
+            continue
+        if spec.name in have and not click.confirm(
+            f"Your {shared.app_name} pack already has {spec.name}. Replace it?", default=False
+        ):
+            continue
+        approved.append(spec)
+    if not approved:
+        click.echo("Nothing added.")
+        return
+    # Tools that refer to each other (run_first) must come along together.
+    names = {spec.name for spec in approved} | (have if base else set())
+    missing = sorted(
+        {pre.run_first for spec in approved for pre in spec.preconditions if pre.run_first and pre.run_first not in names}
+    )
+    if missing:
+        click.secho(f"✗ Not adding: the tools you picked need {', '.join(missing)} from the same pack. Add those too.", fg="red")
+        sys.exit(1)
+    added = packs.Pack(
+        bundle_id=shared.bundle_id,
+        app_name=shared.app_name,
+        app_version=shared.app_version,
+        os_version=shared.os_version,
+        locale=shared.locale,
+        tools=approved,
+    )
+    try:
+        pack, written = live.write(added, paths.user_packs_dir())
+    except live.LiveError as exc:
+        click.secho(f"✗ {exc}", fg="red")
+        sys.exit(1)
+    click.secho(f"✓ Added {len(approved)} tool(s) to {written} ({len(pack.tools)} in the pack).", fg="green")
+    click.echo(
+        f"Open {shared.app_name}, then run `vent verify {shared.app_name}` to check every step finds its "
+        "element on this Mac, and restart your MCP client to see the tools."
+    )
+
+
 SERVE_HELP = """Serve every compiled pack as MCP tools over stdio.
 
     Each call to a high risk tool asks the user to confirm it, through the
@@ -699,20 +838,25 @@ def skill() -> None:
 
 
 @main.command("mcp-config")
-def mcp_config() -> None:
+@click.option("--live", is_flag=True, help="Turn on live mode: the agent can use any app, and save what works as a tool.")
+def mcp_config(live: bool) -> None:
     """Print a ready-to-paste MCP client entry for this install of vent.
 
     Claude Desktop and Cursor start MCP servers without your shell's PATH,
     so the entry names vent by its absolute path.
     """
     command = _vent_executable()
-    entry = {"mcpServers": {"ventriloquist": {"command": command, "args": ["serve"]}}}
+    server: dict = {"command": command, "args": ["serve"]}
+    if live:
+        server["env"] = {"VENT_LIVE": "1"}
+    entry = {"mcpServers": {"ventriloquist": server}}
+    env_flag = "-e VENT_LIVE=1 " if live else ""
     click.echo(json.dumps(entry, indent=2))
     click.echo(
         "\nPaste this into Claude Desktop's claude_desktop_config.json or "
         "Cursor's ~/.cursor/mcp.json, merging it into an existing mcpServers "
         "block if there is one. For Claude Code, run:\n"
-        f"  claude mcp add --scope user ventriloquist -- {shlex.quote(command)} serve\n"
+        f"  claude mcp add --scope user {env_flag}ventriloquist -- {shlex.quote(command)} serve\n"
         "Then give the app that starts vent Accessibility permission: Cursor, "
         "or your terminal for Claude Code (see vent doctor).\n\n"
         "Claude Desktop works differently. Edit its config while it is closed, "

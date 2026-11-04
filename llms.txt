@@ -108,6 +108,17 @@ Everything lives in the `vent/` package. One file per concern:
   read results and error messages is wrapped as untrusted. Never imports
   `llm.py` either; with `VENT_HEAL=1` it can reach a model through the
   healer.
+- `live.py`. Live mode, served only with `VENT_LIVE=1`. Three tools:
+  `vent_live_look` (a running app's elements, numbered), `vent_live_act`
+  (press one, or type into a text field, by number) and `vent_live_save`
+  (keep steps that ran as a pack tool). Each act runs as a one-step tool
+  through `runtime.execute`. `policy.screen_live` decides whether an act
+  runs, asks the user first (send, delete, pay, unlabelled buttons, typing
+  over long text) or is refused (password fields, sign-in windows).
+  Terminals, password managers and System Settings are refused. A save is
+  built only from recorded anchors and written only after the user
+  approves the exact steps; clients without elicitation leave it for
+  `vent approve`. Never imports `llm.py`.
 - `harness.py`. Durability measurement. Records anchors for an app's
   elements, perturbs the app (real window resize, optionally a full quit and
   relaunch), and re-resolves everything. Survival only counts when the found
@@ -272,7 +283,7 @@ tab. The load-bearing invariants:
   JSON schema and rejected on any mismatch, never repaired.
 - Policy screens after the model, so a prompt-injected model still cannot
   reach anything the policy refuses.
-- `runtime.py` and `server.py` never import `llm.py`. Serving calls a model
+- `runtime.py`, `server.py` and `live.py` never import `llm.py`. Serving calls a model
   only through the healer, and only when it was started with `VENT_HEAL=1`.
 - Healed anchors are quarantined, never silently promoted.
 - App-derived text (labels, values, titles) is treated as attacker-influenced

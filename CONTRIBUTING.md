@@ -76,6 +76,26 @@ even if the tests pass, so the tests exist to make breaking them loud.
 6. **No screenshots, no pixel coordinates, no vision.** If a feature seems
    to need them, redesign the feature.
 
+## Sharing a pack
+
+The easiest contribution is a pack for an app you use. Shared packs live
+in `examples/`, one folder per app, and `vent add-pack examples/<app>`
+installs one after the user approves each tool.
+
+1. Make the tools. Doing the task once with live mode on
+   (`VENT_LIVE=1`) and saving it is the quickest way; writing them by hand
+   with `vent inspect` and `vent anchor` works too.
+2. Run each tool once on something harmless, then `vent verify <app>`.
+3. Copy `~/.ventriloquist/packs/<bundle id>/pack.json` to
+   `examples/<app>/pack.json` and scrub anything personal from it, as in
+   step 2 of the next section. Literal text a tool types is in the file
+   too.
+4. Add a README next to it: what each tool does, what none of them do
+   (WhatsApp's says none of them sends), and the app and macOS version
+   you recorded on. Add a row to `examples/README.md`.
+5. `uv run pytest` runs the same privacy checks on `examples/` as on the
+   bundled packs.
+
 ## Shipping a pack
 
 Packs you record land in `~/.ventriloquist/packs/<bundle id>/pack.json`

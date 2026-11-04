@@ -186,6 +186,64 @@ class Policy:
         return Verdict(True, "empty field", "reversible")
 
 
+# Live mode (live.py) lets the client's model press and type in any app.
+# It is not exploration: the user asked for the task, and the model has to
+# get through dialogs and unlabelled toolbar icons to do it. So nothing is
+# refused for being unknown. Instead every act is put in one of three
+# kinds: run, ask the user first, or refuse.
+LIVE_TYPE_ROLES = {"AXTextField", "AXTextArea", "AXComboBox"}
+# Typing into a field replaces what it holds. A search box holds a few
+# words; past this many characters it is a document or a draft, and
+# replacing it is the user's call.
+LIVE_REPLACE_ASK_CHARS = 280
+
+
+def screen_live(node: Node, op: str, current_value: str = "") -> Verdict:
+    """May live mode press this element, or type into it?
+
+    allowed=False refuses. allowed=True with classification "destructive"
+    runs only after the user says yes, and a tool saved from such a step is
+    high risk. Anything else runs. The verb lists are the exploration
+    policy's, so a press that exploration would refuse for its label is one
+    live mode asks about.
+    """
+    window = _fold(node.window_title)
+    if node.subrole == "AXSecureTextField":
+        return Verdict(False, "it is a password field, which vent never touches", "destructive")
+    if any(word in window for word in AUTH_WINDOW_WORDS):
+        return Verdict(False, "it is in a sign-in or password window, which the user should handle", "destructive")
+
+    if op == "set_value":
+        if node.role not in LIVE_TYPE_ROLES:
+            kind = node.role.removeprefix("AX") or "element"
+            return Verdict(False, f"vent types only into text fields, and this is a {kind}", "unknown")
+        if len(current_value) > LIVE_REPLACE_ASK_CHARS:
+            return Verdict(True, f"typing replaces the {len(current_value)} characters already in it", "destructive")
+        return Verdict(True, "typing into a text field", "reversible")
+
+    label = _fold(node.label)
+    if not label:
+        return Verdict(True, "it has no label, so vent cannot tell what it does", "destructive")
+    # A label with no letters at all ("+", "2") has no verb to hide. One in
+    # another script, or mixing scripts the way lookalike letters do, can't
+    # be read against the English verb lists.
+    if _scripts(label) - {"LATIN"}:
+        return Verdict(True, "vent cannot read its label against its English word lists", "destructive")
+    words = _words(label)
+    for verb in sorted(DESTRUCTIVE_VERBS):
+        if _has_verb(words, verb):
+            return Verdict(True, f"its label says {verb!r}", "destructive")
+    for verb in CONTEXTUAL_VERBS:
+        if _has_verb(words, verb) and any(word in f"{window} {label}" for word in DANGEROUS_CONTEXT_WORDS):
+            return Verdict(True, f"its label says {verb!r} in a window about {node.window_title!r}", "destructive")
+    if set(_words(window)) & (DESTRUCTIVE_VERBS | CONTEXTUAL_VERBS) and label in GENERIC_CONFIRM_LABELS:
+        return Verdict(True, f"it confirms the window {node.window_title!r}", "destructive")
+    for verb in CUMULATIVE_VERBS:
+        if _has_verb(words, verb):
+            return Verdict(True, f"its label says {verb!r}", "cumulative")
+    return Verdict(True, "no sign it sends, deletes or spends anything", "reversible")
+
+
 def screen_heal_target(role: str, label: str, window_title: str, subrole: str = "") -> Verdict:
     """May a healed anchor re-point a tool's step onto this element?
 

@@ -560,7 +560,7 @@ def test_failures_wrap_app_text_as_untrusted(tmp_path, monkeypatch, failure):
 def test_deterministic_half_never_imports_llm():
     """CONTRIBUTING rule 2. Serving a pack must not be able to reach a model."""
     package_dir = Path(vent.__file__).resolve().parent
-    for module in ("runtime.py", "server.py"):
+    for module in ("runtime.py", "server.py", "live.py"):
         tree = ast.parse((package_dir / module).read_text())
         imported = set()
         for node in ast.walk(tree):

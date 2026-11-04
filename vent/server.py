@@ -32,8 +32,10 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import sys
 import threading
+import time
 import unicodedata
 from contextlib import AsyncExitStack
 from pathlib import Path
@@ -42,11 +44,12 @@ from typing import Any, Awaitable, Callable, Union
 import anyio
 import mcp.types as types
 from mcp.server import Server
+from mcp.server.lowlevel.server import NotificationOptions
 from mcp.server.request_state import RequestStateBoundary, RequestStateSecurity
 from mcp.server.stdio import stdio_server
 from mcp_types.version import is_version_at_least
 
-from . import __version__, ax, heal, packs, runtime
+from . import __version__, ax, heal, live, packs, runtime
 from .untrusted import wrap_untrusted
 
 LOCK_TIMEOUT_S = 180.0
@@ -70,6 +73,29 @@ SHOWN_ARGUMENT_LIMIT = 2000
 # From this protocol revision on, a server may not send the client a
 # request mid-call; the question rides an input_required result instead.
 INPUT_REQUIRED_VERSION = "2026-07-28"
+
+# On the input_required path a yes comes back with the request state this
+# process handed out. Each state carries a one-time token, so a client
+# can't resend one yes to run the call again (a second Send on one
+# approval). Tokens nobody answers expire with the SDK's ten-minute seal.
+CONFIRM_TOKEN_TTL_S = 600.0
+_issued_tokens: dict[str, float] = {}
+
+
+def _issue_token() -> str:
+    now = time.monotonic()
+    for token, issued in list(_issued_tokens.items()):
+        if now - issued > CONFIRM_TOKEN_TTL_S:
+            del _issued_tokens[token]
+    token = secrets.token_hex(16)
+    _issued_tokens[token] = now
+    return token
+
+
+def _take_token(token: str) -> bool:
+    issued = _issued_tokens.pop(token, None)
+    return issued is not None and time.monotonic() - issued <= CONFIRM_TOKEN_TTL_S
+
 
 # How long the main thread waits between turns of AppKit's run loop. Each
 # turn runs the loop for 50 ms (ax.refresh_app_state).
@@ -214,7 +240,7 @@ def confirmation_message(pack: packs.Pack, spec: packs.ToolSpec, name: str, argu
 
 
 async def _confirm(
-    ctx: Any, params: types.CallToolRequestParams, name: str, question: str
+    ctx: Any, params: types.CallToolRequestParams, name: str, question: str, not_done: str = "was not run"
 ) -> Union[types.InputRequiredResult, str, None]:
     """Ask the user to confirm one call. None means they accepted; a string
     is the refusal to return; an input_required result carries the question
@@ -224,29 +250,33 @@ async def _confirm(
     other arguments, or one the server never asked, asks again. On the
     input_required path the request state carrying the asked question is
     sealed by the SDK's RequestStateBoundary, which also binds it to the
-    tool and its arguments."""
+    tool and its arguments, and it carries a one-time token, so a yes is
+    good for one call."""
     if is_version_at_least(ctx.protocol_version, INPUT_REQUIRED_VERSION):
         asked = hashlib.sha256(question.encode("utf-8")).hexdigest()
         answer = (params.input_responses or {}).get(CONFIRM_KEY)
-        if answer is None or params.request_state != asked:
+        digest, _, token = (params.request_state or "").partition(":")
+        if answer is None or digest != asked or not _take_token(token):
             request = types.ElicitRequest(
                 params=types.ElicitRequestFormParams(message=question, requested_schema=CONFIRM_SCHEMA)
             )
-            return types.InputRequiredResult(input_requests={CONFIRM_KEY: request}, request_state=asked)
+            return types.InputRequiredResult(
+                input_requests={CONFIRM_KEY: request}, request_state=f"{asked}:{_issue_token()}"
+            )
         action = answer.action if isinstance(answer, types.ElicitResult) else None
     else:
         try:
             result = await ctx.session.elicit_form(question, CONFIRM_SCHEMA, related_request_id=ctx.request_id)
         except Exception as exc:  # no answer is a no
-            return f"{name} was not run: asking the user to confirm it failed ({exc}). Refusing."
+            return f"{name} {not_done}: asking the user to confirm it failed ({exc}). Refusing."
         action = result.action
     if action == "accept":
         return None
     if action == "decline":
-        return f"{name} was not run: the user declined it."
+        return f"{name} {not_done}: the user declined it."
     if action == "cancel":
-        return f"{name} was not run: the user dismissed the confirmation without answering."
-    return f"{name} was not run: the confirmation came back without an answer. Refusing."
+        return f"{name} {not_done}: the user dismissed the confirmation without answering."
+    return f"{name} {not_done}: the confirmation came back without an answer. Refusing."
 
 
 def _error(text: str) -> types.CallToolResult:
@@ -297,6 +327,8 @@ def _registry(loaded: list[packs.Pack]) -> dict[str, tuple[packs.Pack, packs.Too
                 problem = "its name has no ASCII letters or digits to make an MCP name from"
             elif not TOOL_NAME.fullmatch(key):
                 problem = f"its MCP name {key} is {len(key)} characters long, over MCP's 128"
+            elif key in live.TOOL_NAMES:
+                problem = f"its MCP name {key} is the name of one of vent's own live-mode tools"
             elif key in registry:
                 other, other_spec = registry[key]
                 problem = (
@@ -348,9 +380,196 @@ def build_server(search_path: list[Path]) -> Server:
     # (SECURITY.md T6).
     redact_values = os.getenv("VENT_NO_VALUES") == "1"
 
+    # Live mode (live.py), served only with VENT_LIVE=1. Its state lives as
+    # long as this process: each app's last look and the steps that ran.
+    live_on = live.enabled()
+    live_state = live.Live()
+
+    def lock_for(bundle_id: str) -> anyio.Lock:
+        """An app's lock, made on first use for an app live mode reaches
+        that no pack covers. The thread limiter grows with the locks."""
+        if bundle_id not in app_locks:
+            app_locks[bundle_id] = anyio.Lock()
+            tool_threads.total_tokens = len(app_locks)
+        return app_locks[bundle_id]
+
+    def refresh(pack: packs.Pack) -> None:
+        """Serve a pack that live mode just saved, in place of its old copy."""
+        for key in [key for key, (held, _) in registry.items() if held.bundle_id == pack.bundle_id]:
+            del registry[key]
+        for spec in pack.tools:
+            key = tool_name(pack, spec)
+            if TOOL_NAME.fullmatch(key) and key not in registry and key not in live.TOOL_NAMES:
+                registry[key] = (pack, spec)
+        lock_for(pack.bundle_id)
+
+    def live_tools() -> list[types.Tool]:
+        schemas = live.tool_schemas()
+        shown = [
+            (live.LOOK_TOOL, "Live: look at an app", live.LOOK_DESCRIPTION, True, False),
+            (live.ACT_TOOL, "Live: press or type", live.ACT_DESCRIPTION, False, True),
+            (live.SAVE_TOOL, "Live: save steps as a tool", live.SAVE_DESCRIPTION, False, False),
+        ]
+        return [
+            types.Tool(
+                name=key,
+                title=title,
+                description=description,
+                inputSchema=schemas[key],
+                annotations=types.ToolAnnotations(
+                    title=title, read_only_hint=reads, destructive_hint=destroys, open_world_hint=False
+                ),
+            )
+            for key, title, description, reads, destroys in shown
+            if reads or not read_only
+        ]
+
+    async def held(bundle_id: str, front: bool, name: str, work, *args):
+        """Run live work on a worker thread under the app's lock, and the
+        front's for an act, the way a pack tool's call runs."""
+        async with AsyncExitStack() as stack:
+            with anyio.move_on_after(LOCK_TIMEOUT_S) as queue:
+                await stack.enter_async_context(lock_for(bundle_id))
+                if front:
+                    await stack.enter_async_context(front_lock)
+            if queue.cancelled_caught:
+                raise live.LiveError(f"waited {LOCK_TIMEOUT_S:g}s for earlier calls to finish. Giving up on the queue.")
+            return await anyio.to_thread.run_sync(work, *args, limiter=tool_threads)
+
+    def live_error(name: str, message: str) -> types.CallToolResult:
+        # Messages can quote the app (labels, window titles), so they are
+        # wrapped like a pack tool's failure.
+        return _error(f"{name} failed:\n" + wrap_untrusted(f"{name} error", message))
+
+    def bundle_of(app_name: str) -> str:
+        return live._checked_bundle(ax.find_app(app_name))
+
+    async def on_live_call(
+        ctx, params: types.CallToolRequestParams, name: str, arguments: dict
+    ) -> Union[types.CallToolResult, types.InputRequiredResult]:
+        if read_only and name != live.LOOK_TOOL:
+            return _error(f"{name} changes the app, and this server was started with VENT_READ_ONLY=1. Refusing.")
+        app_name = arguments.get("app")
+        if not isinstance(app_name, str) or not app_name.strip():
+            return _error(f"{name}: app must be the name of a running app, such as Mail.")
+        try:
+            bundle_id = await anyio.to_thread.run_sync(bundle_of, app_name, limiter=tool_threads)
+            if name == live.LOOK_TOOL:
+                size = arguments.get("max_elements", live.DEFAULT_ELEMENTS)
+                if isinstance(size, bool) or not isinstance(size, int):
+                    size = live.DEFAULT_ELEMENTS
+                menus = arguments.get("menus") is True
+                session, body = await held(bundle_id, False, name, live_state.look, app_name, size, menus)
+                text = live_state.look_header(session)
+                if session.nodes:
+                    text += "\n" + wrap_untrusted(f"{session.app_name} live look", body)
+                note = live_state.recorded_note(session)
+                return types.CallToolResult(
+                    content=[types.TextContent(type="text", text=f"{text}\n{note}".strip())]
+                )
+
+            if name == live.ACT_TOOL:
+                pending = await held(
+                    bundle_id, False, name, live_state.prepare, app_name, arguments.get("element"), arguments.get("text")
+                )
+                if not pending.verdict.allowed:
+                    raise live.LiveError(
+                        f"vent will not touch {live.describe(pending.node)}: {pending.verdict.reason}."
+                    )
+                if pending.asks and not allow_high:
+                    if not client_can_confirm(ctx):
+                        raise live.LiveError(
+                            f"vent asks the user before this act because {pending.verdict.reason}, and this "
+                            "client cannot ask (it did not declare MCP elicitation). Ask the user to do "
+                            "this step in the app themselves."
+                        )
+                    answer = await _confirm(ctx, params, name, pending.question(), not_done="was not done")
+                    if isinstance(answer, types.InputRequiredResult):
+                        return answer
+                    if answer is not None:
+                        return _error(answer)
+                message = await held(bundle_id, True, name, live_state.run, pending)
+                return types.CallToolResult(content=[types.TextContent(type="text", text=message)])
+
+            draft = await held(
+                bundle_id,
+                False,
+                name,
+                live_state.build,
+                app_name,
+                arguments.get("name"),
+                arguments.get("description"),
+                arguments.get("steps"),
+                arguments.get("params"),
+                arguments.get("risk"),
+            )
+            # A name another app's tool already serves under would save a
+            # tool nobody can call, so it's refused before the user is asked.
+            planned = tool_name(packs.Pack(bundle_id, draft.session.app_name, tools=[]), draft.spec)
+            holder = registry.get(planned)
+            if planned in live.TOOL_NAMES or (holder is not None and holder[0].bundle_id != bundle_id):
+                raise live.LiveError(f"{planned} is already another app's tool. Save it under another name.")
+            base, _ = await anyio.to_thread.run_sync(live.existing_pack, writable_dir, bundle_id)
+            replaces = base is not None and any(tool.name == draft.spec.name for tool in base.tools)
+            if not client_can_confirm(ctx):
+                path = await anyio.to_thread.run_sync(live.save_draft, draft)
+                return types.CallToolResult(
+                    content=[
+                        types.TextContent(
+                            type="text",
+                            text=(
+                                f"Not saved yet: this client cannot ask the user to approve a tool. It is "
+                                f"waiting at {path}. Ask the user to run `vent approve` in their own terminal, "
+                                "which shows the exact steps and saves it on a yes. It won't run from your shell."
+                            ),
+                        )
+                    ]
+                )
+            answer = await _confirm(ctx, params, name, draft.question(replaces), not_done="was not saved")
+            if isinstance(answer, types.InputRequiredResult):
+                return answer
+            if answer is not None:
+                return _error(answer)
+            # Under the app's lock, so two saves (or a heal) can't each
+            # read the old pack and the last write drop the other's tool.
+            pack, path = await held(bundle_id, False, name, live.write, draft.pack(), writable_dir)
+            refresh(pack)
+            try:
+                await ctx.session.send_tool_list_changed()
+            except Exception:  # a client that missed it sees the tool after a restart
+                pass
+            saved = tool_name(pack, draft.spec)
+            if registry.get(saved, (None, None))[0] is not pack:
+                return types.CallToolResult(
+                    content=[
+                        types.TextContent(
+                            type="text",
+                            text=(
+                                f"Saved {draft.spec.name} to {path}, but it can't be served as {saved}: "
+                                "another app's tool already has that name. Save it again under another name."
+                            ),
+                        )
+                    ]
+                )
+            return types.CallToolResult(
+                content=[
+                    types.TextContent(
+                        type="text",
+                        text=(
+                            f"Saved {saved} to {path}. It replays these steps with no model. If it is "
+                            "not in your tool list yet, the MCP client needs a restart to see it."
+                        ),
+                    )
+                ]
+            )
+        except (live.LiveError, runtime.ToolExecutionError, ax.AXError, packs.PackError) as exc:
+            return live_error(name, str(exc))
+        except Exception as exc:  # never leak a bare traceback to the client
+            return live_error(name, f"internal error: {exc!r}")
+
     async def on_list_tools(ctx, params) -> types.ListToolsResult:
         can_confirm = client_can_confirm(ctx)
-        tools = []
+        tools = live_tools() if live_on else []
         for name, (pack, spec) in registry.items():
             if risk_refusal(spec, allow_high, read_only=read_only, can_confirm=can_confirm) is not None:
                 continue
@@ -371,6 +590,8 @@ def build_server(search_path: list[Path]) -> Server:
     ) -> Union[types.CallToolResult, types.InputRequiredResult]:
         name = params.name
         arguments = params.arguments or {}
+        if live_on and name in live.TOOL_NAMES:
+            return await on_live_call(ctx, params, name, arguments)
         if name not in registry:
             return _error(f"Unknown tool {name!r}")
         pack, spec = registry[name]
@@ -424,6 +645,13 @@ def build_server(search_path: list[Path]) -> Server:
         instructions=(
             "Tools compiled from Mac apps by Ventriloquist. Each call replays "
             "a recorded accessibility workflow deterministically."
+            + (
+                " For an app with no tool yet, the vent_live_ tools look at it and act on it "
+                "through its accessibility tree, and vent_live_save keeps steps that worked "
+                "as a new tool once the user approves."
+                if live.enabled()
+                else ""
+            )
         ),
         on_list_tools=on_list_tools,
         on_call_tool=on_call_tool,
@@ -492,6 +720,8 @@ def serve_stdio(search_path: list[Path]) -> None:
 
     async def main() -> None:
         async with stdio_server() as (read, write):
-            await server.run(read, write, server.create_initialization_options())
+            # Live mode adds tools while the server runs, and says so.
+            options = server.create_initialization_options(NotificationOptions(tools_changed=True))
+            await server.run(read, write, options)
 
     serve_beside_run_loop(main)

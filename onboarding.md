@@ -72,6 +72,14 @@ the user the change.
   itself: `vent mcp-config` prints that file's path, and the user drags it
   from Finder into the Accessibility list.
 
+Ask the user whether to turn on live mode, in one line: it lets you use
+any app that has no vent tool yet, asks them before anything that looks
+like sending, deleting or paying, and can save what worked as a tool once
+they approve. Live mode needs vent 0.5.0 or later (`vent --version`). If yes, add
+`VENT_LIVE=1` to the server's environment:
+`vent mcp-config --live` prints the entry with it, and for Claude Code add
+`-e VENT_LIVE=1` before `ventriloquist` in the command above.
+
 The permission belongs to whichever app starts vent: the terminal for
 Claude Code and Codex, Cursor itself for Cursor. Then the user restarts
 that app, and the tools show up with names like
@@ -94,5 +102,6 @@ no such command, fetch the same file instead:
 
 Ask which Mac app they want vent to use. If it's TextEdit, Notes, VS Code
 or Slack, show them the tools that ship (the skill lists them). For any
-other app, run `vent doctor <App>` and follow "Making a tool for another
-app" in the skill.
+other app, run `vent doctor <App>`. With live mode on, do a small task in
+it with the live tools and offer to save it. Otherwise follow "Making a
+tool for another app" in the skill.

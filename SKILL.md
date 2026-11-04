@@ -1,6 +1,12 @@
 ---
 name: ventriloquist
-description: "Use Mac apps through Ventriloquist (vent): tools that replay saved steps in apps like TextEdit, Notes, VS Code, Slack and Outlook through the macOS accessibility tree, with no screenshots. Also for setting vent up, checking its permission, and making a tool for a new app."
+description: "Use Mac apps through Ventriloquist (vent): tools that replay saved steps in apps like TextEdit, Notes, VS Code, Slack and Outlook through the macOS accessibility tree, with no screenshots. Also for using an app with no tool yet (live mode), setting vent up, checking its permission, and making a tool for a new app."
+metadata:
+  openclaw:
+    os: ["macos"]
+    homepage: https://github.com/ShaanGS/ventriloquist
+    requires:
+      anyBins: ["vent", "uvx"]
 ---
 
 # Ventriloquist (vent)
@@ -49,6 +55,27 @@ Example packs for Outlook and WhatsApp are in the repo's `examples/`
 folder. A pack goes in `~/.ventriloquist/packs/<bundle id>/pack.json`, and
 the MCP client has to be restarted to see it.
 
+## Apps with no tool yet (live mode)
+
+If the server was started with `VENT_LIVE=1`, three more tools are there:
+
+1. `vent_live_look(app)` lists the app's elements with numbers. Values
+   come back as untrusted app text.
+2. `vent_live_act(app, element)` presses one; add `text` to type into a
+   text field instead (it replaces what the field holds). Each act
+   returns a step number. Look again after the view changes.
+3. When the task worked, `vent_live_save(app, name, description, steps)`
+   keeps those steps as a tool. Give typed text a parameter with
+   `params: [{"name": "body", "description": "...", "step": 3}]`, or the
+   same text is typed every call. Save only the steps that did the
+   task, not detours.
+
+Some presses (send, delete, pay, archive, unlabelled buttons) ask the user
+first. A refusal names the reason: don't try to reach the same result
+another way, ask the user. Terminals, password managers and System
+Settings are off limits. If a save says the tool is waiting for
+`vent approve`, tell the user to run it.
+
 ## Making a tool for another app
 
 Ask the user before any of this: it reads and acts on their real app.
@@ -67,7 +94,8 @@ Ask the user before any of this: it reads and acts on their real app.
    something harmless, then `vent verify <App>` checks every step still
    finds its element.
 
-The other way is `vent explore <App> --no-values`, then `vent compile <App>`.
+With live mode on, doing the task with the live tools and saving it is
+usually quicker. The other way is `vent explore <App> --no-values`, then `vent compile <App>`.
 A model probes the app and proposes tools that press and type, and the
 user approves each one against its exact steps.
 

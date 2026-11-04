@@ -555,6 +555,41 @@ class Pack:
         )
 
 
+def step_summary(spec: ToolSpec, app_name: str) -> str:
+    """The ground-truth rendering shown at the approval gate. Built from the
+    steps themselves, never from model text (SECURITY.md T5). Every value a
+    step writes is shown: the argument it is bound to, or the literal text.
+    The one model text included is each argument's description, labelled as
+    the model's, since it is what the client will be told to pass."""
+    lines = [f"{spec.name!r} (risk: {spec.risk}) does exactly this to {app_name!r}:"]
+    for index, step in enumerate(spec.steps):
+        target = ""
+        if step.anchor:
+            label = step.anchor.labels[0] if step.anchor.labels else ""
+            target = f" {step.anchor.role}"
+            if label:
+                target += f" {label!r}"
+            elif step.anchor.identifier:
+                target += f" id={step.anchor.identifier}"
+            if step.anchor.window_title:
+                target += f" in window {step.anchor.window_title!r}"
+        if step.op == "press" and step.action != "AXPress":
+            target += f" with {step.action}"
+        value = ""
+        if step.value and "param" in step.value:
+            value = f" with argument {step.value['param']!r}"
+        elif step.value and "literal" in step.value:
+            value = f" with the literal text {str(step.value['literal'])!r}"
+        lines.append(f"  step {index}: {step.op}{target}{value}")
+    if not spec.params:
+        lines.append("It takes no arguments.")
+    else:
+        lines.append(f"It takes {len(spec.params)} argument(s), described by the model as:")
+        for param, meta in spec.params.items():
+            lines.append(f"  {param} ({meta.get('type', 'string')}): {meta.get('description', '')!r}")
+    return "\n".join(lines)
+
+
 def load(path: Path) -> Pack:
     """Read and validate one pack. Every way a file can be wrong, from bytes
     that are not UTF-8 to a list where an object belongs, comes out as a

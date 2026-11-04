@@ -383,10 +383,55 @@ quarantine it. This doesn't make injection impossible; it makes the
 boundary visible to the party that can act on it. Tests pin both,
 including that app text can't close the wrapper early.
 
+### T13. Live mode
+
+Live mode (`VENT_LIVE=1`, off by default) gives the client's model three
+more tools: look at any running app, press or type in it by element
+number, and save steps that ran as a new tool. That is the open-ended
+control the rest of this document avoids, so it is opt-in, and the
+controls are these:
+
+- Every act runs as a one-step tool through the runtime, so the checks
+  every pack step gets apply: the element is found again from its anchor,
+  a sheet in the way stops it, the expected role must match, and password
+  fields are never read or written (they never even show up in a look).
+- Each act is screened first (`policy.screen_live`). Presses whose label
+  carries one of T3's destructive verbs (send, delete, pay, archive, and
+  the rest), buttons with no label, labels in another script, typing that
+  would replace more than 280 characters, and generic confirm buttons on
+  a window whose title carries such a verb all ask the user through MCP
+  elicitation first. A client that can't ask is refused, unless the
+  server runs with `VENT_ALLOW_HIGH=1`. Anything in a sign-in or password
+  window is refused outright.
+- Terminals, script editors, password managers and System Settings are
+  refused whatever the element. Typing there runs commands or changes
+  security settings.
+- Saving is the user's decision, never the model's. The tool is built
+  from the anchors that ran, never from model text (as in T5), and the
+  user is shown the exact steps, every literal text it will type, and its
+  risk before anything is written. A client without elicitation can't
+  save directly: the tool waits in `~/.ventriloquist/drafts` (owner-only)
+  until `vent approve` shows it in a terminal. `vent approve` and
+  `vent add-pack` refuse piped input, so an agent told to run them
+  doesn't answer for you. That's a speed bump, not a boundary: an agent
+  with a shell can fake a terminal, and could write the pack file
+  directly anyway. If the agent has a shell, the shell is the bigger
+  grant. A step the user had to
+  approve while acting makes the saved tool `high` risk, so every later
+  call asks again. The model may raise a tool's risk, never lower it.
+- A look returns app text, wrapped as untrusted content (T12), and
+  `VENT_NO_VALUES=1` leaves field values out of it.
+
+What this doesn't change: the Accessibility grant (T10) already let
+anything in the trusted process drive every app. Live mode is the first
+time vent hands that reach to the client's model, which is why it asks
+before anything that looks irreversible and why it's off unless you turn
+it on.
+
 ## Standing rules for contributors
 
 - A new step op needs this document updated and a policy review first.
-- `runtime.py` and `server.py` don't import `llm.py`. The server reaches
+- `runtime.py`, `server.py` and `live.py` don't import `llm.py`. The server reaches
   a model only through the healer, and only with `VENT_HEAL=1`.
 - Healed anchors are never promoted automatically. No exceptions for
   "obvious" fixes.
