@@ -86,11 +86,13 @@ mkdir -p ~/.claude/skills/ventriloquist && vent skill > ~/.claude/skills/ventril
 ```
 
 Other agents can keep the output of `vent skill` wherever they keep
-instructions.
+instructions. `vent skill` arrived after 0.4.0. If this vent says there is
+no such command, fetch the same file instead:
+`curl -fsSL https://raw.githubusercontent.com/ShaanGS/ventriloquist/main/SKILL.md`
 
 ## 6. What next
 
 Ask which Mac app they want vent to use. If it's TextEdit, Notes, VS Code
-or Slack, show them the tools that ship (`vent skill` lists them). For any
+or Slack, show them the tools that ship (the skill lists them). For any
 other app, run `vent doctor <App>` and follow "Making a tool for another
 app" in the skill.
