@@ -3,6 +3,7 @@ steps that ran as a tool. Runs on fake trees, so no app or permission is
 involved."""
 
 import json
+from pathlib import Path
 
 import anyio
 import mcp.types as types
@@ -428,7 +429,7 @@ def user_dir(tmp_path, monkeypatch):
     return tmp_path / "user"
 
 
-EXAMPLES = paths.BUNDLED_PACKS_DIR.parent.parent / "examples"
+EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 
 
 def test_add_pack_adds_only_the_tools_you_approve(user_dir):
