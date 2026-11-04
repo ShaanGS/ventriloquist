@@ -1,0 +1,20 @@
+{
+  "name": "ventriloquist",
+  "displayName": "Ventriloquist",
+  "version": "0.5.0",
+  "description": "Let your agent use Mac apps through the accessibility tree, with no screenshots, and save what worked as tools that replay with no model.",
+  "author": {
+    "name": "ShaanGS",
+    "url": "https://github.com/ShaanGS"
+  },
+  "homepage": "https://github.com/ShaanGS/ventriloquist",
+  "repository": "https://github.com/ShaanGS/ventriloquist",
+  "license": "MIT",
+  "keywords": [
+    "macos",
+    "accessibility",
+    "mcp",
+    "automation",
+    "computer-use"
+  ]
+}

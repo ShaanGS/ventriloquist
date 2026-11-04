@@ -1,0 +1,15 @@
+{
+  "name": "ventriloquist",
+  "owner": {
+    "name": "ShaanGS",
+    "url": "https://github.com/ShaanGS"
+  },
+  "description": "Ventriloquist: Mac apps as MCP tools through the accessibility tree.",
+  "plugins": [
+    {
+      "name": "ventriloquist",
+      "source": "./integrations/claude-plugin",
+      "description": "Let your agent use Mac apps through the accessibility tree, with no screenshots, and save what worked as tools that replay with no model."
+    }
+  ]
+}

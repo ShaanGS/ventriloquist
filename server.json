@@ -7,17 +7,23 @@
     "url": "https://github.com/ShaanGS/ventriloquist",
     "source": "github"
   },
-  "version": "0.4.0",
+  "version": "0.5.0",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "ventriloquist-mcp",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
       },
       "environmentVariables": [
+        {
+          "name": "VENT_LIVE",
+          "description": "Set to 1 for live mode: the agent can look at and use any running app through its accessibility tree, and save steps that worked as a tool once you approve them. Sends, deletes and the like ask you first.",
+          "isRequired": false,
+          "format": "string"
+        },
         {
           "name": "VENT_ALLOW_HIGH",
           "description": "Set to 1 to run tools a pack marks as high risk without asking. Without it, they're offered only to clients that can ask you to confirm each call (MCP elicitation).",

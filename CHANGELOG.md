@@ -4,8 +4,30 @@ The notes for every release are on
 [GitHub Releases](https://github.com/ShaanGS/ventriloquist/releases). This
 file lists what has changed since the last one.
 
-## Unreleased
+## 0.5.0 (2026-11-05)
 
+Live mode, for Mac apps with no tool yet, and a plugin for Claude Code
+and OpenClaw.
+
+- Live mode, for apps with no tool yet. Start the server with
+  `VENT_LIVE=1` (`vent mcp-config --live` prints the entry) and the agent
+  can look at any running app as a numbered list of elements, press and
+  type by number, and save steps that worked as a new tool. Every act runs
+  through the same runtime as a saved tool. Presses that look like
+  sending, deleting or paying, unlabelled buttons and typing over long
+  text ask the user first; password fields, sign-in windows, terminals,
+  password managers and System Settings are refused. Nothing is saved
+  until the user approves the exact steps. Clients without MCP
+  elicitation leave the tool for `vent approve`. See SECURITY.md T13.
+- A plugin for Claude Code and OpenClaw in `integrations/claude-plugin`,
+  with this repo as its Claude Code marketplace. It starts vent through
+  `uvx` with live mode on and adds the skill.
+- `vent add-pack examples/<app>` adds a shared pack's tools after you
+  approve each one against its exact steps. `examples/README.md` lists
+  the shared packs and how to add yours.
+- On the 2026-07-28 MCP protocol, a yes to a confirmation is good for
+  one call. A client could resend the same answer to run a high risk call
+  again.
 - Set vent up by pasting one prompt into your coding agent. The agent
   follows the new `onboarding.md`: it checks what's in place, installs
   vent, connects it to your agent app and stops only for the steps that

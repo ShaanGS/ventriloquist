@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "ventriloquist": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "ventriloquist-mcp>=0.5.0",
+        "ventriloquist-mcp"
+      ],
+      "env": {
+        "VENT_LIVE": "1"
+      }
+    }
+  }
+}
