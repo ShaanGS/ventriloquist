@@ -579,3 +579,21 @@ def test_a_name_another_app_serves_is_refused_before_asking(live_server, mail):
     assert results[2].is_error and "another app's tool" in results[2].content[0].text
     assert asked == []
     assert not (user_dir / MAIL).exists()
+
+
+def test_a_look_waits_out_an_app_that_is_still_launching(mail, monkeypatch):
+    """Seen live: TextEdit opened and looked at two seconds later answered
+    "cannot complete" (AXError -25204) for a moment."""
+    root, _ = mail
+    calls = []
+
+    def app_element(running):
+        calls.append(1)
+        if len(calls) < 3:
+            raise ax.AXTransientError("App is not answering accessibility queries (AXError -25204).")
+        return root
+
+    monkeypatch.setattr(ax, "app_element", app_element)
+    monkeypatch.setattr(live, "LOOK_RETRY_S", 0)
+    session, body = live.Live().look("Mail")
+    assert "Send" in body and len(calls) == 3

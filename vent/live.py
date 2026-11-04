@@ -32,6 +32,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
@@ -49,6 +50,12 @@ TOOL_NAMES = (LOOK_TOOL, ACT_TOOL, SAVE_TOOL)
 
 DEFAULT_ELEMENTS = 400
 MAX_ELEMENTS = 1500
+# An app that was just opened answers "cannot complete" for a moment while
+# it finishes launching. An agent usually looks right after opening one, so
+# a look waits that out before reporting it.
+LOOK_RETRIES = 3
+LOOK_RETRY_S = 0.5
+
 # Steps kept per app while the server runs. Save numbers them from 0.
 MAX_RECORDED = 200
 
@@ -283,9 +290,16 @@ class Live:
         and the rendered list, which is app text."""
         app = ax.find_app(app_name)
         bundle_id = _checked_bundle(app)
-        root = ax.app_element(app)
         max_elements = max(1, min(int(max_elements), MAX_ELEMENTS))
-        snap = snapshot(root, max_nodes=max_elements, include_menus=menus)
+        for attempt in range(LOOK_RETRIES + 1):
+            try:
+                root = ax.app_element(app)
+                snap = snapshot(root, max_nodes=max_elements, include_menus=menus)
+                break
+            except ax.AXTransientError:
+                if attempt == LOOK_RETRIES:
+                    raise
+                time.sleep(LOOK_RETRY_S)
         session = self.sessions.get(bundle_id)
         if session is None:
             session = self.sessions[bundle_id] = AppSession(bundle_id=bundle_id, app_name=app.name)
