@@ -26,9 +26,8 @@ To try it:
 3. Restart your MCP client. The tools show up as `outlook_read_selected_message`
    and so on.
 
-It needs a vent newer than 0.3.1, which checks the folder list (0.3.1
-refuses the pack). Until the next release, install from GitHub:
-`uv tool install git+https://github.com/ShaanGS/ventriloquist`. The flag and filing tools bring Outlook to the
+It needs vent 0.4.0 or later, which checks the folder list (older
+versions refuse the pack). The flag and filing tools bring Outlook to the
 front while they run, because Outlook ignores those presses in the
 background. Anchors were recorded on one Mac, so a tool may refuse on yours
 until you re-record it with `vent inspect` and `vent anchor`.

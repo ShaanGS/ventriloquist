@@ -4,7 +4,10 @@ The notes for every release are on
 [GitHub Releases](https://github.com/ShaanGS/ventriloquist/releases). This
 file lists what has changed since the last one.
 
-## Unreleased
+## 0.4.0 (2026-11-04)
+
+Tools that check the app is in the right state before acting, and
+arguments limited to a list of allowed values.
 
 - A tool can check the app is in the state it needs before it acts (#2).
   An `element_exists` precondition names an element that is only on
