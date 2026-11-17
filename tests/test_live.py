@@ -817,3 +817,22 @@ def test_doctor_says_live_mode_refuses_terminals(monkeypatch):
     monkeypatch.setattr("time.sleep", lambda seconds: None)
     result = CliRunner().invoke(cli.main, ["doctor", "Terminal"])
     assert "Live mode won't drive Terminal" in result.output
+
+
+def test_a_look_shows_unlabelled_text_that_has_a_value():
+    """Found pressing buttons in Calculator: its result is an unlabelled
+    static text with no actions, and the look left it out."""
+    window = FakeElement(
+        "AXWindow",
+        "Calculator",
+        children=[
+            FakeElement("AXGroup", children=[
+                FakeElement("AXScrollArea", "Edit field", children=[FakeElement("AXStaticText", value="5")]),
+                FakeElement("AXStaticText", value=""),
+            ]),
+            PressRecorder("AXButton", "Equals"),
+        ],
+    )
+    root = FakeElement("AXApplication", "Calculator", children=[window])
+    texts = [n for n in snapshot(root).nodes if n.role == "AXStaticText"]
+    assert [n.value_preview for n in texts] == ["5"]

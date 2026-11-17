@@ -11,6 +11,9 @@ file lists what has changed since the last one.
   first, and how many sampled elements a saved tool could find again.
   `--report` adds a row for docs/COMPATIBILITY.md with counts and
   versions only, safe to paste into an issue.
+- A look shows unlabelled text that has a value. Calculator's result is
+  one, and the look used to leave it out, so an agent could press
+  2 + 3 = and never see the 5.
 
 ## 0.5.1 (2026-11-18)
 

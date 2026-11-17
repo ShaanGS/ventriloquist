@@ -317,6 +317,13 @@ def snapshot(
             role in ALWAYS_SHOW_ROLES
             or (role not in CONTAINER_ROLES and role != "AXApplication" and (label or actions))
         )
+        value_preview = None
+        if not interesting and role == "AXStaticText":
+            # Unlabelled text with no actions is how many apps show their
+            # content: Calculator's result is one, so a look that dropped
+            # it let an agent press 2 + 3 = and never see the 5.
+            value_preview = _preview(element.value)
+            interesting = bool(value_preview)
 
         if interesting:
             nodes.append(
@@ -326,7 +333,7 @@ def snapshot(
                     subrole=subrole,
                     label=label,
                     identifier=_identifier(element),
-                    value_preview=_preview(element.value),
+                    value_preview=value_preview if value_preview is not None else _preview(element.value),
                     actions=[a for a in actions if a != "AXShowMenu"],
                     chain=chain,
                     depth=shown_depth,
