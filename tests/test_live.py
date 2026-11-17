@@ -10,7 +10,7 @@ import mcp.types as types
 import pytest
 from click.testing import CliRunner
 
-from vent import ax, cli, live, packs, paths, policy, runtime
+from vent import anchors, ax, cli, live, packs, paths, policy, runtime
 from vent import server as server_mod
 from vent.packs import load, save
 from vent.server import build_server
@@ -598,3 +598,174 @@ def test_a_look_waits_out_an_app_that_is_still_launching(mail, monkeypatch):
     monkeypatch.setattr(live, "LOOK_RETRY_S", 0)
     session, body = live.Live().look("Mail")
     assert "Send" in body and len(calls) == 3
+
+
+# Lookalikes: found by the app sweep (Freeform's two scroll bars carry
+# identical arrow buttons, and their anchors tie).
+
+
+def twin_scrollbars():
+    first = PressRecorder("AXButton", "", subrole="AXIncrementArrow")
+    second = PressRecorder("AXButton", "", subrole="AXIncrementArrow")
+    window = FakeElement(
+        "AXWindow",
+        "Board",
+        children=[
+            FakeElement("AXScrollArea", children=[
+                FakeElement("AXScrollBar", children=[first]),
+                FakeElement("AXScrollBar", children=[second]),
+            ]),
+            PressRecorder("AXButton", "Share Board"),
+        ],
+    )
+    return FakeElement("AXApplication", "Board", children=[window]), first, second
+
+
+def test_anchors_refuse_twins_unless_told_which_one():
+    root, first, second = twin_scrollbars()
+    node = next(n for n in snapshot(root).nodes if n.element is second)
+    anchor = anchors.build(node)
+    with pytest.raises(anchors.AnchorAmbiguous):
+        anchors.locate(root, anchor)
+    found = anchors.locate(root, anchor, prefer=second)
+    assert found.element is second and found.tied
+    # A preference that isn't among the tied candidates changes nothing.
+    with pytest.raises(anchors.AnchorAmbiguous):
+        anchors.locate(root, anchor, prefer=root)
+
+
+def test_a_live_act_on_a_twin_presses_that_one_but_cannot_be_saved(monkeypatch):
+    root, first, second = twin_scrollbars()
+    app = ax.RunningApp("Board", "com.example.Board", 9)
+    monkeypatch.setattr(ax, "find_app", lambda name: app)
+    monkeypatch.setattr(ax, "find_app_by_bundle", lambda bundle_id: app)
+    monkeypatch.setattr(ax, "app_element", lambda running: root)
+    monkeypatch.setattr(ax, "app_version", lambda running: "1.0")
+    monkeypatch.setattr(ax, "activate", lambda running: True)
+    monkeypatch.setattr(runtime, "_wait_frontmost", lambda *args: None)
+    monkeypatch.setattr(runtime, "SETTLE_NO_REACTION_S", 0.01)
+    state = live.Live()
+    session, _ = state.look("Board")
+    pending = state.prepare("Board", number_of(session, second), None)
+    message = state.run(pending)
+    assert second.presses == 1 and first.presses == 0
+    assert "can't be part of a saved tool" in message
+    share = state.prepare("Board", number_of(session, root._children[0]._children[1]), None)
+    state.run(share)
+    with pytest.raises(live.LiveError, match="looks just like another one"):
+        state.build("Board", "scroll_down", "Scroll down.", [0, 1])
+    assert state.build("Board", "share", "Share the board.", [1]).spec.steps[0].op == "press"
+
+
+def test_a_slow_app_gets_a_partial_look_that_says_so(mail, monkeypatch):
+    """Found by the app sweep: Finder's file list took 22 s for 400
+    elements, so a look now stops at a time budget and says so."""
+    state = live.Live()
+    session, _ = state.look("Mail")
+    assert not session.out_of_time
+    session.out_of_time = True  # as if the budget ran out partway
+    assert "only part of it" in state.look_header(session)
+    monkeypatch.setattr(live, "LOOK_BUDGET_S", 0)
+    session, _ = state.look("Mail")
+    assert session.out_of_time and not session.nodes
+    assert "got nothing" in state.look_header(session)
+
+
+def test_an_app_that_never_answers_gets_a_plain_answer(mail, monkeypatch):
+    def app_element(running):
+        raise ax.AXTransientError("App is not answering accessibility queries (AXError -25204).")
+
+    monkeypatch.setattr(ax, "app_element", app_element)
+    monkeypatch.setattr(live, "LOOK_RETRY_S", 0)
+    with pytest.raises(live.LiveError, match="look again"):
+        live.Live().look("Mail")
+
+
+def test_the_look_budget_stops_inside_a_wide_list(monkeypatch):
+    """Review finding: the budget was checked only per element, so a
+    400-row list read every remaining row's attributes after time ran out."""
+    reads = []
+
+    class Row(FakeElement):
+        @property
+        def label(self):
+            reads.append(1)
+            return "row"
+
+        @label.setter
+        def label(self, value):
+            pass
+
+    table = FakeElement("AXTable", children=[Row("AXRow") for _ in range(400)])
+    root = FakeElement("AXApplication", "Files", children=[FakeElement("AXWindow", "Files", children=[table])])
+    from vent import snapshot as snapshot_mod
+
+    clock = iter([0.0] * 6 + [100.0] * 10_000)
+    monkeypatch.setattr(snapshot_mod.time, "monotonic", lambda: next(clock))
+    snap = snapshot_mod.snapshot(root, budget_s=1.0)
+    assert snap.out_of_time
+    assert len(reads) < 20
+
+
+def test_retries_share_one_deadline(mail, monkeypatch):
+    calls = []
+
+    def app_element(running):
+        calls.append(1)
+        raise ax.AXTransientError("App is not answering accessibility queries (AXError -25204).")
+
+    now = [0.0]
+    monkeypatch.setattr(live.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(live.time, "sleep", lambda s: now.__setitem__(0, now[0] + s))
+    monkeypatch.setattr(ax, "app_element", app_element)
+    with pytest.raises(live.LiveError, match=r"hasn't for \d+ s"):
+        live.Live().look("Mail")
+    assert now[0] <= live.LOOK_WAIT_S and len(calls) <= live.LOOK_RETRIES + 1
+
+
+def test_prefer_never_rescues_a_candidate_below_the_threshold(monkeypatch):
+    """The tie-break only chooses among candidates that pass on their own.
+    Here a window's close button ties with a labelled button deeper in,
+    and the threshold sits between their scores."""
+    close = PressRecorder("AXButton", "", subrole="AXCloseButton")
+    inner = PressRecorder("AXButton", "Go")
+    window = FakeElement("AXWindow", "", children=[close, FakeElement("AXSplitGroup", children=[inner])])
+    root = FakeElement("AXApplication", "Board", children=[window])
+    anchor = anchors.build(next(n for n in snapshot(root).nodes if n.element is close))
+    scores = {}
+    for element, chain, _ in anchors._walk_with_chains(root, 50):
+        score, _ = anchors._score(anchor, chain)
+        if element in (close, inner):
+            scores[element] = score
+    assert 0 < scores[close] - scores[inner] < anchors.AMBIGUITY_MARGIN, scores
+    monkeypatch.setattr(anchors, "ACCEPT_THRESHOLD", (scores[close] + scores[inner]) / 2)
+    with pytest.raises(anchors.AnchorAmbiguous):
+        anchors.locate(root, anchor, prefer=inner)
+
+
+def test_a_tie_the_focused_window_settles_stays_replayable():
+    """Review finding: prefer used to win before the focused-window
+    settle, marking steps a saved tool could replay as unsaveable."""
+    def board(name):
+        button = PressRecorder("AXButton", "Share")
+        return FakeElement("AXWindow", "", children=[button]), button
+
+    back, back_button = board("back")
+    front, front_button = board("front")
+    root = FakeElement("AXApplication", "Board", children=[back, front])
+    root.focused_window = front
+    node = next(n for n in snapshot(root).nodes if n.element is front_button)
+    anchor = anchors.build(node)
+    found = anchors.locate(root, anchor, prefer=front_button)
+    assert found.element is front_button and not found.tied
+    found = anchors.locate(root, anchor, prefer=back_button)
+    assert found.element is back_button and found.tied
+
+
+def test_an_empty_look_on_a_locked_screen_says_so(mail, monkeypatch):
+    root, _ = mail
+    root._children = []  # what a locked screen looks like to accessibility
+    monkeypatch.setattr(ax, "session_locked", lambda: True)
+    state = live.Live()
+    session, _ = state.look("Mail")
+    assert "screen is locked" in state.look_header(session)

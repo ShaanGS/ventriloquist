@@ -53,8 +53,15 @@ MAX_ELEMENTS = 1500
 # An app that was just opened answers "cannot complete" for a moment while
 # it finishes launching. An agent usually looks right after opening one, so
 # a look waits that out before reporting it.
-LOOK_RETRIES = 3
-LOOK_RETRY_S = 0.5
+LOOK_RETRIES = 8
+LOOK_RETRY_S = 0.6
+# How long a look keeps retrying an app that isn't answering, all attempts
+# together. Each attempt's walk gets what is left of the budget, so a busy
+# app can't hold the app's lock for minutes.
+LOOK_WAIT_S = 5.0
+# A look stops after this long and says so. Most apps answer in well under
+# a second; Finder's file list took 22 s for 400 elements in the app sweep.
+LOOK_BUDGET_S = 10.0
 
 # Steps kept per app while the server runs. Save numbers them from 0.
 MAX_RECORDED = 200
@@ -127,6 +134,10 @@ class Recorded:
     action: str = "AXPress"
     text: str = ""
     classification: str = "reversible"
+    # False when the element only told apart from a lookalike because the
+    # act held it from the look. Such a step would refuse on replay, so
+    # save won't take it.
+    replayable: bool = True
 
 
 @dataclass
@@ -139,6 +150,8 @@ class AppSession:
     nodes: list[Node] = field(default_factory=list)
     recorded: list[Recorded] = field(default_factory=list)
     looks: int = 0  # how many looks so far; a question names the one it came from
+    out_of_time: bool = False  # the last look hit LOOK_BUDGET_S
+    locked: bool = False  # the screen was locked during the last look, so every app reads empty
 
 
 SHOWN_LIMIT = 2000
@@ -291,14 +304,22 @@ class Live:
         app = ax.find_app(app_name)
         bundle_id = _checked_bundle(app)
         max_elements = max(1, min(int(max_elements), MAX_ELEMENTS))
+        started = time.monotonic()
+        deadline = started + LOOK_WAIT_S + LOOK_BUDGET_S
         for attempt in range(LOOK_RETRIES + 1):
             try:
                 root = ax.app_element(app)
-                snap = snapshot(root, max_nodes=max_elements, include_menus=menus)
+                budget = max(0.0, min(LOOK_BUDGET_S, deadline - time.monotonic()))
+                snap = snapshot(root, max_nodes=max_elements, include_menus=menus, budget_s=budget)
                 break
-            except ax.AXTransientError:
-                if attempt == LOOK_RETRIES:
-                    raise
+            except ax.AXTransientError as exc:
+                if attempt == LOOK_RETRIES or time.monotonic() - started + LOOK_RETRY_S > LOOK_WAIT_S:
+                    waited = time.monotonic() - started
+                    raise LiveError(
+                        f"{app.name} isn't answering accessibility questions yet ({exc}). Apps often "
+                        f"don't while they're still starting, and this one hasn't for {waited:.0f} s. "
+                        "Wait a few seconds and look again."
+                    ) from exc
                 time.sleep(LOOK_RETRY_S)
         session = self.sessions.get(bundle_id)
         if session is None:
@@ -306,18 +327,39 @@ class Live:
         session.app_name = app.name
         session.app_version = ax.app_version(app)
         session.nodes = snap.nodes
+        session.out_of_time = snap.out_of_time
+        try:
+            session.locked = not snap.nodes and ax.session_locked()
+        except Exception:
+            session.locked = False
         session.looks += 1
         return session, render(snap, redact_values=os.getenv("VENT_NO_VALUES") == "1")
 
     def look_header(self, session: AppSession) -> str:
         count = len(session.nodes)
+        if not count and session.locked:
+            return (
+                "The Mac's screen is locked, and a locked screen makes every app look empty. "
+                "Ask the user to unlock it, then look again."
+            )
+        if not count and session.out_of_time:
+            return (
+                f"{session.app_name} answers so slowly that the look got nothing in {LOOK_BUDGET_S:g} s. "
+                "It may still be starting or busy; look again in a few seconds."
+            )
         if not count:
             return (
                 f"{session.app_name} shows no elements. It may have no window open on this Space, "
                 "or the screen may be locked. Some apps built on Chromium or Electron need to be "
                 "started with --force-renderer-accessibility."
             )
-        return f"{session.app_name} ({session.bundle_id}): {count} elements. Act on one with {ACT_TOOL} and its number."
+        header = f"{session.app_name} ({session.bundle_id}): {count} elements. Act on one with {ACT_TOOL} and its number."
+        if session.out_of_time:
+            header += (
+                f" {session.app_name} answers slowly, so the look stopped after {LOOK_BUDGET_S:g} s and "
+                "this is only part of it. Acting still works on any element listed."
+            )
+        return header
 
     def recorded_note(self, session: AppSession) -> str:
         if not session.recorded:
@@ -384,7 +426,8 @@ class Live:
         pack = Pack(bundle_id=session.bundle_id, app_name=session.app_name, tools=[spec])
         ax.activate(app)
         runtime._wait_frontmost(root, session.app_name, ACT_TOOL)
-        result = runtime.execute(pack, ACT_TOOL, {}, root, app=None)
+        result = runtime.execute(pack, ACT_TOOL, {}, root, app=None, prefer={0: node.element})
+        replayable = not (result.steps and result.steps[0].tied)
         session.recorded.append(
             Recorded(
                 op=pending.op,
@@ -395,15 +438,21 @@ class Live:
                 action=pending.action,
                 text=pending.text or "",
                 classification=pending.verdict.classification,
+                replayable=replayable,
             )
         )
         number = len(session.recorded) - 1
         done = "Typed into" if pending.op == "set_value" else "Pressed"
         effect = {"settled": "The app changed.", "no_reaction": "Nothing visible changed.", "timeout": "The app was still changing."}
         detail = result.steps[0].detail if result.steps else ""
+        note = (
+            ""
+            if replayable
+            else " It looks just like another element in the app, so this step can't be part of a saved tool."
+        )
         return (
             f"{done} {describe(node)} in {session.app_name}. {effect.get(detail, '')} "
-            f"Recorded as step {number}. Look again with {LOOK_TOOL} to see the app now."
+            f"Recorded as step {number}.{note} Look again with {LOOK_TOOL} to see the app now."
         ).replace("  ", " ")
 
     # Save
@@ -435,6 +484,13 @@ class Live:
         for number in steps:
             if isinstance(number, bool) or not isinstance(number, int) or not 0 <= number <= last:
                 raise LiveError(f"steps must be numbers from 0 to {last}; {number!r} is not one.")
+        lookalikes = [number for number in steps if not session.recorded[number].replayable]
+        if lookalikes:
+            raise LiveError(
+                f"step {lookalikes[0]} acted on an element that looks just like another one in "
+                f"{session.app_name}, so a saved tool couldn't find it again reliably. Leave it out, "
+                "or do that part another way (a menu item or a labelled button) and save that."
+            )
 
         bound: dict[int, tuple[str, str]] = {}
         for item in params or []:

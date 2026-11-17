@@ -187,7 +187,9 @@ text. Without a client that can ask (MCP elicitation), those steps are
 refused, and a tool to save waits for `vent approve` in a terminal. It
 never touches password fields, sign-in windows, terminals, password
 managers or System Settings. [docs/SECURITY.md](https://github.com/ShaanGS/ventriloquist/blob/main/docs/SECURITY.md)
-(T13) has the details.
+(T13) has the details, and
+[docs/COMPATIBILITY.md](https://github.com/ShaanGS/ventriloquist/blob/main/docs/COMPATIBILITY.md)
+lists the 29 apps it was checked on, with what worked.
 
 ## What ships
 

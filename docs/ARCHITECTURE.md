@@ -477,6 +477,12 @@ step are the same thing: if it ran, it replays. The runtime is called
 without the app handle, so focus isn't handed back after each act; that
 would close a menu the act had just opened.
 
+An act passes the element the look returned to the runtime (`prefer`),
+and `anchors.locate` uses it only to break a tie within the ambiguity
+margin. A step won that way is recorded as not replayable, and save
+refuses it. Looks run with a time budget (`snapshot(budget_s=...)`) and
+say when they stopped early.
+
 Acts are screened by `policy.screen_live` into run, ask, or refuse, and
 the server asks through the same elicitation path as a high risk tool.
 Executed acts are kept per app for as long as the server runs. Save takes

@@ -136,3 +136,28 @@ def test_refusal_under_claude_desktop_carries_the_file_to_trust(monkeypatch):
     monkeypatch.setattr(ax, "_process_chain", lambda: [VENT_PYTHON, DISCLAIMER, CLAUDE])
     with pytest.raises(ax.NotTrustedError, match="python3.14"):
         ax.require_trusted()
+
+
+def test_find_app_knows_an_app_by_its_finder_name(monkeypatch):
+    """Found by the app sweep: Visual Studio Code runs as "Code", so asking
+    for it by the name in /Applications found nothing."""
+    code = ax.RunningApp(name="Code", bundle_id="com.microsoft.VSCode", pid=41)
+    notes = ax.RunningApp(name="Notes", bundle_id="com.apple.Notes", pid=42)
+    monkeypatch.setattr(ax, "running_apps", lambda: [notes, code])
+    monkeypatch.setattr(ax, "bundle_file_name", lambda app: {41: "Visual Studio Code", 42: "Notes"}[app.pid])
+    assert ax.find_app("Visual Studio Code") is code
+    assert ax.find_app("visual studio code.app") is code
+    assert ax.find_app("Code") is code
+    with pytest.raises(ax.AXError):
+        ax.find_app("Xcode Beta")
+
+
+def test_find_app_prefers_a_running_name_and_ignores_empty_names(monkeypatch):
+    code = ax.RunningApp(name="Code", bundle_id="com.microsoft.VSCode", pid=41)
+    nameless = ax.RunningApp(name="Helper", bundle_id="com.example.Helper", pid=43)
+    impostor = ax.RunningApp(name="Visual Studio Code", bundle_id="com.example.Other", pid=44)
+    monkeypatch.setattr(ax, "running_apps", lambda: [nameless, code, impostor])
+    monkeypatch.setattr(ax, "bundle_file_name", lambda app: {41: "Visual Studio Code", 43: "", 44: "Other"}[app.pid])
+    assert ax.find_app("Visual Studio Code") is impostor  # a running name beats a file name
+    with pytest.raises(ax.AXError):
+        ax.find_app(".app")

@@ -48,7 +48,7 @@ from difflib import SequenceMatcher
 from typing import Iterator, Optional, Sequence
 
 from .ax import Element
-from .snapshot import MAX_TREE_DEPTH, SECURE_SUBROLE, SHEET_ROLE, ChainLink, Node, app_children
+from .snapshot import MAX_TREE_DEPTH, SECURE_SUBROLE, SHEET_ROLE, ChainLink, Node, app_children, same_element
 
 
 class AnchorLost(RuntimeError):
@@ -172,6 +172,9 @@ class Candidate:
     score: float = 0.0
     breakdown: dict = field(default_factory=dict)
     top: Optional[Element] = None
+    # Won only because the caller named it (locate's prefer): the anchor
+    # alone ties it with a lookalike, so it would not replay on its own.
+    tied: bool = False
 
 
 def _walk_with_chains(
@@ -400,9 +403,16 @@ def resolve(root: Element, anchor: Anchor, low_confidence: bool = False) -> Elem
     return locate(root, anchor, low_confidence).element
 
 
-def locate(root: Element, anchor: Anchor, low_confidence: bool = False) -> Candidate:
+def locate(
+    root: Element, anchor: Anchor, low_confidence: bool = False, prefer: Optional[Element] = None
+) -> Candidate:
     """resolve, returning the winning candidate: the element, the chain it
-    was found under, and the window (or menu bar) it sits in."""
+    was found under, and the window (or menu bar) it sits in.
+
+    prefer is the exact element a caller already holds and means, for live
+    mode's acts right after a look. When candidates tie within the margin
+    and one of the tied ones is that element, it wins: that is no guess.
+    Saved tools never pass it, so a tool still refuses between lookalikes."""
     threshold = ACCEPT_THRESHOLD + (2.0 if low_confidence else 0.0)
 
     # The menu bar is most of a native app's tree (about 365 of TextEdit's
@@ -437,12 +447,22 @@ def locate(root: Element, anchor: Anchor, low_confidence: bool = False) -> Candi
 
     if len(candidates) > 1 and best.score - candidates[1].score < AMBIGUITY_MARGIN:
         settled = None if anchor.window_title else _settle_by_focused_window(root, candidates, threshold)
-        if settled is None:
-            raise AnchorAmbiguous(
-                f"Two candidates for {anchor.role} scored {best.score:.1f} and "
-                f"{candidates[1].score:.1f}, within the ambiguity margin. Refusing to guess."
-            )
-        return settled
+        # A settle by focused window is how a saved tool would replay, so
+        # it wins when it agrees with the element the caller holds (or the
+        # caller holds none), and the result is not marked tied.
+        if settled is not None and (prefer is None or same_element(settled.element, prefer)):
+            return settled
+        if prefer is not None:
+            for candidate in candidates:
+                if best.score - candidate.score >= AMBIGUITY_MARGIN or candidate.score < threshold:
+                    break
+                if same_element(candidate.element, prefer):
+                    candidate.tied = True
+                    return candidate
+        raise AnchorAmbiguous(
+            f"Two candidates for {anchor.role} scored {best.score:.1f} and "
+            f"{candidates[1].score:.1f}, within the ambiguity margin. Refusing to guess."
+        )
 
     return best
 

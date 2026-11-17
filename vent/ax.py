@@ -256,10 +256,33 @@ def find_app(name_or_bundle: str) -> RunningApp:
     for app in candidates:
         if needle in app.name.lower():
             return app
+    # Some apps run under a shorter name than the one in /Applications:
+    # Visual Studio Code runs as "Code". People (and agents) use the
+    # Finder name, so match the .app file's name too.
+    stem = needle.removesuffix(".app").strip()
+    for app in candidates if stem else []:
+        file_name = bundle_file_name(app).lower()
+        if file_name and file_name == stem:
+            return app
     raise AXError(
         f"No running application matches {name_or_bundle!r}. "
         f"Running apps: {', '.join(sorted(a.name for a in candidates))}"
     )
+
+
+def bundle_file_name(app: RunningApp) -> str:
+    """The app's name as Finder shows it, from its bundle's file name
+    ("Visual Studio Code" for the app that runs as "Code"), or "" if it
+    can't be read."""
+    if not _PYOBJC_AVAILABLE:
+        return ""
+    try:
+        ns_app = NSRunningApplication.runningApplicationWithProcessIdentifier_(app.pid)
+        url = ns_app.bundleURL() if ns_app is not None else None
+        name = str(url.lastPathComponent() or "") if url is not None else ""
+    except Exception:  # an app quitting mid-lookup; matching by name still works
+        return ""
+    return name[:-4] if name.endswith(".app") else name
 
 
 def find_app_by_bundle(bundle_id: str) -> RunningApp:

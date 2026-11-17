@@ -4,6 +4,26 @@ The notes for every release are on
 [GitHub Releases](https://github.com/ShaanGS/ventriloquist/releases). This
 file lists what has changed since the last one.
 
+## Unreleased
+
+Fixes from running live mode's look across 29 Mac apps. The results are
+in docs/COMPATIBILITY.md.
+
+- A live act on an element that looks just like another one (Freeform's
+  two scroll bars carry identical arrow buttons) presses the one the
+  agent picked, instead of refusing to guess. Saving such a step is
+  refused, because a saved tool couldn't tell the two apart; saved tools
+  still refuse between lookalikes.
+- `vent_live_look` and the CLI find an app by its name in Finder as well
+  as the name it runs under, so "Visual Studio Code" finds the app that
+  runs as "Code".
+- A look stops after 10 seconds and says it only has part of the app.
+  Finder's file list took 22 seconds for 400 elements.
+- A look waits up to about 5 seconds for an app that is still starting,
+  then says to look again in a few seconds instead of quoting an AXError.
+- An empty look on a locked screen says the screen is locked, instead of
+  guessing at Spaces or Electron flags.
+
 ## 0.5.0 (2026-11-05)
 
 Live mode, for Mac apps with no tool yet, and a plugin for Claude Code

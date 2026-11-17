@@ -73,6 +73,7 @@ class StepReport:
     op: str
     ok: bool
     detail: str = ""
+    tied: bool = False  # found only through prefer; see anchors.Candidate
 
 
 @dataclass
@@ -192,12 +193,14 @@ def _resolve(
     low_confidence: bool,
     heal: Optional[HealFn],
     where: str,
+    prefer: Optional[Element] = None,
 ) -> tuple[anchors.Candidate, anchors.Anchor]:
     """Find a step's element, healing the anchor once if a healer is set.
-    Returns what was found and the anchor that found it."""
+    Returns what was found and the anchor that found it. prefer is the
+    element a live act already holds (anchors.locate)."""
     used = step_anchor
     try:
-        found = anchors.locate(root, step_anchor, low_confidence=low_confidence)
+        found = anchors.locate(root, step_anchor, low_confidence=low_confidence, prefer=prefer)
     except (anchors.AnchorLost, anchors.AnchorAmbiguous) as exc:
         if heal is None:
             raise ToolExecutionError(f"{where}: {exc}") from exc
@@ -485,6 +488,7 @@ def _run_step(
     heal: Optional[HealFn],
     index: int,
     sent: list[str],
+    prefer: Optional[Element] = None,
 ) -> StepReport:
     """Run one step. A press, write or pick that reaches the app is added
     to `sent`, so a later failure in the call can say it went out."""
@@ -552,7 +556,7 @@ def _run_step(
 
     if step.anchor is None:
         raise ToolExecutionError(f"{where}: step has no anchor; the pack should not have loaded")
-    found, used = _resolve(step.anchor, root, low_confidence, heal, where)
+    found, used = _resolve(step.anchor, root, low_confidence, heal, where, prefer)
     blocked = _dialog_in_the_way(root, used, found, pack.app_name)
     if blocked:
         raise ToolExecutionError(f"{where}: {blocked}")
@@ -632,7 +636,7 @@ def _run_step(
         if step.settle
         else "settle skipped"
     )
-    return StepReport(op=step.op, ok=True, detail=detail)
+    return StepReport(op=step.op, ok=True, detail=detail, tied=found.tied)
 
 
 STATE_RETRY_S = 0.3
@@ -721,6 +725,7 @@ def execute(
     app: Optional[ax.RunningApp] = None,
     low_confidence: bool = False,
     heal: Optional[HealFn] = None,
+    prefer: Optional[dict[int, Element]] = None,
 ) -> ToolResult:
     """Run one tool against a live app root.
 
@@ -729,6 +734,10 @@ def execute(
     handle is provided, the app is activated for the duration and the
     previously frontmost app is restored afterward, so a tool call does not
     permanently steal the user's focus.
+
+    prefer maps a step's index to the element a live act already holds, so
+    a tie with a lookalike goes to that element (anchors.locate). Saved
+    tools never pass it.
     """
     tool = pack.tool(tool_name)
 
@@ -776,7 +785,9 @@ def execute(
         result = ToolResult(ok=True, tool=tool_name)
         for index, step in enumerate(tool.steps):
             try:
-                report = _run_step(step, root, args, pack, tool, low_confidence, heal, index, sent)
+                report = _run_step(
+                    step, root, args, pack, tool, low_confidence, heal, index, sent, (prefer or {}).get(index)
+                )
             except ax.AXTransientError as exc:
                 raise ToolExecutionError(
                     f"{pack.app_name}.{tool_name} step {index}: {exc}"

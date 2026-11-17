@@ -10,3 +10,5 @@ def unlocked_screen(monkeypatch):
     unlocked so the suite gives the same answers on a locked Mac as in CI.
     Found when the off-Space tests failed while the Mac's display slept."""
     monkeypatch.setattr("vent.snapshot.session_locked", lambda: False)
+    # Live mode asks ax directly, to say why a look came back empty.
+    monkeypatch.setattr("vent.ax.session_locked", lambda: False)

@@ -419,6 +419,12 @@ controls are these:
   grant. A step the user had to
   approve while acting makes the saved tool `high` risk, so every later
   call asks again. The model may raise a tool's risk, never lower it.
+- When an act's element ties with a lookalike (identical twins such as
+  the arrow buttons of two scroll bars), the act goes to the element the
+  look returned, which vent still holds, rather than refusing. That is
+  no guess, and it is the only place resolution takes a hint. The step
+  is marked as not replayable, and saving it is refused: a saved tool has
+  no such hint and would refuse between the twins, as tools always have.
 - A look returns app text, wrapped as untrusted content (T12), and
   `VENT_NO_VALUES=1` leaves field values out of it.
 

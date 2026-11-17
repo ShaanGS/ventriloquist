@@ -18,6 +18,7 @@ Design notes worth knowing before editing:
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
@@ -119,6 +120,7 @@ class Snapshot:
     modal_present: bool
     focused_window_title: str
     off_space: bool = False  # the app listed no window, so its main one was walked; see _unlisted_windows
+    out_of_time: bool = False  # the walk hit its time budget (snapshot's budget_s) and stopped
 
 
 def _preview(value: Any) -> str:
@@ -257,6 +259,7 @@ def snapshot(
     max_nodes: int = 800,
     include_menus: bool = False,
     only_top: Optional[int] = None,
+    budget_s: Optional[float] = None,
 ) -> Snapshot:
     """Walk an app and return its snapshot.
 
@@ -269,9 +272,16 @@ def snapshot(
     as app_children lists them. The healer looks at one window this way.
     Chains still start at the app root, so anchors built from the nodes
     resolve as usual.
+
+    budget_s stops the walk after that many seconds, marked truncated and
+    out_of_time. Some apps answer slowly per element: Finder's file list
+    took 22 s for 400 elements in the app sweep. Live mode's look sets one,
+    so an agent gets part of the app instead of waiting.
     """
     nodes: list[Node] = []
     truncated = False
+    out_of_time = False
+    deadline = time.monotonic() + budget_s if budget_s is not None else None
     # Ancestor-path cycle guard: real AX trees can contain cycles (a wedged
     # TextEdit was observed returning the app element as its own child) and
     # are DAGs besides, so only true ancestor cycles are cut; an element
@@ -279,7 +289,10 @@ def snapshot(
     path_keys: set[int] = set()
 
     def visit(element: Element, chain: tuple[ChainLink, ...], depth: int, shown_depth: int) -> None:
-        nonlocal truncated
+        nonlocal truncated, out_of_time
+        if deadline is not None and time.monotonic() > deadline:
+            truncated = out_of_time = True
+            return
         if depth > max_depth:
             truncated = True
             return
@@ -323,6 +336,12 @@ def snapshot(
 
         role_counts: dict[str, int] = {}
         for index, child in enumerate(top_level if depth == 0 else element.children()):
+            if deadline is not None and time.monotonic() > deadline:
+                # Checked per child too: a wide list (Finder's file rows)
+                # would otherwise read every remaining row's attributes
+                # before any visit noticed the time.
+                truncated = out_of_time = True
+                break
             child_role = child.role
             ordinal = role_counts.get(child_role, 0)
             role_counts[child_role] = ordinal + 1
@@ -374,6 +393,7 @@ def snapshot(
         modal_present=modal,
         focused_window_title=focused_title,
         off_space=bool(unlisted),
+        out_of_time=out_of_time,
     )
 
 

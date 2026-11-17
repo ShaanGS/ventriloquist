@@ -346,7 +346,7 @@ def test_a_field_that_turns_secure_after_resolution_is_refused(monkeypatch):
     tree, field, pack = account_form()
     real_locate = anchors.locate
 
-    def locate_then_turn_secure(root, anchor, low_confidence=False):
+    def locate_then_turn_secure(root, anchor, low_confidence=False, prefer=None):
         found = real_locate(root, anchor, low_confidence=low_confidence)
         field.subrole = "AXSecureTextField"
         return found
