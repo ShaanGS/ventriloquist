@@ -51,6 +51,24 @@ live app.
 Electron apps were started with `--force-renderer-accessibility`, which
 they need (see the README).
 
+## Acting
+
+On 18 November 2026 three apps were also driven for real over MCP: live
+acts, then saving them as a tool, then calling the saved tool. All 19
+checks passed.
+
+| App | Done live | Saved tool, replayed with no model |
+| --- | --- | --- |
+| Calculator | All Clear (it asked first), 2, +, 3, =, each 0.7 to 1.6 s. The display showed 5 | `add_two_and_three` in 2.9 s, and the display showed 5 again |
+| Dictionary | Typed "accessibility" into the search field, 1.8 s | `look_up(word)` with "ventriloquist", 5.4 s: the results keep redrawing, so vent waits out its settle time |
+| TextEdit | Typed into a scratch document, 0.4 s | `replace_text(text)` in 0.3 s, and reading the document back matched |
+
+The first run of this test found two problems, both fixed: a look left
+out Calculator's result (unlabelled text with a value), and a saved
+Dictionary tool refused to replay because the window's title had changed
+to the word looked up. Saved tools now leave window titles out, as every
+shipped pack does.
+
 ## Check your own app
 
 ```bash
@@ -70,8 +88,9 @@ the row, and say what kind of app it is, to add it here.
 
 - It's one Mac and one run. Apps you sign in to, like Slack and Notion,
   show more once you're signed in and a workspace is open.
-- Looking isn't acting. A press can still be ignored by an app that
-  draws its own controls, and only a real act shows that.
+- Looking isn't acting. Only the three apps under "Acting" were driven
+  for real. A press can still be ignored by an app that draws its own
+  controls, and only a real act shows that.
 - Several apps gave worse numbers while they were still starting or
   syncing, when their tree changes between a look and an act. An act
   then fails rather than pressing something else: the element's role is

@@ -29,6 +29,7 @@ How it keeps the guarantees packs have:
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import re
@@ -519,6 +520,11 @@ class Live:
         tool_params: dict[str, dict] = {}
         for number in steps:
             act = session.recorded[number]
+            # A saved tool acts on whichever window is in front, like every
+            # pack that ships: a window title often changes with what the
+            # window shows (Dictionary's becomes the word looked up, so the
+            # replay refused), and it carries document names and subjects.
+            act = dataclasses.replace(act, anchor=dataclasses.replace(act.anchor, window_title=""))
             expect = {"role": act.role}
             if act.op == "press":
                 built_steps.append(Step(op="press", anchor=act.anchor, expect=expect, action=act.action))

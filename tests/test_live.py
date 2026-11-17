@@ -836,3 +836,29 @@ def test_a_look_shows_unlabelled_text_that_has_a_value():
     root = FakeElement("AXApplication", "Calculator", children=[window])
     texts = [n for n in snapshot(root).nodes if n.role == "AXStaticText"]
     assert [n.value_preview for n in texts] == ["5"]
+
+
+def test_a_saved_tool_still_works_when_the_window_title_changes(mail):
+    """Found pressing buttons in Dictionary: its window title becomes the
+    word looked up, and a saved step that recorded the old title refused
+    to replay. Saved tools leave window titles out, like shipped packs."""
+    root, parts = mail
+    state = live.Live()
+    session, _ = state.look("Mail")
+    state.run(state.prepare("Mail", number_of(session, parts["search"]), "receipts"))
+    draft = state.build(
+        "Mail", "search", "Search mail.", [0], [{"name": "query", "description": "What to find.", "step": 0}]
+    )
+    assert all(step.anchor.window_title == "" for step in draft.spec.steps)
+    assert "Inbox" not in draft.question(replaces=False)
+    window = root._children[0]
+    window.title = window.label = "Search results"
+    result = runtime.execute(draft.pack(), "search", {"query": "invoices"}, root)
+    assert result.ok and parts["search"].value == "invoices"
+
+
+def test_previews_drop_invisible_direction_marks():
+    """Calculator shows 5 as U+200E 5, which a look printed as \\u200e5."""
+    window = FakeElement("AXWindow", "Calculator", children=[FakeElement("AXStaticText", value="‎5")])
+    root = FakeElement("AXApplication", "Calculator", children=[window])
+    assert [n.value_preview for n in snapshot(root).nodes if n.role == "AXStaticText"] == ["5"]

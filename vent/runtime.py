@@ -23,6 +23,7 @@ from typing import Any, Callable, Optional
 from . import anchors, ax, packs
 from .ax import Element
 from .packs import Pack, Precondition, Step, ToolSpec, Verify
+from .snapshot import DIRECTION_MARKS as _SNAPSHOT_DIRECTION_MARKS
 from .snapshot import (
     DIALOG_SUBROLES,
     MAX_TREE_DEPTH,
@@ -381,9 +382,7 @@ TEXT_LEAF_ROLES = {"AXStaticText", "AXButton", "AXHeading", "AXLink"}
 # word it shows, which costs tokens and carries nothing, and an override in
 # app text can make a result display in an order other than the one a
 # model reads (SECURITY.md T12). Joiners stay: emoji sequences need them.
-DIRECTION_MARKS = dict.fromkeys(
-    [0x061C, 0x200E, 0x200F, *range(0x202A, 0x202F), *range(0x2066, 0x206A)]
-)
+DIRECTION_MARKS = _SNAPSHOT_DIRECTION_MARKS  # one list, kept in snapshot.py
 
 
 def _text_inside(element: Element) -> str:

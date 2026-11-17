@@ -14,6 +14,12 @@ file lists what has changed since the last one.
 - A look shows unlabelled text that has a value. Calculator's result is
   one, and the look used to leave it out, so an agent could press
   2 + 3 = and never see the 5.
+- A tool saved in live mode leaves window titles out of its steps, as
+  every shipped pack does, so it works on whichever window is in front.
+  A saved Dictionary tool refused to replay once the window's title had
+  changed to the word looked up, and titles carry document names.
+- Looks drop invisible direction marks from values, as reads already
+  did: Calculator's 5 showed as \u200e5.
 
 ## 0.5.1 (2026-11-18)
 

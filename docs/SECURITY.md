@@ -406,6 +406,10 @@ controls are these:
 - Terminals, script editors, password managers and System Settings are
   refused whatever the element. Typing there runs commands or changes
   security settings.
+- A saved tool's steps leave window titles out, like every shipped pack:
+  titles change with content and carry document names and subjects.
+  The tool then acts on whichever window is in front, and when two
+  windows hold a match, the focused one wins or the step refuses.
 - Saving is the user's decision, never the model's. The tool is built
   from the anchors that ran, never from model text (as in T5), and the
   user is shown the exact steps, every literal text it will type, and its

@@ -123,12 +123,21 @@ class Snapshot:
     out_of_time: bool = False  # the walk hit its time budget (snapshot's budget_s) and stopped
 
 
+# Invisible bidi marks, embeddings, overrides and isolates. Apps wrap text
+# in them (Calculator shows 5 as U+200E 5), and they can make text display
+# in an order other than the one a model reads, so previews and reads drop
+# them (SECURITY.md T12).
+DIRECTION_MARKS = dict.fromkeys(
+    [0x061C, 0x200E, 0x200F, *range(0x202A, 0x202F), *range(0x2066, 0x206A)]
+)
+
+
 def _preview(value: Any) -> str:
     """Display value for humans and models. Never used for verification;
     the runtime always re-reads live values (ARCHITECTURE.md section 5)."""
     if value is None:
         return ""
-    text = str(value)
+    text = str(value).translate(DIRECTION_MARKS)
     return text if len(text) <= VALUE_PREVIEW_LIMIT else text[: VALUE_PREVIEW_LIMIT - 3] + "..."
 
 
