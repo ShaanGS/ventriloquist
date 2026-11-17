@@ -80,8 +80,8 @@ Settings are off limits. If a save says the tool is waiting for
 
 Ask the user before any of this: it reads and acts on their real app.
 
-1. `vent doctor <App>` says whether the app has a usable tree. `vent apps`
-   gives its bundle id.
+1. `vent doctor <App>` says whether the app has a usable tree and how ready
+   it is for live mode. `vent apps` gives its bundle id.
 2. `vent inspect <App>` lists its elements with numbers, and
    `vent anchor <App> <number>` prints one element's anchor as JSON.
 3. Write the tool into `~/.ventriloquist/packs/<bundle id>/pack.json`.

@@ -189,7 +189,8 @@ never touches password fields, sign-in windows, terminals, password
 managers or System Settings. [docs/SECURITY.md](https://github.com/ShaanGS/ventriloquist/blob/main/docs/SECURITY.md)
 (T13) has the details, and
 [docs/COMPATIBILITY.md](https://github.com/ShaanGS/ventriloquist/blob/main/docs/COMPATIBILITY.md)
-lists the 29 apps it was checked on, with what worked.
+lists the 29 apps it was checked on, with what worked. `vent doctor "Your App"`
+checks your own app the same way.
 
 ## What ships
 

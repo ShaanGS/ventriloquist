@@ -50,12 +50,17 @@ def main() -> None:
 
 @main.command()
 @click.argument("app_name", required=False)
-def doctor(app_name: str | None) -> None:
+@click.option(
+    "--report",
+    is_flag=True,
+    help="Also print a table row for docs/COMPATIBILITY.md: counts and versions only, safe to paste in an issue.",
+)
+def doctor(app_name: str | None, report: bool) -> None:
     """Check Accessibility permission, or probe APP_NAME's tree health.
 
-    With an app name, reports whether the app exposes a usable tree and
+    With an app name, reports whether the app exposes a usable tree,
     whether web-content accessibility had to be requested (Chromium and
-    Electron apps ship with it off).
+    Electron apps ship with it off), and how ready it is for live mode.
     """
     if not ax.is_trusted():
         click.secho("✗ Accessibility permission missing.", fg="red")
@@ -117,6 +122,63 @@ def doctor(app_name: str | None) -> None:
             "  Its window is on another Space, so vent reached it through the "
             "app's main window. Other windows the app has on other Spaces stay "
             "out of reach until you switch to them."
+        )
+    _live_readiness(app, root, report)
+
+
+def _live_readiness(app: ax.RunningApp, root, report: bool) -> None:
+    """What live mode would see: the look an agent gets (live.py's limits),
+    how many presses would ask first, and whether sampled elements can be
+    found again. Counts only, so --report is safe to paste anywhere."""
+    import platform as platform_mod
+    import time as time_mod
+
+    from . import live
+
+    click.echo()
+    click.secho("Live mode", bold=True)
+    if app.bundle_id in live.REFUSED_BUNDLES:
+        click.echo(f"  Live mode won't drive {app.name}: it is {live.REFUSED_BUNDLES[app.bundle_id]}.")
+        return
+    try:
+        started = time_mod.monotonic()
+        look = snapshot(root, max_nodes=live.DEFAULT_ELEMENTS, budget_s=live.LOOK_BUDGET_S)
+        look_s = time_mod.monotonic() - started
+        ready = live.readiness(root, look, look_s)
+    except ax.AXError as exc:
+        click.secho(f"  ✗ {exc}", fg="red")
+        return
+    more = " (the look stopped there; ask for more with max_elements)" if look.truncated and not look.out_of_time else ""
+    click.echo(f"  An agent's look sees {ready.elements} elements in {ready.look_s:.1f} s{more}.")
+    if ready.out_of_time:
+        click.secho(
+            f"  ⚠ {app.name} answers slowly: the look stopped after {live.LOOK_BUDGET_S:g} s with only part of it.",
+            fg="yellow",
+        )
+    click.echo(f"  {ready.pressable} can be pressed and {ready.typeable} typed into.")
+    if ready.asks:
+        click.echo(
+            f"  {ready.asks} presses would ask you first: {ready.asks_unlabelled} have no label, "
+            f"{ready.asks_risky_word} have a word like send, delete or close in their name."
+        )
+    if ready.checked:
+        click.echo(
+            f"  Of {ready.checked} elements checked, {ready.replays} can go in a saved tool, "
+            f"{ready.live_only} work only live (they have a lookalike), and {ready.lost} weren't found again."
+        )
+        if ready.lost:
+            click.echo("  If the app was still loading, run this again once it has settled.")
+    if report:
+        notes = f"{app.name} {ax.app_version(app) or '?'}, macOS {platform_mod.mac_ver()[0] or '?'}"
+        if ready.out_of_time:
+            notes += f", look stopped at {live.LOOK_BUDGET_S:g} s"
+        if ready.asks:
+            notes += f", {ready.asks} of {ready.pressable} presses ask first"
+        click.echo()
+        click.echo("Row for docs/COMPATIBILITY.md (counts only, no app content):")
+        click.echo(
+            f"| {app.name} | ? | {ready.elements} | {ready.look_s:.2f} s | {ready.replays} | "
+            f"{ready.live_only} | {ready.lost} | {notes} |"
         )
 
 

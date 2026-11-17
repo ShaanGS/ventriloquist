@@ -51,6 +51,21 @@ live app.
 Electron apps were started with `--force-renderer-accessibility`, which
 they need (see the README).
 
+## Check your own app
+
+```bash
+vent doctor "Your App" --report
+```
+
+It looks at the app the way an agent's look would, prints how ready it
+is for live mode, and ends with a row for the table above. The row holds
+counts and version numbers only, nothing from the app's content, so it's
+safe to paste into an issue. Open the app first and let it finish
+loading; numbers taken while an app is still starting are worse.
+
+[Open an issue](https://github.com/ShaanGS/ventriloquist/issues/new) with
+the row, and say what kind of app it is, to add it here.
+
 ## What this doesn't show
 
 - It's one Mac and one run. Apps you sign in to, like Slack and Notion,

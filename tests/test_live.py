@@ -769,3 +769,51 @@ def test_an_empty_look_on_a_locked_screen_says_so(mail, monkeypatch):
     state = live.Live()
     session, _ = state.look("Mail")
     assert "screen is locked" in state.look_header(session)
+
+
+# Readiness: what vent doctor <App> reports for live mode.
+
+
+def test_readiness_counts_twins_as_live_only():
+    root, first, second = twin_scrollbars()
+    snap = snapshot(root)
+    ready = live.readiness(root, snap, look_s=0.1)
+    assert ready.pressable == 3 and ready.typeable == 0
+    assert ready.live_only == 2 and ready.replays == 1 and ready.lost == 0
+    assert ready.asks_unlabelled == 2 and ready.asks_risky_word == 1  # "Share Board" says share
+
+
+def test_doctor_reports_live_readiness_without_app_content(monkeypatch):
+    from vent import harness
+
+    root, parts = mail_like()
+    window = root._children[0]
+    window.title = window.label = "Re: salary review"  # private, must not reach the report
+    app = ax.RunningApp("Mail", MAIL, 42)
+    monkeypatch.setattr(cli.ax, "is_trusted", lambda: True)
+    monkeypatch.setattr(cli.ax, "find_app", lambda name: app)
+    monkeypatch.setattr(cli.ax, "app_element", lambda running: root)
+    monkeypatch.setattr(cli.ax, "app_version", lambda running: "16.0")
+    monkeypatch.setattr(harness, "enable_web_accessibility", lambda root: None)
+    monkeypatch.setattr("time.sleep", lambda seconds: None)
+    result = CliRunner().invoke(cli.main, ["doctor", "Mail", "--report"])
+    assert result.exit_code == 0, result.output
+    assert "Live mode" in result.output
+    assert "presses would ask you first" in result.output
+    row = next(line for line in result.output.splitlines() if line.startswith("| Mail |"))
+    assert "Mail 16.0, macOS" in row
+    for private in ("salary", "Send", "Search", "Show Folders"):
+        assert private not in row
+
+
+def test_doctor_says_live_mode_refuses_terminals(monkeypatch):
+    from vent import harness
+    from .fakes import textedit_like
+
+    monkeypatch.setattr(cli.ax, "is_trusted", lambda: True)
+    monkeypatch.setattr(cli.ax, "find_app", lambda name: ax.RunningApp("Terminal", "com.apple.Terminal", 7))
+    monkeypatch.setattr(cli.ax, "app_element", lambda running: textedit_like())
+    monkeypatch.setattr(harness, "enable_web_accessibility", lambda root: None)
+    monkeypatch.setattr("time.sleep", lambda seconds: None)
+    result = CliRunner().invoke(cli.main, ["doctor", "Terminal"])
+    assert "Live mode won't drive Terminal" in result.output

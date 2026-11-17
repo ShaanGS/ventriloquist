@@ -555,6 +555,85 @@ class Live:
         return Draft(session=session, spec=spec)
 
 
+@dataclass
+class Readiness:
+    """How ready an app is for live mode, in counts only: nothing from
+    the app's content is kept, so a report can be pasted into an issue."""
+
+    elements: int
+    look_s: float
+    out_of_time: bool
+    pressable: int
+    typeable: int
+    asks_unlabelled: int
+    asks_risky_word: int
+    checked: int
+    replays: int
+    live_only: int
+    lost: int
+
+    @property
+    def asks(self) -> int:
+        return self.asks_unlabelled + self.asks_risky_word
+
+
+READINESS_SAMPLE = 30
+
+
+def readiness(root: Any, snap: Any, look_s: float, sample: int = READINESS_SAMPLE) -> Readiness:
+    """Measure an app the way the compatibility sweep did: which elements
+    an agent can act on, how many presses would ask first, and whether
+    each sampled element's anchor finds it again on its own (replays), only
+    with the element in hand (live only), or not at all (lost)."""
+    from .snapshot import same_element
+
+    pressable = [n for n in snap.nodes if any(a in packs.PRESS_ACTIONS for a in n.actions)]
+    typeable = [n for n in snap.nodes if n.role in policy.LIVE_TYPE_ROLES]
+    unlabelled = risky = 0
+    for node in pressable:
+        verdict = policy.screen_live(node, "press")
+        if verdict.allowed and verdict.classification == "destructive":
+            if node.label.strip():
+                risky += 1
+            else:
+                unlabelled += 1
+    candidates = pressable + typeable
+    step = max(1, len(candidates) // sample) if candidates else 1
+    replays = live_only = lost = 0
+    chosen = candidates[::step][:sample]
+    for node in chosen:
+        anchor = anchors.build(node)
+        try:
+            found = anchors.locate(root, anchor)
+            if same_element(found.element, node.element):
+                replays += 1
+            else:
+                lost += 1
+        except anchors.AnchorAmbiguous:
+            try:
+                anchors.locate(root, anchor, prefer=node.element)
+                live_only += 1
+            except (anchors.AnchorAmbiguous, anchors.AnchorLost):
+                lost += 1
+        except anchors.AnchorLost:
+            lost += 1
+        except ax.AXError:
+            lost += 1
+    return Readiness(
+        elements=len(snap.nodes),
+        look_s=look_s,
+        out_of_time=bool(getattr(snap, "out_of_time", False)),
+        pressable=len(pressable),
+        typeable=len(typeable),
+        asks_unlabelled=unlabelled,
+        asks_risky_word=risky,
+        checked=len(chosen),
+        replays=replays,
+        live_only=live_only,
+        lost=lost,
+    )
+
+
 def existing_pack(writable_dir: Path, bundle_id: str) -> tuple[Optional[Pack], Path]:
     """The pack a saved tool joins, and where it is written. The user's own
     pack if there is one, else the bundled one, whose tools would otherwise

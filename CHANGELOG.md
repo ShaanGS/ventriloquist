@@ -4,6 +4,14 @@ The notes for every release are on
 [GitHub Releases](https://github.com/ShaanGS/ventriloquist/releases). This
 file lists what has changed since the last one.
 
+## Unreleased
+
+- `vent doctor <App>` reports how ready an app is for live mode: what an
+  agent's look sees and how long it takes, how many presses would ask
+  first, and how many sampled elements a saved tool could find again.
+  `--report` adds a row for docs/COMPATIBILITY.md with counts and
+  versions only, safe to paste into an issue.
+
 ## 0.5.1 (2026-11-18)
 
 Fixes from running live mode's look across 29 Mac apps. The results are
