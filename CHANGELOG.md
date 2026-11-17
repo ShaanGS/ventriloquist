@@ -4,7 +4,7 @@ The notes for every release are on
 [GitHub Releases](https://github.com/ShaanGS/ventriloquist/releases). This
 file lists what has changed since the last one.
 
-## Unreleased
+## 0.5.1 (2026-11-18)
 
 Fixes from running live mode's look across 29 Mac apps. The results are
 in docs/COMPATIBILITY.md.
