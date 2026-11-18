@@ -4,7 +4,9 @@ The notes for every release are on
 [GitHub Releases](https://github.com/ShaanGS/ventriloquist/releases). This
 file lists what has changed since the last one.
 
-## Unreleased
+## 0.5.2 (2026-11-18)
+
+Fixes from pressing and typing in real apps, and a way to check your own.
 
 - `vent doctor <App>` reports how ready an app is for live mode: what an
   agent's look sees and how long it takes, how many presses would ask
@@ -15,7 +17,7 @@ file lists what has changed since the last one.
   one, and the look used to leave it out, so an agent could press
   2 + 3 = and never see the 5.
 - A tool saved in live mode leaves window titles out of its steps, as
-  every shipped pack does, so it works on whichever window is in front.
+  the bundled packs do, so it works on whichever window is in front.
   A saved Dictionary tool refused to replay once the window's title had
   changed to the word looked up, and titles carry document names.
 - Looks drop invisible direction marks from values, as reads already

@@ -841,7 +841,7 @@ def test_a_look_shows_unlabelled_text_that_has_a_value():
 def test_a_saved_tool_still_works_when_the_window_title_changes(mail):
     """Found pressing buttons in Dictionary: its window title becomes the
     word looked up, and a saved step that recorded the old title refused
-    to replay. Saved tools leave window titles out, like shipped packs."""
+    to replay. Saved tools leave window titles out, like bundled packs."""
     root, parts = mail
     state = live.Live()
     session, _ = state.look("Mail")

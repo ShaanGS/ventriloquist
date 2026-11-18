@@ -406,7 +406,7 @@ controls are these:
 - Terminals, script editors, password managers and System Settings are
   refused whatever the element. Typing there runs commands or changes
   security settings.
-- A saved tool's steps leave window titles out, like every shipped pack:
+- A saved tool's steps leave window titles out, like the bundled packs:
   titles change with content and carry document names and subjects.
   The tool then acts on whichever window is in front, and when two
   windows hold a match, the focused one wins or the step refuses.

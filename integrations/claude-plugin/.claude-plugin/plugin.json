@@ -1,7 +1,7 @@
 {
   "name": "ventriloquist",
   "displayName": "Ventriloquist",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Let your agent use Mac apps through the accessibility tree, with no screenshots, and save what worked as tools that replay with no model.",
   "author": {
     "name": "ShaanGS",

@@ -66,8 +66,8 @@ checks passed.
 The first run of this test found two problems, both fixed: a look left
 out Calculator's result (unlabelled text with a value), and a saved
 Dictionary tool refused to replay because the window's title had changed
-to the word looked up. Saved tools now leave window titles out, as every
-shipped pack does.
+to the word looked up. Saved tools now leave window titles out, as the
+bundled packs do.
 
 ## Check your own app
 

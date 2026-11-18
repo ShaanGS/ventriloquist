@@ -520,8 +520,8 @@ class Live:
         tool_params: dict[str, dict] = {}
         for number in steps:
             act = session.recorded[number]
-            # A saved tool acts on whichever window is in front, like every
-            # pack that ships: a window title often changes with what the
+            # A saved tool acts on whichever window is in front, like the
+            # bundled packs: a window title often changes with what the
             # window shows (Dictionary's becomes the word looked up, so the
             # replay refused), and it carries document names and subjects.
             act = dataclasses.replace(act, anchor=dataclasses.replace(act.anchor, window_title=""))
